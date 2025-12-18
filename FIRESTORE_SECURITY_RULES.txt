@@ -1,0 +1,65 @@
+// Firestore Security Rules for quiz-app-ff0ab
+// Copy this to Firebase Console > Firestore Database > Rules
+
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Allow authenticated users to read/write their own user document
+    match /users/{userId} {
+      allow read, write: if request.auth.uid == userId;
+    }
+    
+    // Allow admin operations (schools, campuses, quizzes, etc.)
+    // Admins are users with role == 'Admin' in their user document
+    match /schools/{document=**} {
+      allow read: if request.auth != null;
+      allow create, update, delete: if isAdmin();
+    }
+    
+    match /campuses/{document=**} {
+      allow read: if request.auth != null;
+      allow create, update, delete: if isAdmin();
+    }
+    
+    // Allow teachers to create and manage quizzes
+    match /quizzes/{document=**} {
+      allow read: if request.auth != null;
+      allow create: if isTeacher() || isAdmin();
+      allow update, delete: if isOwnerOrAdmin(resource.data.createdBy);
+    }
+    
+    // Allow students to read quizzes and create attempts
+    match /quizAttempts/{document=**} {
+      allow read, create: if request.auth.uid == resource.data.studentId || isAdmin();
+      allow update: if request.auth.uid == resource.data.studentId;
+    }
+    
+    // Allow questions to be managed by teachers and admins
+    match /questions/{document=**} {
+      allow read: if request.auth != null;
+      allow create: if isTeacher() || isAdmin();
+      allow update, delete: if isOwnerOrAdmin(resource.data.createdBy);
+    }
+    
+    // Default deny all other access
+    match /{document=**} {
+      allow read, write: if false;
+    }
+    
+    // Helper functions
+    function isAdmin() {
+      return exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'Admin';
+    }
+    
+    function isTeacher() {
+      return exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'Teacher';
+    }
+    
+    function isOwnerOrAdmin(createdBy) {
+      return request.auth.uid == createdBy || isAdmin();
+    }
+  }
+}

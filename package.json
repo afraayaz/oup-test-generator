@@ -1,0 +1,51 @@
+{
+  "name": "next-app",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "cross-env NODE_ENV=development next dev -H 0.0.0.0 -p 5000",
+    "build": "next build",
+    "start": "next start -H 0.0.0.0 -p 5000",
+    "lint": "next lint"
+  },
+  "dependencies": {
+    "@dnd-kit/core": "^6.3.1",
+    "@dnd-kit/sortable": "^10.0.0",
+    "@dnd-kit/utilities": "^3.2.2",
+    "@react-google-maps/api": "^2.19.3",
+    "better-react-mathjax": "^2.3.0",
+    "docx": "^8.5.0",
+    "file-saver": "^2.0.5",
+    "firebase": "^12.6.0",
+    "gsap": "^3.13.0",
+    "jquery": "^3.7.1",
+    "katex": "^0.16.22",
+    "mammoth": "^1.11.0",
+    "mathlive": "^0.107.0",
+    "mathquill": "^0.10.1-a",
+    "next": "^15.5.2",
+    "papaparse": "^5.5.3",
+    "react": "^19.1.1",
+    "react-dom": "^19.1.1",
+    "react-icons": "^5.5.0",
+    "react-mathlive": "^3.0.5-preview.1",
+    "react-simple-keyboard": "^3.8.111",
+    "recharts": "^3.0.2",
+    "simple-keyboard-layouts": "^3.4.134",
+    "uuid": "^11.1.0",
+    "xlsx": "^0.18.5"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4",
+    "@types/file-saver": "^2.0.7",
+    "@types/node": "^20",
+    "@types/papaparse": "^5.3.16",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "autoprefixer": "^10.4.21",
+    "cross-env": "^7.0.3",
+    "postcss": "^8.5.5",
+    "tailwindcss": "^3.4.17",
+    "typescript": "^5"
+  }
+}

@@ -1,0 +1,621 @@
+GOAL
+
+Configure a complete PostgreSQL database schema for a Test Generator system. The schema must enforce specific organizational, content, and user-role constraints as detailed below.
+
+CORE BUSINESS LOGIC & CONSTRAINTS
+
+User Management Hierarchy: The OUP Admin is the top-level entity. Every School must be linked via Foreign Key to the user_id of the OUP Admin who created it (oup_admin_id).
+
+Dual Question Banks (QB):
+
+The Oxford QB is universally available (stored in the Question table with qb_source = 'Oxford' and source_school_id = NULL).
+
+The School QB is private to a school (stored in Question with qb_source = 'School' and a specific source_school_id).
+
+Flexible Role Assignment: Roles are assigned via the UserRole junction table. This is critical for the constraint:
+
+A user can be both Teacher and Content Manager.
+
+Application logic MUST prevent a dedicated Content Manager from being assigned the Teacher role.
+
+Content Hierarchy: The content structure for tagging questions is enforced as: Grade $\to$ Subject $\to$ Book $\to$ Chapter $\to$ Topic $\to$ SLO.
+
+Test Source Tracking: The QuizSource table tracks whether a generated quiz (Quiz) utilized questions from the 'Oxford' bank, the 'School' bank, or both.
+
+SCHEMA DEFINITION
+
+Define the following tables with the specified fields, data types (using standard PostgreSQL types like SERIAL, INT, VARCHAR, TEXT, BOOLEAN, TIMESTAMP WITH TIME ZONE, DECIMAL), and constraints.
+
+1. User and Role Management
+
+Table Name
+
+Field Name
+
+Data Type
+
+Constraints & Description
+
+School
+
+school_id
+
+SERIAL
+
+PK
+
+
+
+oup_admin_id
+
+INT
+
+FK to User.user_id (The OUP Admin creator)
+
+
+
+name
+
+VARCHAR(255)
+
+
+
+Campus
+
+campus_id
+
+SERIAL
+
+PK
+
+
+
+school_id
+
+INT
+
+FK to School.school_id
+
+
+
+name
+
+VARCHAR(100)
+
+
+
+User
+
+user_id
+
+SERIAL
+
+PK
+
+
+
+school_id
+
+INT
+
+FK to School.school_id (NULL for OUP staff)
+
+
+
+campus_id
+
+INT
+
+FK to Campus.campus_id (NULL for OUP staff)
+
+
+
+email
+
+VARCHAR(255)
+
+UNIQUE
+
+
+
+password_hash
+
+VARCHAR(255)
+
+
+
+Role
+
+role_id
+
+SERIAL
+
+PK
+
+
+
+name
+
+VARCHAR(50)
+
+'Admin', 'School Admin', 'Teacher', 'Content Manager', 'Student'
+
+UserRole
+
+user_role_id
+
+SERIAL
+
+PK
+
+
+
+user_id
+
+INT
+
+FK to User.user_id
+
+
+
+role_id
+
+INT
+
+FK to Role.role_id (Combined PK for uniqueness)
+
+2. Assignments and Grade Structure
+
+Table Name
+
+Field Name
+
+Data Type
+
+Constraints & Description
+
+Grade
+
+grade_id
+
+SERIAL
+
+PK
+
+
+
+school_id
+
+INT
+
+FK to School.school_id
+
+
+
+campus_id
+
+INT
+
+FK to Campus.campus_id
+
+
+
+name
+
+VARCHAR(50)
+
+
+
+StudentGrade
+
+student_grade_id
+
+SERIAL
+
+PK
+
+
+
+student_id
+
+INT
+
+FK to User.user_id (Must be a student role)
+
+
+
+grade_id
+
+INT
+
+FK to Grade.grade_id
+
+TeacherAssignment
+
+assignment_id
+
+SERIAL
+
+PK
+
+
+
+teacher_id
+
+INT
+
+FK to User.user_id (Must be a teacher role)
+
+
+
+grade_id
+
+INT
+
+FK to Grade.grade_id
+
+
+
+subject_id
+
+INT
+
+FK to Subject.subject_id
+
+3. Content Metadata and Question Banks
+
+Table Name
+
+Field Name
+
+Data Type
+
+Constraints & Description
+
+Subject
+
+subject_id
+
+SERIAL
+
+PK
+
+
+
+name
+
+VARCHAR(100)
+
+
+
+Book
+
+book_id
+
+SERIAL
+
+PK
+
+
+
+subject_id
+
+INT
+
+FK to Subject.subject_id
+
+
+
+grade_id
+
+INT
+
+FK to Grade.grade_id
+
+
+
+is_oup_content
+
+BOOLEAN
+
+TRUE for Oxford master content
+
+Chapter
+
+chapter_id
+
+SERIAL
+
+PK
+
+
+
+book_id
+
+INT
+
+FK to Book.book_id
+
+Topic
+
+topic_id
+
+SERIAL
+
+PK
+
+
+
+chapter_id
+
+INT
+
+FK to Chapter.chapter_id
+
+SLO
+
+slo_id
+
+SERIAL
+
+PK
+
+
+
+topic_id
+
+INT
+
+FK to Topic.topic_id
+
+Question
+
+question_id
+
+SERIAL
+
+PK
+
+
+
+qb_source
+
+VARCHAR(10)
+
+CHECK ('Oxford' or 'School')
+
+
+
+source_school_id
+
+INT
+
+FK to School.school_id (NULL if Oxford)
+
+
+
+slo_id
+
+INT
+
+FK to SLO.slo_id
+
+
+
+creator_id
+
+INT
+
+FK to User.user_id
+
+
+
+status
+
+VARCHAR(15)
+
+'Pending', 'Approved', 'Rejected'
+
+QuestionOption
+
+option_id
+
+SERIAL
+
+PK
+
+
+
+question_id
+
+INT
+
+FK to Question.question_id
+
+
+
+is_correct
+
+BOOLEAN
+
+
+
+4. Test Generation and Results
+
+Table Name
+
+Field Name
+
+Data Type
+
+Constraints & Description
+
+Quiz
+
+quiz_id
+
+SERIAL
+
+PK
+
+
+
+creator_id
+
+INT
+
+FK to User.user_id (Teacher/Content Creator)
+
+
+
+school_id
+
+INT
+
+FK to School.school_id
+
+
+
+mode
+
+VARCHAR(10)
+
+'Online' or 'Offline'
+
+QuizSource
+
+quiz_source_id
+
+SERIAL
+
+PK
+
+
+
+quiz_id
+
+INT
+
+FK to Quiz.quiz_id
+
+
+
+source_type
+
+VARCHAR(10)
+
+CHECK ('Oxford' or 'School')
+
+QuizQuestion
+
+quiz_question_id
+
+SERIAL
+
+PK
+
+
+
+quiz_id
+
+INT
+
+FK to Quiz.quiz_id
+
+
+
+question_id
+
+INT
+
+FK to Question.question_id
+
+
+
+marks
+
+DECIMAL(5, 2)
+
+Specific marks for this quiz instance
+
+Assignment
+
+assignment_id
+
+SERIAL
+
+PK
+
+
+
+quiz_id
+
+INT
+
+FK to Quiz.quiz_id
+
+
+
+grade_id
+
+INT
+
+FK to Grade.grade_id (Target class)
+
+StudentAttempt
+
+attempt_id
+
+SERIAL
+
+PK
+
+
+
+assignment_id
+
+INT
+
+FK to Assignment.assignment_id
+
+
+
+student_id
+
+INT
+
+FK to User.user_id
+
+
+
+raw_score
+
+DECIMAL(5, 2)
+
+
+
+StudentAnswer
+
+answer_id
+
+SERIAL
+
+PK
+
+
+
+attempt_id
+
+INT
+
+FK to StudentAttempt.attempt_id
+
+
+
+quiz_question_id
+
+INT
+
+FK to QuizQuestion.quiz_question_id
+
+INSTRUCT THE AGENT: Generate the complete PostgreSQL CREATE TABLE script, including all PRIMARY KEY, FOREIGN KEY, and CHECK constraints for the tables listed above. Ensure proper data types for numerical IDs, descriptive text fields, and timestamps.
