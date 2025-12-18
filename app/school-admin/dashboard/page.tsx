@@ -171,11 +171,11 @@ export default function SchoolAdminDashboard() {
     setLoading(false);
   };
 
-  const [performanceData, setPerformanceData] = useState([]);
-  const [gradePerformance, setGradePerformance] = useState([]);
-  const [subjectDistribution, setSubjectDistribution] = useState([]);
-  const [topTeachers, setTopTeachers] = useState([]);
-  const [recentActivity, setRecentActivity] = useState([]);
+  const [performanceData, setPerformanceData] = useState<any[]>([]);
+  const [gradePerformance, setGradePerformance] = useState<any[]>([]);
+  const [subjectDistribution, setSubjectDistribution] = useState<{ subject: string; tests: number; color: string }[]>([]);
+  const [topTeachers, setTopTeachers] = useState<any[]>([]);
+  const [recentActivity, setRecentActivity] = useState<any[]>([]);
 
   return (
     <div className="flex min-h-screen bg-gray-50">
