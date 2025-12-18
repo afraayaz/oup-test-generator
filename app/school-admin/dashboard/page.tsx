@@ -107,11 +107,11 @@ export default function SchoolAdminDashboard() {
       ]);
 
       // Recent activity
-      const recentQuestions = questions.slice(-4).reverse().map((q, idx) => ({
+      const recentQuestions = questions.slice(-4).reverse().map((q: any, idx) => ({
         id: idx + 1,
         type: 'quiz',
         title: 'Question added',
-        description: `${q.subject} - ${q.chapter || 'Chapter'} question added`,
+        description: `${q?.subject || 'Subject'} - ${q?.chapter || 'Chapter'} question added`,
         time: `${Math.floor(Math.random() * 24) + 1} hours ago`
       }));
       setRecentActivity(recentQuestions.length > 0 ? recentQuestions : [
