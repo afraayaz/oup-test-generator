@@ -2,12 +2,17 @@ import { db } from '@/firebase/firebase';
 import { doc, updateDoc, deleteDoc, getDoc } from 'firebase/firestore';
 import { NextRequest, NextResponse } from 'next/server';
 
+interface RouteParams {
+  params: Promise<{ questionId: string }>;
+}
+
 // PUT - Update school question (only own questions)
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { questionId: string } }
+  { params }: RouteParams
 ) {
   try {
+    const { questionId } = await params;
     const schoolId = request.headers.get('x-school-id');
     const userId = request.headers.get('x-user-id');
     const userRole = request.headers.get('x-user-role');
@@ -16,7 +21,7 @@ export async function PUT(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
     }
 
-    const questionRef = doc(db, `questions/schools/${schoolId}`, params.questionId);
+    const questionRef = doc(db, `questions/schools/${schoolId}`, questionId);
     const questionSnap = await getDoc(questionRef);
 
     if (!questionSnap.exists()) {
@@ -52,9 +57,10 @@ export async function PUT(
 // DELETE - Delete school question (only own questions)
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { questionId: string } }
+  { params }: RouteParams
 ) {
   try {
+    const { questionId } = await params;
     const schoolId = request.headers.get('x-school-id');
     const userId = request.headers.get('x-user-id');
     const userRole = request.headers.get('x-user-role');
@@ -63,7 +69,7 @@ export async function DELETE(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
     }
 
-    const questionRef = doc(db, `questions/schools/${schoolId}`, params.questionId);
+    const questionRef = doc(db, `questions/schools/${schoolId}`, questionId);
     const questionSnap = await getDoc(questionRef);
 
     if (!questionSnap.exists()) {
