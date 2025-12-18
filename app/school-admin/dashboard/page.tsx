@@ -360,7 +360,7 @@ export default function SchoolAdminDashboard() {
                         <div className="flex items-center gap-3">
                           <div className="w-10 h-10 bg-indigo-100 rounded-full flex items-center justify-center">
                             <span className="text-indigo-600 font-semibold text-sm">
-                              {teacher.name.split(' ').map(n => n[0]).join('')}
+                              {teacher.name.split(' ').map((n: string) => n[0]).join('')}
                             </span>
                           </div>
                           <div>
