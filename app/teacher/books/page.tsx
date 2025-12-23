@@ -70,7 +70,7 @@ async function fetchBooksData() {
     for (const doc of data.documents) {
       const fields = doc.fields || {};
       
-      const grade = parseFirestoreValue(fields.grade || fields.class || {}) || '';
+      let grade = parseFirestoreValue(fields.grade || fields.class || {}) || '';
       const subject = parseFirestoreValue(fields.subject || {}) || '';
       const book = parseFirestoreValue(fields.book || {}) || '';
       const chapter = parseFirestoreValue(fields.chapter || {}) || '';
@@ -78,7 +78,10 @@ async function fetchBooksData() {
       
       if (!grade || !subject || !book) continue;
       
-      const bookKey = `${grade.toString().toLowerCase()}-${subject.toLowerCase()}-${book.toLowerCase()}`;
+      // Normalize grade - ensure it's just the number without "Grade " prefix
+      grade = grade.toString().replace('Grade ', '').trim();
+      
+      const bookKey = `${grade.toLowerCase()}-${subject.toLowerCase()}-${book.toLowerCase()}`;
       
       if (!booksMap.has(bookKey)) {
         booksMap.set(bookKey, {

@@ -4,6 +4,7 @@ import { useState, useLayoutEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { getAuth, signInWithEmailAndPassword } from 'firebase/auth';
 import { app } from '@/firebase/firebase';
+import { retryWithBackoff, getNetworkErrorMessage, isNetworkConnected } from '@/lib/networkHelper';
 import gsap from 'gsap';
 import Head from 'next/head';
 import Link from 'next/link';
@@ -44,8 +45,23 @@ export default function LoginPage() {
         setError('');
 
         try {
+            // Check network connectivity first
+            console.log('🔍 Checking network connectivity...');
+            const hasNetwork = await isNetworkConnected();
+            if (!hasNetwork) {
+                throw new Error('No internet connection. Please check your network and try again.');
+            }
+            console.log('✅ Network connectivity confirmed');
+
             console.log('🔐 Login attempt:', email);
-            const userCredential = await signInWithEmailAndPassword(auth, email, password);
+            
+            // Use retry mechanism for login
+            const userCredential = await retryWithBackoff(
+              () => signInWithEmailAndPassword(auth, email, password),
+              3,
+              1000
+            );
+            
             const user = userCredential.user;
             console.log('✓ Firebase sign in successful:', user.email, user.uid);
 
@@ -123,7 +139,24 @@ export default function LoginPage() {
             console.error('❌ Login error:', error);
             console.error('Error message:', error.message);
             console.error('Error code:', error.code);
-            setError(error.message || 'Failed to log in. Please check your credentials.');
+            
+            // Use helper function to get appropriate error message
+            let userMessage = getNetworkErrorMessage(error);
+            
+            // Handle specific Firebase auth errors that aren't network-related
+            if (error.code === 'auth/user-not-found') {
+              userMessage = 'User not found. Please check your email.';
+            } else if (error.code === 'auth/wrong-password') {
+              userMessage = 'Incorrect password. Please try again.';
+            } else if (error.code === 'auth/invalid-email') {
+              userMessage = 'Invalid email format.';
+            } else if (error.code === 'auth/user-disabled') {
+              userMessage = 'This account has been disabled. Contact support.';
+            } else if (error.message === 'No internet connection. Please check your network and try again.') {
+              userMessage = error.message;
+            }
+            
+            setError(userMessage);
             setIsLoading(false);
         }
     };

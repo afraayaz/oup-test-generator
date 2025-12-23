@@ -146,11 +146,12 @@ export default function CreateInteractiveQuiz() {
     if (!quizMeta.grade || !quizMeta.subject || !quizMeta.book) return [];
     const chapters = new Set<string>();
     existingQuestions.forEach((q: Record<string, unknown>) => {
-      const qGrade = ((q.grade || q.class || '') as string).toString().toLowerCase();
+      const qGradeNormalized = ((q.grade || q.class || '') as string).toString().replace('Grade ', '').trim().toLowerCase();
+      const quizGradeNormalized = String(quizMeta.grade).replace('Grade ', '').trim().toLowerCase();
       const qSubject = ((q.subject || '') as string).toLowerCase();
       const qBook = ((q.book || '') as string).toLowerCase();
       const qChapter = (q.chapter || '') as string;
-      if (qGrade === quizMeta.grade.toLowerCase() && 
+      if (qGradeNormalized === quizGradeNormalized && 
           qSubject === quizMeta.subject.toLowerCase() && 
           qBook === quizMeta.book.toLowerCase() && 
           qChapter) {
@@ -164,12 +165,13 @@ export default function CreateInteractiveQuiz() {
     if (!quizMeta.grade || !quizMeta.subject || !quizMeta.book || !quizMeta.chapter) return [];
     const slos = new Set<string>();
     existingQuestions.forEach((q: Record<string, unknown>) => {
-      const qGrade = ((q.grade || q.class || '') as string).toString().toLowerCase();
+      const qGradeNormalized = ((q.grade || q.class || '') as string).toString().replace('Grade ', '').trim().toLowerCase();
+      const quizGradeNormalized = String(quizMeta.grade).replace('Grade ', '').trim().toLowerCase();
       const qSubject = ((q.subject || '') as string).toLowerCase();
       const qBook = ((q.book || '') as string).toLowerCase();
       const qChapter = ((q.chapter || '') as string).toLowerCase();
       const qSLO = (q.slo || '') as string;
-      if (qGrade === quizMeta.grade.toLowerCase() && 
+      if (qGradeNormalized === quizGradeNormalized && 
           qSubject === quizMeta.subject.toLowerCase() && 
           qBook === quizMeta.book.toLowerCase() && 
           qChapter === quizMeta.chapter.toLowerCase() && 

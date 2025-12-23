@@ -289,7 +289,8 @@ const QuizGeneration = () => {
   
   // Extract unique subjects and grades directly from assignedBooks for accuracy
   let uniqueSubjects = [...new Set(assignedBooks.map(b => b.subject))];
-  let uniqueGrades = [...new Set(assignedBooks.map(b => String(b.grade)))];
+  // Normalize grades - remove "Grade " prefix for consistency
+  let uniqueGrades = [...new Set(assignedBooks.map(b => String(b.grade).replace('Grade ', '').trim()))];
   
   console.log(`📋 Initial unique subjects (from school books): ${uniqueSubjects.join(', ') || '(none)'}`);
   console.log(`📋 Initial unique grades (from school books): ${uniqueGrades.join(', ') || '(none)'}`);
@@ -332,7 +333,11 @@ const QuizGeneration = () => {
     books[String(grade)] = {};
     uniqueSubjects.forEach(subject => {
       books[String(grade)][subject] = assignedBooks
-        .filter(book => String(book.grade) === String(grade) && book.subject === subject)
+        .filter(book => {
+          // Normalize book grade for comparison
+          const normalizedBookGrade = String(book.grade).replace('Grade ', '').trim();
+          return normalizedBookGrade === grade && book.subject === subject;
+        })
         .map(book => book.title);
     });
   });
@@ -435,13 +440,24 @@ const QuizGeneration = () => {
 
       // Filter questions by grade, subject, and book to get unique chapters and SLOs
       const filtered = questions.filter(q => {
-        const qGrade = (q.grade || q.class || '').toString().toLowerCase();
+        // Normalize grades: remove "Grade " prefix and convert to lowercase
+        const qGradeNormalized = (q.grade || q.class || '').toString().replace('Grade ', '').trim().toLowerCase();
+        const selectedGradeNormalized = String(selectedGrade).replace('Grade ', '').trim().toLowerCase();
         const qSubject = (q.subject || '').toLowerCase();
         const qBook = (q.book || '').toLowerCase();
         
-        return qGrade === selectedGrade.toLowerCase() &&
+        return qGradeNormalized === selectedGradeNormalized &&
                qSubject === selectedSubject.toLowerCase() &&
                qBook === selectedBook.toLowerCase();
+      });
+
+      console.log('📚 Chapter Fetch Debug:', {
+        selectedGrade,
+        selectedSubject,
+        selectedBook,
+        questionsTotal: questions.length,
+        filteredQuestions: filtered.length,
+        questions: filtered.slice(0, 3) // Log first 3 for debugging
       });
 
       // Extract unique chapters and SLOs
@@ -515,12 +531,13 @@ const QuizGeneration = () => {
     // Filter questions by selected chapters to get SLOs
     const slos = new Set();
     questions.forEach(q => {
-      const qGrade = (q.grade || q.class || '').toString().toLowerCase();
+      const qGradeNormalized = (q.grade || q.class || '').toString().replace('Grade ', '').trim().toLowerCase();
+      const selectedGradeNormalized = String(selectedGrade).replace('Grade ', '').trim().toLowerCase();
       const qSubject = (q.subject || '').toLowerCase();
       const qBook = (q.book || '').toLowerCase();
       const qChapter = q.chapter || '';
       const qSLO = q.slo || '';
-      if (qGrade === selectedGrade.toLowerCase() && 
+      if (qGradeNormalized === selectedGradeNormalized && 
           qSubject === selectedSubject.toLowerCase() && 
           qBook === selectedBook.toLowerCase() && 
           selectedChapters.includes(qChapter) && 
@@ -535,7 +552,8 @@ const QuizGeneration = () => {
     if (!selectedGrade || !selectedSubject || !selectedBook) return 0;
     const selectedDifficulties = questionConfig[type]?.difficulties || [];
     return questions.filter(q => {
-      const qGrade = (q.grade || q.class || '').toString().toLowerCase();
+      const qGradeNormalized = (q.grade || q.class || '').toString().replace('Grade ', '').trim().toLowerCase();
+      const selectedGradeNormalized = String(selectedGrade).replace('Grade ', '').trim().toLowerCase();
       const qSubject = (q.subject || '').toLowerCase();
       const qBook = (q.book || '').toLowerCase();
       const qChapter = q.chapter || '';
@@ -544,7 +562,7 @@ const QuizGeneration = () => {
       const qDifficulty = q.difficulty || 'Medium';
       const normalizedType = qType === 'mcqs' ? 'multiple' : qType.replace('_', '');
       
-      const basicMatch = qGrade === selectedGrade.toLowerCase() && 
+      const basicMatch = qGradeNormalized === selectedGradeNormalized && 
                         qSubject === selectedSubject.toLowerCase() && 
                         qBook === selectedBook.toLowerCase() &&
                         normalizedType === type;
@@ -574,7 +592,8 @@ const QuizGeneration = () => {
 
       // Filter questions for this type with selected difficulties
       const typeQuestions = questions.filter(q => {
-        const qGrade = (q.grade || q.class || '').toString().toLowerCase();
+        const qGradeNormalized = (q.grade || q.class || '').toString().replace('Grade ', '').trim().toLowerCase();
+        const selectedGradeNormalized = String(selectedGrade).replace('Grade ', '').trim().toLowerCase();
         const qSubject = (q.subject || '').toLowerCase();
         const qBook = (q.book || '').toLowerCase();
         const qChapter = q.chapter || '';
@@ -583,7 +602,7 @@ const QuizGeneration = () => {
         const qDifficulty = q.difficulty || 'Medium';
         const normalizedType = qType === 'mcqs' ? 'multiple' : qType.replace('_', '');
 
-        return qGrade === selectedGrade.toLowerCase() &&
+        return qGradeNormalized === selectedGradeNormalized &&
                qSubject === selectedSubject.toLowerCase() &&
                qBook === selectedBook.toLowerCase() &&
                (selectedChapters.length === 0 || selectedChapters.includes(qChapter)) &&
@@ -1383,29 +1402,45 @@ const QuizGeneration = () => {
                 spacing: { after: 100 },
               }),
               ...(q.type === 'multiple' && q.options?.length
-                ? q.options.map((opt, j) => 
-                      new Paragraph({
-                        children: [new TextRun({ 
-                          text: `${q.question.isRTL ? optionLabels(true)[j] : String.fromCharCode(65 + j)}. ${convertFormulasToReadable(opt.text)}`, 
-                          size: 24, 
-                          font: q.question.isRTL ? 'Noto Nastaliq Urdu' : 'Arial' 
-                        })],
-                        alignment: q.question.isRTL ? AlignmentType.RIGHT : AlignmentType.LEFT,
-                        spacing: { after: 50 },
-                      })
-                  )
+                ? q.options.map((opt, j) => {
+                    const optionLabel = q.question.isRTL ? optionLabels(true)[j] : String.fromCharCode(65 + j);
+                    const optionText = convertFormulasToReadable(opt.text);
+                    // For RTL (Urdu): Format as "ب. متن" (label. text)
+                    // For LTR (English): Format as "A. text"
+                    const formattedOption = q.question.isRTL 
+                      ? `${optionLabel}. ${optionText}` 
+                      : `${optionLabel}. ${optionText}`;
+                    
+                    return new Paragraph({
+                      children: [new TextRun({ 
+                        text: formattedOption, 
+                        size: 24, 
+                        font: q.question.isRTL ? 'Noto Nastaliq Urdu' : 'Arial' 
+                      })],
+                      alignment: q.question.isRTL ? AlignmentType.RIGHT : AlignmentType.LEFT,
+                      spacing: { after: 50 },
+                    });
+                  })
                 : q.type === 'truefalse' && q.options?.length
-                ? q.options.map((opt, j) => 
-                      new Paragraph({
-                        children: [new TextRun({ 
-                          text: `${q.question.isRTL ? optionLabels(true)[j] : String.fromCharCode(65 + j)}. ${q.question.isRTL ? (opt.text === 'True' ? 'صحیح' : 'غلط') : opt.text}`, 
-                          size: 24, 
-                          font: q.question.isRTL ? 'Noto Nastaliq Urdu' : 'Arial' 
-                        })],
-                        alignment: q.question.isRTL ? AlignmentType.RIGHT : AlignmentType.LEFT,
-                        spacing: { after: 50 },
-                      })
-                  )
+                ? q.options.map((opt, j) => {
+                    const optionLabel = q.question.isRTL ? optionLabels(true)[j] : String.fromCharCode(65 + j);
+                    const optionText = q.question.isRTL ? (opt.text === 'True' ? 'صحیح' : 'غلط') : opt.text;
+                    // For RTL (Urdu): Format as "الف. صحیح" (label. text)
+                    // For LTR (English): Format as "A. True"
+                    const formattedOption = q.question.isRTL 
+                      ? `${optionLabel}. ${optionText}` 
+                      : `${optionLabel}. ${optionText}`;
+                    
+                    return new Paragraph({
+                      children: [new TextRun({ 
+                        text: formattedOption, 
+                        size: 24, 
+                        font: q.question.isRTL ? 'Noto Nastaliq Urdu' : 'Arial' 
+                      })],
+                      alignment: q.question.isRTL ? AlignmentType.RIGHT : AlignmentType.LEFT,
+                      spacing: { after: 50 },
+                    });
+                  })
                 : q.type === 'fillblanks'
                 ? []
                 : [
@@ -1634,7 +1669,11 @@ const QuizGeneration = () => {
                       >
                         <option value="">Select Subject</option>
                         {assignedBooks
-                          .filter(b => String(b.grade) === String(selectedGrade))
+                          .filter(b => {
+                            // Normalize book grade for comparison
+                            const normalizedBookGrade = String(b.grade).replace('Grade ', '').trim();
+                            return normalizedBookGrade === String(selectedGrade);
+                          })
                           .map(b => b.subject)
                           .filter((v, i, a) => a.indexOf(v) === i)
                           .map(subject => (
@@ -1657,16 +1696,17 @@ const QuizGeneration = () => {
                       >
                         <option value="">Select Book</option>
                         {(() => {
-                          const filteredBooks = assignedBooks.filter(b => String(b.grade) === String(selectedGrade) && b.subject === selectedSubject);
+                          // Use the pre-built books object to get books for selected grade and subject
+                          const availableBooks = books[String(selectedGrade)]?.[selectedSubject] || [];
                           console.log('📖 Book Selection Debug:', {
                             selectedGrade,
                             selectedSubject,
-                            assignedBooksLength: assignedBooks.length,
-                            filteredBooksLength: filteredBooks.length,
-                            filteredBooks
+                            availableBooksLength: availableBooks.length,
+                            availableBooks,
+                            booksObject: books
                           });
-                          return filteredBooks.map(book => (
-                            <option key={book.id} value={book.title}>{book.title}</option>
+                          return availableBooks.map(bookTitle => (
+                            <option key={bookTitle} value={bookTitle}>{bookTitle}</option>
                           ));
                         })()}
                       </select>

@@ -3,6 +3,13 @@
 import { useState } from 'react';
 import Sidebar from '@/components/Sidebar';
 
+interface SubjectGradePair {
+  id: string;
+  subject: string;
+  grade: string;
+  assignedBooks: { id: string; title: string; subject: string; grade: string; chapters: number }[];
+}
+
 interface User {
   id: string;
   name: string;
@@ -21,6 +28,7 @@ interface User {
   subjects?: string[];
   assignedClasses?: string[];
   assignedGrades?: string[];
+  subjectGradePairs?: SubjectGradePair[];
   assignedBooks?: { id: string; title: string; subject: string; grade: string; chapters: number }[];
 }
 
@@ -71,6 +79,9 @@ export default function UsersClient({ initialUsers, schools, campuses }: Props) 
   const [formStep, setFormStep] = useState(1);
   const [userType, setUserType] = useState<'school' | 'oup' | null>(null);
 
+  // Track original assignments when editing
+  const [originalSubjectGradePairs, setOriginalSubjectGradePairs] = useState<SubjectGradePair[]>([]);
+
   const [userForm, setUserForm] = useState({
     name: '',
     email: '',
@@ -84,6 +95,7 @@ export default function UsersClient({ initialUsers, schools, campuses }: Props) 
     subjects: [] as string[],
     assignedClasses: [] as string[],
     assignedGrades: [] as string[],
+    subjectGradePairs: [] as SubjectGradePair[],
     assignedBooks: [] as { id: string; title: string; subject: string; grade: string; chapters: number }[]
   });
 
@@ -147,6 +159,7 @@ export default function UsersClient({ initialUsers, schools, campuses }: Props) 
       subjects: [],
       assignedClasses: [],
       assignedGrades: [],
+      subjectGradePairs: [],
       assignedBooks: []
     });
     setAvailableBooks({});
@@ -212,7 +225,7 @@ export default function UsersClient({ initialUsers, schools, campuses }: Props) 
 
   const deleteUser = async (userId: string) => {
     const user = users.find(u => u.id === userId);
-    if (!confirm(`Are you sure you want to delete user "${user?.name}"? This action cannot be undone.`)) {
+    if (!confirm(`Are you sure you want to delete user "${user?.name}"? This will permanently delete:\n- Authentication account\n- All quiz attempts\n- All created quizzes\n- All profile data\n\nThis action cannot be undone.`)) {
       return;
     }
 
@@ -226,7 +239,7 @@ export default function UsersClient({ initialUsers, schools, campuses }: Props) 
       }
 
       setUsers(prev => prev.filter(u => u.id !== userId));
-      alert('User deleted successfully!');
+      alert('User account and all associated data deleted successfully!');
     } catch (error: any) {
       alert(error.message || 'Failed to delete user');
     }
@@ -260,6 +273,9 @@ export default function UsersClient({ initialUsers, schools, campuses }: Props) 
 
   const openEditUser = (user: User) => {
     setEditingUserId(user.id);
+    // Store original subject-grade pairs for comparison
+    setOriginalSubjectGradePairs(user.subjectGradePairs || []);
+    
     setUserForm({
       name: user.name,
       email: user.email,
@@ -273,6 +289,7 @@ export default function UsersClient({ initialUsers, schools, campuses }: Props) 
       subjects: user.subjects || [],
       assignedClasses: user.assignedClasses || [],
       assignedGrades: user.assignedGrades || [],
+      subjectGradePairs: user.subjectGradePairs || [],
       assignedBooks: user.assignedBooks || []
     });
     setFormStep(3);
@@ -285,34 +302,75 @@ export default function UsersClient({ initialUsers, schools, campuses }: Props) 
     
     setIsLoading(true);
     try {
-      const response = await fetch('/api/admin/users', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          id: editingUserId,
-          name: userForm.name,
-          email: userForm.email,
-          role: userForm.role,
-          subjects: userForm.subjects,
-          assignedGrades: userForm.assignedGrades,
-          assignedBooks: userForm.assignedBooks,
-          grade: userForm.grade,
-          section: userForm.section,
-          rollNumber: userForm.rollNumber
-        }),
-      });
+      // For teacher role, process subject-grade pairs
+      if (userForm.role === 'teacher') {
+        // Rebuild books array from subject-grade pairs
+        let finalBooks: { id: string; title: string; subject: string; grade: string; chapters: number }[] = [];
+        
+        // For each subject-grade pair, add its books to the final books array
+        for (const pair of userForm.subjectGradePairs) {
+          finalBooks = [...finalBooks, ...pair.assignedBooks];
+        }
+        
+        const response = await fetch('/api/admin/users', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            id: editingUserId,
+            name: userForm.name,
+            email: userForm.email,
+            role: userForm.role,
+            subjects: userForm.subjectGradePairs.map(p => p.subject),
+            assignedGrades: userForm.subjectGradePairs.map(p => p.grade),
+            subjectGradePairs: userForm.subjectGradePairs,
+            assignedBooks: finalBooks,
+            grade: userForm.grade,
+            section: userForm.section,
+            rollNumber: userForm.rollNumber
+          }),
+        });
 
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || 'Failed to update user');
+        if (!response.ok) {
+          const error = await response.json();
+          throw new Error(error.error || 'Failed to update user');
+        }
+
+        const data = await response.json();
+        setUsers(prev => prev.map(u => u.id === editingUserId ? { ...u, ...data.user } : u));
+        resetForm();
+        setShowEditUser(false);
+        setEditingUserId(null);
+        alert('User updated successfully!');
+      } else {
+        // For non-teacher roles, use the old structure
+        const response = await fetch('/api/admin/users', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            id: editingUserId,
+            name: userForm.name,
+            email: userForm.email,
+            role: userForm.role,
+            subjects: userForm.subjects,
+            assignedBooks: userForm.assignedBooks,
+            grade: userForm.grade,
+            section: userForm.section,
+            rollNumber: userForm.rollNumber
+          }),
+        });
+
+        if (!response.ok) {
+          const error = await response.json();
+          throw new Error(error.error || 'Failed to update user');
+        }
+
+        const data = await response.json();
+        setUsers(prev => prev.map(u => u.id === editingUserId ? { ...u, ...data.user } : u));
+        resetForm();
+        setShowEditUser(false);
+        setEditingUserId(null);
+        alert('User updated successfully!');
       }
-
-      const data = await response.json();
-      setUsers(prev => prev.map(u => u.id === editingUserId ? { ...u, ...data.user } : u));
-      resetForm();
-      setShowEditUser(false);
-      setEditingUserId(null);
-      alert('User updated successfully!');
     } catch (error: any) {
       alert(error.message || 'Failed to update user');
     } finally {
@@ -723,7 +781,7 @@ export default function UsersClient({ initialUsers, schools, campuses }: Props) 
                 )}
 
                 {(userForm.role === 'teacher' || userForm.role === 'content_manager' || userForm.role === 'content_creator') && (
-                  <div>
+                  <div className="space-y-4">
                     <label className="block text-sm font-medium text-gray-700 mb-2">Subjects</label>
                     <div className="flex flex-wrap gap-2">
                       {availableSubjects.map(subject => (
@@ -731,36 +789,25 @@ export default function UsersClient({ initialUsers, schools, campuses }: Props) 
                           key={subject}
                           type="button"
                           onClick={async () => {
-                            const isCurrentlySelected = userForm.subjects.includes(subject);
-                            
-                            if (isCurrentlySelected) {
-                              // When deselecting: remove subject and its books
+                            if (userForm.subjects.includes(subject)) {
                               setUserForm(prev => ({
                                 ...prev,
                                 subjects: prev.subjects.filter(s => s !== subject),
                                 assignedBooks: prev.assignedBooks.filter(book => book.subject !== subject)
                               }));
                             } else {
-                              // When selecting: add subject and fetch+assign its books
                               await fetchBooksBySubject(subject);
-                              
-                              // Get the books for this subject from availableBooks
                               const booksForSubject = availableBooks[subject] || [];
-                              
                               setUserForm(prev => ({
                                 ...prev,
                                 subjects: [...prev.subjects, subject],
-                                // Auto-assign all books for this subject
-                                assignedBooks: [
-                                  ...prev.assignedBooks,
-                                  ...booksForSubject.map(book => ({
-                                    id: book.id,
-                                    title: book.title,
-                                    subject: subject,
-                                    grade: book.grade,
-                                    chapters: book.chapters
-                                  }))
-                                ]
+                                assignedBooks: [...prev.assignedBooks, ...booksForSubject.map(book => ({
+                                  id: book.id,
+                                  title: book.title,
+                                  subject: subject,
+                                  grade: book.grade,
+                                  chapters: book.chapters
+                                }))]
                               }));
                             }
                           }}
@@ -778,7 +825,7 @@ export default function UsersClient({ initialUsers, schools, campuses }: Props) 
                 )}
 
                 {userForm.role === 'teacher' && (
-                  <div>
+                  <div className="space-y-4">
                     <label className="block text-sm font-medium text-gray-700 mb-2">Assigned Grades</label>
                     <div className="flex flex-wrap gap-2">
                       {availableGrades.map(grade => (
@@ -907,14 +954,101 @@ export default function UsersClient({ initialUsers, schools, campuses }: Props) 
     const currentUser = users.find(u => u.id === editingUserId);
     if (!currentUser) return null;
 
+    const handleAddSubjectGradePair = async () => {
+      // Generate unique ID for this pair
+      const pairId = `pair_${Date.now()}_${Math.random()}`;
+      
+      // Create new empty pair
+      const newPair: SubjectGradePair = {
+        id: pairId,
+        subject: '',
+        grade: '',
+        assignedBooks: []
+      };
+      
+      setUserForm(prev => ({
+        ...prev,
+        subjectGradePairs: [...prev.subjectGradePairs, newPair]
+      }));
+    };
+
+    const handleRemoveSubjectGradePair = (pairId: string) => {
+      setUserForm(prev => ({
+        ...prev,
+        subjectGradePairs: prev.subjectGradePairs.filter(p => p.id !== pairId)
+      }));
+    };
+
+    const handleSubjectChange = async (pairId: string, newSubject: string) => {
+      // Update subject in the pair and clear grade/books
+      setUserForm(prev => ({
+        ...prev,
+        subjectGradePairs: prev.subjectGradePairs.map(p => 
+          p.id === pairId ? { ...p, subject: newSubject, grade: '', assignedBooks: [] } : p
+        )
+      }));
+      
+      // Fetch books for this subject
+      if (newSubject) {
+        await fetchBooksBySubject(newSubject);
+      }
+    };
+
+    const handleGradeChange = async (pairId: string, newGrade: string) => {
+      // Update the pair with new grade - do not auto-assign books
+      setUserForm(prev => ({
+        ...prev,
+        subjectGradePairs: prev.subjectGradePairs.map(p => 
+          p.id === pairId ? { ...p, grade: newGrade } : p
+        )
+      }));
+    };
+
+    const handleBookToggle = (pairId: string, bookId: string, book: any, isRemoving: boolean = false) => {
+      setUserForm(prev => {
+        // Check if book is already assigned to this user in any subject-grade pair
+        const isBookAlreadyAssigned = prev.subjectGradePairs.some(p => 
+          p.assignedBooks.some(b => b.id === bookId)
+        );
+        
+        if (!isRemoving && isBookAlreadyAssigned) {
+          // Book is already assigned to this user
+          alert(`📚 "${book.title}" is already assigned to this user in another subject-grade combination.`);
+          return prev;
+        }
+        
+        return {
+          ...prev,
+          subjectGradePairs: prev.subjectGradePairs.map(p => {
+            if (p.id === pairId) {
+              const bookExists = p.assignedBooks.find(b => b.id === bookId);
+              return {
+                ...p,
+                assignedBooks: bookExists
+                  ? p.assignedBooks.filter(b => b.id !== bookId)
+                  : [...p.assignedBooks, {
+                      id: book.id,
+                      title: book.title,
+                      subject: book.subject,
+                      grade: book.grade,
+                      chapters: book.chapters
+                    }]
+              };
+            }
+            return p;
+          })
+        };
+      });
+    };
+
     return (
       <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-        <div className="bg-white rounded-xl shadow-xl max-w-lg w-full max-h-[90vh] overflow-y-auto">
-          <div className="p-6 border-b border-gray-200">
+        <div className="bg-white rounded-xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+          <div className="p-6 border-b border-gray-200 sticky top-0 bg-white">
             <h3 className="text-xl font-semibold text-gray-900">Edit User: {currentUser.name}</h3>
           </div>
           
-          <form onSubmit={updateUser} className="p-6 space-y-4">
+          <form onSubmit={updateUser} className="p-6 space-y-6">
             {/* Name */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">Name *</label>
@@ -942,94 +1076,166 @@ export default function UsersClient({ initialUsers, schools, campuses }: Props) 
               <p className="text-xs text-gray-500 mt-1">Email cannot be changed after account creation</p>
             </div>
 
-            {/* Subjects - For Teacher/Content Manager/Content Creator */}
-            {(userForm.role === 'teacher' || userForm.role === 'content_manager' || userForm.role === 'content_creator') && (
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Subjects</label>
-                <div className="flex flex-wrap gap-2">
-                  {availableSubjects.map(subject => (
-                    <button
-                      key={subject}
-                      type="button"
-                      onClick={async () => {
-                        const isCurrentlySelected = userForm.subjects.includes(subject);
-                        
-                        if (isCurrentlySelected) {
-                          // When deselecting: remove subject and its books
-                          setUserForm(prev => ({
-                            ...prev,
-                            subjects: prev.subjects.filter(s => s !== subject),
-                            assignedBooks: prev.assignedBooks.filter(book => book.subject !== subject)
-                          }));
-                        } else {
-                          // When selecting: add subject and fetch+assign its books
-                          await fetchBooksBySubject(subject);
-                          
-                          // Get the books for this subject from availableBooks
-                          const booksForSubject = availableBooks[subject] || [];
-                          
-                          setUserForm(prev => ({
-                            ...prev,
-                            subjects: [...prev.subjects, subject],
-                            // Auto-assign all books for this subject
-                            assignedBooks: [
-                              ...prev.assignedBooks,
-                              ...booksForSubject.map(book => ({
-                                id: book.id,
-                                title: book.title,
-                                subject: subject,
-                                grade: book.grade,
-                                chapters: book.chapters
-                              }))
-                            ]
-                          }));
-                        }
-                      }}
-                      className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-                        userForm.subjects.includes(subject)
-                          ? 'bg-emerald-600 text-white'
-                          : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                      }`}
-                    >
-                      {subject}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Assigned Grades - For Teacher */}
+            {/* Subject-Grade Pairs for Teacher */}
             {userForm.role === 'teacher' && (
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Assigned Grades</label>
-                <div className="flex flex-wrap gap-2">
-                  {availableGrades.map(grade => (
-                    <button
-                      key={grade}
-                      type="button"
-                      onClick={() => {
-                        setUserForm(prev => ({
-                          ...prev,
-                          assignedGrades: prev.assignedGrades.includes(grade)
-                            ? prev.assignedGrades.filter(g => g !== grade)
-                            : [...prev.assignedGrades, grade]
-                        }));
-                      }}
-                      className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-                        userForm.assignedGrades.includes(grade)
-                          ? 'bg-orange-600 text-white'
-                          : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                      }`}
-                    >
-                      Grade {grade}
-                    </button>
-                  ))}
+              <div className="border-t pt-6">
+                <div className="flex items-center justify-between mb-4">
+                  <h4 className="text-sm font-semibold text-gray-900">Subject & Grade Assignments</h4>
+                  <button
+                    type="button"
+                    onClick={handleAddSubjectGradePair}
+                    className="inline-flex items-center gap-2 px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium rounded-lg transition-colors"
+                  >
+                    <i className="ri-add-line"></i>
+                    Add Subject-Grade
+                  </button>
                 </div>
+
+                {userForm.subjectGradePairs.length === 0 ? (
+                  <div className="p-8 bg-gray-50 rounded-lg border-2 border-dashed border-gray-300 text-center">
+                    <i className="ri-book-line text-4xl text-gray-400 mb-2"></i>
+                    <p className="text-gray-600 mb-4">No subject-grade assignments yet</p>
+                    <button
+                      type="button"
+                      onClick={handleAddSubjectGradePair}
+                      className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-medium rounded-lg"
+                    >
+                      <i className="ri-add-line"></i>
+                      Add First Assignment
+                    </button>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {userForm.subjectGradePairs.map((pair, pairIndex) => (
+                      <div key={pair.id} className="border border-gray-200 rounded-lg p-4 bg-gray-50">
+                        <div className="flex gap-3 mb-4">
+                          {/* Subject Dropdown */}
+                          <div className="flex-1">
+                            <label className="block text-xs font-medium text-gray-700 mb-1">Subject</label>
+                            <select
+                              value={pair.subject}
+                              onChange={(e) => handleSubjectChange(pair.id, e.target.value)}
+                              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 bg-white"
+                            >
+                              <option value="">Select Subject...</option>
+                              {availableSubjects.map(subject => (
+                                <option key={subject} value={subject}>{subject}</option>
+                              ))}
+                            </select>
+                          </div>
+
+                          {/* Grade Dropdown */}
+                          <div className="flex-1">
+                            <label className="block text-xs font-medium text-gray-700 mb-1">Grade</label>
+                            <select
+                              value={pair.grade}
+                              onChange={(e) => handleGradeChange(pair.id, e.target.value)}
+                              disabled={!pair.subject}
+                              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 bg-white disabled:bg-gray-100 disabled:cursor-not-allowed"
+                            >
+                              <option value="">Select Grade...</option>
+                              {availableGrades.map(grade => (
+                                <option key={grade} value={grade}>Grade {grade}</option>
+                              ))}
+                            </select>
+                          </div>
+
+                          {/* Remove Button */}
+                          <div className="flex items-end">
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveSubjectGradePair(pair.id)}
+                              className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                              title="Remove this assignment"
+                            >
+                              <i className="ri-delete-bin-line text-lg"></i>
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* Books for this Subject-Grade combination */}
+                        {pair.subject && pair.grade && (
+                          <div className="mt-4 pt-4 border-t border-gray-200">
+                            <label className="block text-xs font-medium text-gray-700 mb-2">
+                              📚 Books for {pair.subject} - Grade {pair.grade}
+                            </label>
+                            
+                            {loadingBooks[pair.subject] ? (
+                              <p className="text-sm text-gray-500 text-center py-4">Loading books...</p>
+                            ) : (
+                              <>
+                                {/* Available Books Section */}
+                                <div className="mb-3">
+                                  <p className="text-xs font-medium text-gray-600 mb-2">Available Books:</p>
+                                  {(() => {
+                                    const availableBooks_filtered = (availableBooks[pair.subject] || []).filter(book => 
+                                      book.grade === pair.grade || book.grade === `Grade ${pair.grade}`
+                                    );
+                                    const alreadyAssignedInThisPair = pair.assignedBooks.map(b => b.id);
+                                    const notYetAssigned = availableBooks_filtered.filter(book => 
+                                      !alreadyAssignedInThisPair.includes(book.id)
+                                    );
+                                    
+                                    if (notYetAssigned.length === 0) {
+                                      return <p className="text-xs text-gray-500 italic py-2">All available books are already assigned below</p>;
+                                    }
+                                    
+                                    return (
+                                      <div className="space-y-2 max-h-[150px] overflow-y-auto">
+                                        {notYetAssigned.map(book => (
+                                          <div key={book.id} className="flex items-center justify-between p-2 bg-blue-50 rounded border border-blue-200">
+                                            <div className="flex-1 min-w-0">
+                                              <div className="text-sm font-medium text-gray-900 truncate">{book.title}</div>
+                                              <div className="text-xs text-gray-500">{book.chapters} Chapters</div>
+                                            </div>
+                                            <button
+                                              type="button"
+                                              onClick={() => handleBookToggle(pair.id, book.id, book)}
+                                              className="ml-2 px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium rounded transition-colors"
+                                            >
+                                              + Assign
+                                            </button>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    );
+                                  })()}
+                                </div>
+                                
+                                {/* Assigned Books Section */}
+                                {pair.assignedBooks.length > 0 && (
+                                  <div className="mt-3 pt-3 border-t border-gray-200">
+                                    <p className="text-xs font-medium text-emerald-700 mb-2">✅ Assigned Books ({pair.assignedBooks.length}):</p>
+                                    <div className="space-y-1 max-h-[120px] overflow-y-auto">
+                                      {pair.assignedBooks.map(book => (
+                                        <div key={book.id} className="flex items-center justify-between p-2 bg-emerald-50 rounded border border-emerald-200">
+                                          <div className="text-sm text-emerald-900">{book.title}</div>
+                                          <button
+                                            type="button"
+                                            onClick={() => handleBookToggle(pair.id, book.id, book, true)}
+                                            className="text-red-600 hover:text-red-700 hover:bg-red-50 p-1 rounded transition-colors"
+                                            title="Remove this book"
+                                          >
+                                            <i className="ri-close-line"></i>
+                                          </button>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </div>
+                                )}
+                              </>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
 
             {/* Action Buttons */}
-            <div className="flex space-x-3 pt-4">
+            <div className="flex space-x-3 pt-4 border-t">
               <button
                 type="submit"
                 disabled={isLoading || !userForm.name || !userForm.email}

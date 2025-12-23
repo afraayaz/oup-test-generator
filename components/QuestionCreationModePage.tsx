@@ -52,8 +52,14 @@ export default function QuestionCreationModePage({
       return [];
     }
     return user.assignedBooks.filter(
-      (book) => (!formData.grade || book.grade === formData.grade) && 
-                 (!formData.subject || book.subject === formData.subject)
+      (book) => {
+        // Normalize grade for comparison
+        const normalizedBookGrade = String(book.grade).replace('Grade ', '').trim();
+        const normalizedFormGrade = String(formData.grade).replace('Grade ', '').trim();
+        
+        return (!formData.grade || normalizedBookGrade === normalizedFormGrade) && 
+               (!formData.subject || book.subject === formData.subject);
+      }
     );
   };
 

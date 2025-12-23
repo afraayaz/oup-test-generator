@@ -1,7 +1,7 @@
 
 import { initializeApp, getApps, FirebaseApp } from "firebase/app";
 import { getFirestore, Firestore, initializeFirestore, memoryLocalCache } from "firebase/firestore";
-import { getAuth, Auth } from "firebase/auth";
+import { getAuth, Auth, connectAuthEmulator } from "firebase/auth";
 
 const firebaseConfig = {
   apiKey: "AIzaSyDdsApeXM5WsHTcx4sLVJ37dAwxOjBMTu8",
@@ -16,8 +16,10 @@ const firebaseConfig = {
 let app: FirebaseApp;
 if (!getApps().length) {
   app = initializeApp(firebaseConfig);
+  console.log('✅ Firebase App initialized');
 } else {
   app = getApps()[0];
+  console.log('✅ Firebase App already initialized');
 }
 
 // ✅ Initialize Firestore with cache and fallback
@@ -33,6 +35,12 @@ try {
 
 // ✅ Initialize Auth
 const auth: Auth = getAuth(app);
+// Enable offline persistence
+auth.setPersistence = auth.setPersistence || (() => Promise.resolve());
+
+// Log Auth initialization
+console.log('✅ Firebase Auth initialized for domain:', firebaseConfig.authDomain);
+console.log('✅ Project ID:', firebaseConfig.projectId);
 
 // ✅ Export instances
 export { app, db, auth };

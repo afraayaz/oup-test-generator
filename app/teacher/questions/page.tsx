@@ -209,7 +209,10 @@ const QuestionCreator = () => {
     if (!formData.grade) return [];
     const subjectsSet = new Set(
       user?.assignedBooks
-        ?.filter(b => b.grade === `Grade ${formData.grade}`)
+        ?.filter(b => {
+          const normalizedBookGrade = String(b.grade).replace('Grade ', '').trim();
+          return normalizedBookGrade === String(formData.grade);
+        })
         .map(b => b.subject) || []
     );
     return Array.from(subjectsSet).sort();
@@ -218,7 +221,10 @@ const QuestionCreator = () => {
   const getAvailableBooks = () => {
     if (!formData.grade || !formData.subject) return [];
     const booksArray = user?.assignedBooks
-      ?.filter(b => b.grade === `Grade ${formData.grade}` && b.subject === formData.subject)
+      ?.filter(b => {
+        const normalizedBookGrade = String(b.grade).replace('Grade ', '').trim();
+        return normalizedBookGrade === String(formData.grade) && b.subject === formData.subject;
+      })
       .map(b => b.title) || [];
     return booksArray.sort();
   };

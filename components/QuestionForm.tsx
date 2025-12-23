@@ -1,6 +1,8 @@
 "use client";
 
 import { useState } from "react";
+import InlineMathToolbar from "./InlineMathToolbar";
+import UrduKeyboard from "./UrduKeyboard";
 
 interface QuestionFormProps {
   onSubmit: (questionData: QuestionFormData) => Promise<void>;
@@ -62,6 +64,9 @@ export default function QuestionForm({
   const [formData, setFormData] = useState<QuestionFormData>(initialFormData);
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
   const [toast, setToast] = useState<{ type: "error" | "success" | "info"; message: string } | null>(null);
+  const [focusedMathField, setFocusedMathField] = useState<"question" | "explanation" | "option" | "blank" | null>(null);
+  const [activeOptionIndex, setActiveOptionIndex] = useState(-1);
+  const [activeBlankId, setActiveBlankId] = useState<string | null>(null);
 
   // Initialize with defaults
   useState(() => {
@@ -131,6 +136,43 @@ export default function QuestionForm({
     delete newBlanks[blankId];
     setFormData((prev) => ({ ...prev, blanks: newBlanks }));
   };
+
+  const insertMathSymbol = (symbol: string) => {
+    if (focusedMathField === "question") {
+      setFormData((prev) => ({
+        ...prev,
+        questionText: prev.questionText + symbol,
+      }));
+    } else if (focusedMathField === "explanation") {
+      setFormData((prev) => ({
+        ...prev,
+        explanation: prev.explanation + symbol,
+      }));
+    } else if (focusedMathField === "option" && activeOptionIndex >= 0) {
+      const newOptions = [...formData.options];
+      newOptions[activeOptionIndex] = (newOptions[activeOptionIndex] || "") + symbol;
+      setFormData((prev) => ({
+        ...prev,
+        options: newOptions,
+      }));
+    } else if (focusedMathField === "blank" && activeBlankId) {
+      handleBlankChange(activeBlankId, (formData.blanks[activeBlankId]?.join("|") || "") + symbol);
+    }
+  };
+
+  const insertLanguageCharacter = (character: string) => {
+    // Works for both math symbols and language characters (Urdu, etc.)
+    insertMathSymbol(character);
+  };
+
+  const handleMathFieldFocus = (field: "question" | "explanation" | "option" | "blank", optionIdx?: number, blankId?: string) => {
+    setFocusedMathField(field);
+    if (optionIdx !== undefined) setActiveOptionIndex(optionIdx);
+    if (blankId) setActiveBlankId(blankId);
+  };
+
+  const isMathSubject = formData.subject.toLowerCase().includes("math") || formData.subject.toLowerCase().includes("mathematics");
+  const isUrduSubject = formData.subject.toLowerCase().includes("urdu");
 
   const validateForm = (): boolean => {
     const newErrors: { [key: string]: string } = {};
@@ -370,9 +412,23 @@ export default function QuestionForm({
           {/* Question Text */}
           <div className="mb-3 sm:mb-4 lg:mb-6">
             <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1 sm:mb-2">Question Text *</label>
+            {isMathSubject && focusedMathField === "question" && (
+              <InlineMathToolbar
+                isVisible={true}
+                onInsert={insertMathSymbol}
+              />
+            )}
+            {isUrduSubject && focusedMathField === "question" && (
+              <UrduKeyboard
+                isVisible={true}
+                onInsert={insertLanguageCharacter}
+              />
+            )}
             <textarea
               value={formData.questionText}
               onChange={(e) => setFormData({ ...formData, questionText: e.target.value })}
+              onFocus={() => (isMathSubject || isUrduSubject) && handleMathFieldFocus("question")}
+              onBlur={() => (isMathSubject || isUrduSubject) && setFocusedMathField(null)}
               placeholder="Enter your question here"
               rows={4}
               className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm ${errors.questionText ? "border-red-500" : "border-gray-300"}`}
@@ -386,23 +442,39 @@ export default function QuestionForm({
               <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-2 sm:mb-3">Options *</label>
               <div className="space-y-2 sm:space-y-3">
                 {formData.options.map((option, i) => (
-                  <div key={i} className="flex gap-1 sm:gap-2 items-center">
-                    <span className="w-10 sm:w-12 text-xs sm:text-sm font-medium flex-shrink-0">Option {optionLabels[i]}</span>
-                    <input
-                      type="text"
-                      value={option}
-                      onChange={(e) => handleOptionChange(i, e.target.value)}
-                      placeholder={`Option ${optionLabels[i]}`}
-                      className="flex-1 px-2 sm:px-3 py-1.5 sm:py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-xs sm:text-sm"
-                    />
-                    {formData.options.length > 2 && (
-                      <button
-                        onClick={() => removeOption(i)}
-                        className="px-2 sm:px-3 py-1.5 sm:py-2 bg-red-100 text-red-600 rounded-lg hover:bg-red-200 text-xs sm:text-sm flex-shrink-0"
-                      >
-                        Remove
-                      </button>
+                  <div key={i}>
+                    {isMathSubject && focusedMathField === "option" && activeOptionIndex === i && (
+                      <InlineMathToolbar
+                        isVisible={true}
+                        onInsert={insertMathSymbol}
+                      />
                     )}
+                    {isUrduSubject && focusedMathField === "option" && activeOptionIndex === i && (
+                      <UrduKeyboard
+                        isVisible={true}
+                        onInsert={insertLanguageCharacter}
+                      />
+                    )}
+                    <div className="flex gap-1 sm:gap-2 items-center">
+                      <span className="w-10 sm:w-12 text-xs sm:text-sm font-medium flex-shrink-0">Option {optionLabels[i]}</span>
+                      <input
+                        type="text"
+                        value={option}
+                        onChange={(e) => handleOptionChange(i, e.target.value)}
+                        onFocus={() => (isMathSubject || isUrduSubject) && handleMathFieldFocus("option", i)}
+                        onBlur={() => (isMathSubject || isUrduSubject) && setFocusedMathField(null)}
+                        placeholder={`Option ${optionLabels[i]}`}
+                        className="flex-1 px-2 sm:px-3 py-1.5 sm:py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-xs sm:text-sm"
+                      />
+                      {formData.options.length > 2 && (
+                        <button
+                          onClick={() => removeOption(i)}
+                          className="px-2 sm:px-3 py-1.5 sm:py-2 bg-red-100 text-red-600 rounded-lg hover:bg-red-200 text-xs sm:text-sm flex-shrink-0"
+                        >
+                          Remove
+                        </button>
+                      )}
+                    </div>
                   </div>
                 ))}
               </div>
@@ -520,9 +592,23 @@ export default function QuestionForm({
           {/* Explanation */}
           <div className="mb-4 sm:mb-6">
             <label className="block text-sm font-medium text-gray-700 mb-2">Explanation (Optional)</label>
+            {isMathSubject && focusedMathField === "explanation" && (
+              <InlineMathToolbar
+                isVisible={true}
+                onInsert={insertMathSymbol}
+              />
+            )}
+            {isUrduSubject && focusedMathField === "explanation" && (
+              <UrduKeyboard
+                isVisible={true}
+                onInsert={insertLanguageCharacter}
+              />
+            )}
             <textarea
               value={formData.explanation}
               onChange={(e) => setFormData({ ...formData, explanation: e.target.value })}
+              onFocus={() => (isMathSubject || isUrduSubject) && handleMathFieldFocus("explanation")}
+              onBlur={() => (isMathSubject || isUrduSubject) && setFocusedMathField(null)}
               placeholder="Add explanation for the correct answer"
               rows={3}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"

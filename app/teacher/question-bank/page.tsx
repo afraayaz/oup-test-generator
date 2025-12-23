@@ -106,7 +106,11 @@ export default function TeacherQuestionBankPage() {
     if (!filters.grade) return [];
     const subjects = [...new Set(
       user?.assignedBooks
-        ?.filter(b => b.grade === filters.grade)
+        ?.filter(b => {
+          const normalizedBookGrade = String(b.grade).replace('Grade ', '').trim();
+          const normalizedFilterGrade = String(filters.grade).replace('Grade ', '').trim();
+          return normalizedBookGrade === normalizedFilterGrade;
+        })
         .map(b => b.subject) || []
     )];
     return subjects.sort();
@@ -116,7 +120,11 @@ export default function TeacherQuestionBankPage() {
   const getAvailableBooks = () => {
     if (!filters.grade || !filters.subject) return [];
     const books = user?.assignedBooks
-      ?.filter(b => b.grade === filters.grade && b.subject === filters.subject)
+      ?.filter(b => {
+        const normalizedBookGrade = String(b.grade).replace('Grade ', '').trim();
+        const normalizedFilterGrade = String(filters.grade).replace('Grade ', '').trim();
+        return normalizedBookGrade === normalizedFilterGrade && b.subject === filters.subject;
+      })
       .map(b => b.title) || [];
     return books.sort();
   };

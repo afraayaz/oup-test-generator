@@ -32,18 +32,35 @@ export default function BooksClient({ books: allBooks, error: initialError }: Bo
   const { user } = useUserProfile();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   
-  // Create book objects from teacher's assigned books
-  const teacherBooks = user?.assignedBooks?.map((book, index) => ({
-    id: index + 1,
-    title: book.title,
-    subject: book.subject,
-    grade: book.grade,
-    gradeNumber: book.grade.replace('Grade ', ''),
-    totalChapters: book.chapters || 0,
-    totalQuestions: 0,
-    status: 'Active',
-    chapters: [] as Chapter[]
-  })) || [];
+  // Merge teacher's assigned books with question count data from all books
+  const teacherBooks = user?.assignedBooks?.map((assignedBook, index) => {
+    // Normalize assigned book grade (remove "Grade " prefix if present)
+    const normalizedAssignedGrade = assignedBook.grade.toString().replace('Grade ', '').trim();
+    
+    // Find matching book in allBooks data to get question count and chapters
+    const matchingBookData = allBooks.find(b => {
+      // Normalize book grade from server data
+      const normalizedServerGrade = b.grade.toString().replace('Grade ', '').trim();
+      
+      return (
+        b.title.toLowerCase() === assignedBook.title.toLowerCase() &&
+        b.subject.toLowerCase() === assignedBook.subject.toLowerCase() &&
+        normalizedServerGrade === normalizedAssignedGrade
+      );
+    });
+    
+    return {
+      id: index + 1,
+      title: assignedBook.title,
+      subject: assignedBook.subject,
+      grade: assignedBook.grade,
+      gradeNumber: normalizedAssignedGrade,
+      totalChapters: assignedBook.chapters || 0,
+      totalQuestions: matchingBookData?.totalQuestions || 0,  // Use matched data or fallback to 0
+      status: 'Active',
+      chapters: matchingBookData?.chapters || []  // Use matched chapters or empty array
+    };
+  }) || [];
 
   const [selectedBook, setSelectedBook] = useState<Book | null>(teacherBooks.length > 0 ? teacherBooks[0] : null);
   const [selectedGrade, setSelectedGrade] = useState<string>('all');
