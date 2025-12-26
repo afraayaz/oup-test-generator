@@ -1,5 +1,4 @@
 import UsersClient from './UsersClient';
-import { getAuth } from '@/firebase/firebase';
 
 interface FirestoreValue {
   stringValue?: string;
