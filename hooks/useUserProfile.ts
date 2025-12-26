@@ -13,6 +13,7 @@ export interface UserProfile {
   subjects?: string[];
   assignedGrades?: string[];
   assignedBooks?: { id: string; title: string; subject: string; grade: string; chapters: number }[];
+  subjectGradePairs?: { id: string; subject: string; grade: string; assignedBooks: { id: string; title: string; subject: string; grade: string; chapters: number }[] }[];
 }
 
 export function useUserProfile() {
@@ -73,6 +74,83 @@ export function useUserProfile() {
             console.log('✅ Updated assignedBooks:', assignedBooks);
           }
 
+          // Parse subjectGradePairs array - TRY TO PARSE FROM DATABASE FIRST
+          let subjectGradePairs: { id: string; subject: string; grade: string; assignedBooks: { id: string; title: string; subject: string; grade: string; chapters: number }[] }[] = [];
+          
+          console.log('🔍 Checking if subjectGradePairs exists in database...');
+          console.log('  userDoc.fields?.subjectGradePairs:', userDoc.fields?.subjectGradePairs);
+          
+          if (userDoc.fields?.subjectGradePairs?.arrayValue?.values && userDoc.fields.subjectGradePairs.arrayValue.values.length > 0) {
+            console.log('✅ Found subjectGradePairs in database! Parsing...');
+            try {
+              subjectGradePairs = userDoc.fields.subjectGradePairs.arrayValue.values.map((pairValue: any, idx: number) => {
+                console.log(`  Parsing pair ${idx}:`, pairValue);
+                
+                // Parse books in this pair
+                const pairBooks = (pairValue.mapValue?.fields?.assignedBooks?.arrayValue?.values || []).map((bookValue: any) => {
+                  return {
+                    id: bookValue.mapValue?.fields?.id?.stringValue || '',
+                    title: bookValue.mapValue?.fields?.title?.stringValue || '',
+                    subject: bookValue.mapValue?.fields?.subject?.stringValue || '',
+                    grade: bookValue.mapValue?.fields?.grade?.stringValue || '',
+                    chapters: parseInt(bookValue.mapValue?.fields?.chapters?.integerValue || '0')
+                  };
+                }).filter((book: any) => book.id && book.title);
+                
+                const pair = {
+                  id: pairValue.mapValue?.fields?.id?.stringValue || `pair-${idx}`,
+                  subject: pairValue.mapValue?.fields?.subject?.stringValue || '',
+                  grade: pairValue.mapValue?.fields?.grade?.stringValue || '',
+                  assignedBooks: pairBooks
+                };
+                
+                console.log(`    ✅ Parsed pair: subject="${pair.subject}", grade="${pair.grade}", books=${pair.assignedBooks.length}`);
+                return pair;
+              });
+              console.log('✅ Successfully parsed subjectGradePairs from database:', subjectGradePairs);
+            } catch (err) {
+              console.error('❌ Error parsing subjectGradePairs:', err);
+            }
+          }
+          
+          // Fallback: If we couldn't parse from database, rebuild from subjects/grades/books
+          if (subjectGradePairs.length === 0) {
+            console.log('🔧 No valid subjectGradePairs from database. Rebuilding from subjects/grades/books...');
+            console.log('  subjects:', subjects);
+            console.log('  assignedGrades:', assignedGrades);
+            console.log('  assignedBooks:', assignedBooks);
+            
+            if (subjects.length > 0 && assignedGrades.length > 0) {
+              // Create one pair per subject-grade combination
+              subjectGradePairs = subjects.map((subject, idx) => {
+                const grade = assignedGrades[idx] || assignedGrades[0];
+                const normalizedGrade = grade.startsWith('Grade') ? grade : `Grade ${grade}`;
+                
+                // Find all books that match this grade
+                const booksForThisGrade = assignedBooks.filter(book => {
+                  const bookGrade = book.grade.replace('Grade ', '').trim();
+                  const gradeNum = grade.replace('Grade ', '').trim();
+                  return bookGrade === gradeNum;
+                });
+                
+                console.log(`  Pair ${idx}: subject="${subject}", grade="${normalizedGrade}", books=${booksForThisGrade.length}`);
+                
+                return {
+                  id: `${subject.toLowerCase()}-${grade.replace('Grade ', '').trim()}-${Date.now()}`,
+                  subject: subject,
+                  grade: normalizedGrade,
+                  assignedBooks: booksForThisGrade.map(book => ({
+                    ...book,
+                    subject: subject // Ensure subject is always set
+                  }))
+                };
+              });
+              console.log('✅ Rebuilt subjectGradePairs:', subjectGradePairs);
+            } else {
+              console.log('⚠️ Not enough data to build subjectGradePairs. subjects:', subjects.length, 'grades:', assignedGrades.length);
+            }
+          }
+
           const userProfile: UserProfile = {
             name: userDoc.fields?.name?.stringValue || 'User',
             email: userDoc.fields?.email?.stringValue || authUser.email || '',
@@ -83,9 +161,21 @@ export function useUserProfile() {
             subjects: subjects.length > 0 ? subjects : undefined,
             assignedGrades: assignedGrades.length > 0 ? assignedGrades : undefined,
             assignedBooks: assignedBooks,
+            subjectGradePairs: subjectGradePairs && subjectGradePairs.length > 0 ? subjectGradePairs : [],
           };
           
+          console.log('🎓 Creating userProfile with:', {
+            name: userProfile.name,
+            email: userProfile.email,
+            role: userProfile.role,
+            subjectGradePairsLength: subjectGradePairs.length,
+            subjectGradePairs: subjectGradePairs,
+            assignedBooksLength: assignedBooks.length,
+            subjects: subjects,
+            assignedGrades: assignedGrades
+          });
           console.log('✅ Updated user profile:', userProfile);
+          console.log('🔥 About to call setUser with:', userProfile);
           setUser(userProfile);
           saveTabSession(userProfile);
           return true;

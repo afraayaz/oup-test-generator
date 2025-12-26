@@ -235,13 +235,13 @@ export default function QuestionBank({
   }
 
   return (
-    <div className="w-full space-y-4 sm:space-y-6">
+    <div className="w-full px-3 sm:px-4 lg:px-6 py-4 sm:py-6 space-y-4 sm:space-y-5">
       {/* Filters */}
-      <div className="bg-white rounded-lg shadow-sm p-3 sm:p-4 space-y-3 sm:space-y-4">
+      <div className="bg-white rounded-xl shadow-sm p-3 sm:p-4 space-y-3 sm:space-y-4 border border-gray-100">
         <h3 className="font-semibold text-sm sm:text-base text-gray-900">Filters</h3>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 sm:gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 sm:gap-3">
           <div>
-            <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1 sm:mb-2">
+            <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1.5">
               Subject
             </label>
             <select
@@ -249,7 +249,7 @@ export default function QuestionBank({
               onChange={(e) =>
                 setFilters({ ...filters, subject: e.target.value })
               }
-              className="w-full px-2 sm:px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+              className="w-full px-2.5 sm:px-3 py-1.5 sm:py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-xs sm:text-sm bg-white hover:border-gray-400 transition-colors"
             >
               <option value="">All Subjects</option>
               {uniqueSubjects.map((subject) => (
@@ -261,7 +261,7 @@ export default function QuestionBank({
           </div>
 
           <div>
-            <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1 sm:mb-2">
+            <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1.5">
               Grade
             </label>
             <select
@@ -269,7 +269,7 @@ export default function QuestionBank({
               onChange={(e) =>
                 setFilters({ ...filters, grade: e.target.value })
               }
-              className="w-full px-2 sm:px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+              className="w-full px-2.5 sm:px-3 py-1.5 sm:py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-xs sm:text-sm bg-white hover:border-gray-400 transition-colors"
             >
               <option value="">All Grades</option>
               {uniqueGrades.map((grade) => (
@@ -281,13 +281,13 @@ export default function QuestionBank({
           </div>
 
           <div>
-            <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1 sm:mb-2">
+            <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1.5">
               Book
             </label>
             <select
               value={filters.book}
               onChange={(e) => setFilters({ ...filters, book: e.target.value })}
-              className="w-full px-2 sm:px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+              className="w-full px-2.5 sm:px-3 py-1.5 sm:py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-xs sm:text-sm bg-white hover:border-gray-400 transition-colors"
             >
               <option value="">All Books</option>
               {uniqueBooks.map((book) => (
@@ -301,101 +301,111 @@ export default function QuestionBank({
       </div>
 
       {/* Statistics */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-4">
-        <div className="bg-white rounded-lg shadow-sm p-3 sm:p-4">
-          <div className="text-xl sm:text-2xl font-bold text-gray-900">
+      <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3">
+        <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-lg shadow-sm p-3 sm:p-4 border border-blue-200">
+          <div className="text-lg sm:text-2xl font-bold text-blue-900">
             {filteredQuestions.length}
           </div>
-          <div className="text-xs sm:text-sm text-gray-500">Questions</div>
+          <div className="text-xs sm:text-sm text-blue-700 font-medium">Questions</div>
         </div>
-        <div className="bg-white rounded-lg shadow-sm p-3 sm:p-4">
-          <div className="text-xl sm:text-2xl font-bold text-gray-900">
+        <div className="bg-gradient-to-br from-purple-50 to-purple-100 rounded-lg shadow-sm p-3 sm:p-4 border border-purple-200">
+          <div className="text-lg sm:text-2xl font-bold text-purple-900">
             {uniqueSubjects.length}
           </div>
-          <div className="text-xs sm:text-sm text-gray-500">Subjects</div>
+          <div className="text-xs sm:text-sm text-purple-700 font-medium">Subjects</div>
         </div>
-        <div className="bg-white rounded-lg shadow-sm p-3 sm:p-4">
-          <div className="text-xl sm:text-2xl font-bold text-gray-900">
+        <div className="bg-gradient-to-br from-green-50 to-green-100 rounded-lg shadow-sm p-3 sm:p-4 border border-green-200">
+          <div className="text-lg sm:text-2xl font-bold text-green-900">
             {uniqueGrades.length}
           </div>
-          <div className="text-xs sm:text-sm text-gray-500">Grades</div>
+          <div className="text-xs sm:text-sm text-green-700 font-medium">Grades</div>
         </div>
-        <div className="bg-white rounded-lg shadow-sm p-3 sm:p-4">
-          <div className="text-xl sm:text-2xl font-bold text-gray-900">
+        <div className="bg-gradient-to-br from-orange-50 to-orange-100 rounded-lg shadow-sm p-3 sm:p-4 border border-orange-200">
+          <div className="text-lg sm:text-2xl font-bold text-orange-900">
             {uniqueBooks.length}
           </div>
-          <div className="text-xs sm:text-sm text-gray-500">Books</div>
+          <div className="text-xs sm:text-sm text-orange-700 font-medium">Books</div>
         </div>
       </div>
 
       {/* Questions List */}
       {filteredQuestions.length === 0 ? (
-        <div className="bg-white rounded-lg shadow-sm p-6 sm:p-8 text-center">
-          <p className="text-sm sm:text-base text-gray-500">
+        <div className="bg-white rounded-xl shadow-sm p-8 sm:p-12 text-center border border-gray-100">
+          <div className="flex justify-center mb-3">
+            <i className="ri-file-list-3-line text-4xl text-gray-300"></i>
+          </div>
+          <p className="text-sm sm:text-base text-gray-600 font-medium">
             {questions.length === 0
               ? "No questions yet. Create your first question!"
               : "No questions match your filters."}
           </p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 sm:gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3 sm:gap-3.5">
           {filteredQuestions.map((question) => (
             <div
               key={question.id}
-              className="bg-indigo-50 rounded-lg shadow-sm p-3 sm:p-4 border border-indigo-200 hover:shadow-md hover:border-indigo-300 transition-all"
+              className="bg-white rounded-lg shadow-sm hover:shadow-md border border-gray-200 hover:border-blue-300 transition-all duration-300 overflow-hidden flex flex-col"
             >
-              {/* Type Badge */}
-              <div className="flex items-start justify-between mb-2 sm:mb-3">
+              {/* Card Header with Type Badge */}
+              <div className="bg-gradient-to-r from-gray-50 to-gray-100 px-3 sm:px-4 py-2.5 sm:py-3 flex items-center justify-between border-b border-gray-200">
                 <span
-                  className={`inline-block px-2 py-1 rounded text-xs sm:text-sm font-medium ${
+                  className={`inline-block px-2 py-0.5 rounded-full text-xs font-semibold ${
                     typeColors[question.type] ||
                     "bg-gray-100 text-gray-800"
                   }`}
                 >
                   {typeLabels[question.type] || question.type}
                 </span>
-                <span className="text-xs text-gray-500">
+                <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-yellow-100 text-yellow-800">
                   {question.difficulty}
                 </span>
               </div>
 
-              {/* Question Text Preview */}
-              <p className="text-xs sm:text-sm text-gray-700 mb-2 sm:mb-3 line-clamp-2">
-                {question.questionText}
-              </p>
+              {/* Card Body */}
+              <div className="flex-1 px-3 sm:px-4 py-2.5 sm:py-3 space-y-2">
+                {/* Question Text Preview */}
+                <p className="text-xs sm:text-sm text-gray-800 leading-relaxed line-clamp-3 font-medium">
+                  {question.questionText || "No text provided"}
+                </p>
 
-              {/* Metadata */}
-              <div className="text-xs text-gray-500 space-y-1 mb-3 sm:mb-4 bg-gray-50 p-2 rounded">
-                <p>
-                  <strong>Subject:</strong> {question.subject}
-                </p>
-                <p>
-                  <strong>Grade:</strong> {question.grade}
-                </p>
-                <p>
-                  <strong>Book:</strong> {question.book}
-                </p>
-                <p>
-                  <strong>Chapter:</strong> {question.chapter}
-                </p>
+                {/* Metadata */}
+                <div className="text-xs text-gray-600 space-y-1 bg-gray-50 -mx-3 sm:-mx-4 -mb-2.5 sm:-mb-3 px-3 sm:px-4 py-2 sm:py-2.5 rounded-b-lg">
+                  <div className="flex items-center justify-between">
+                    <span className="font-medium text-gray-700">Subject:</span>
+                    <span className="text-gray-600">{question.subject}</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="font-medium text-gray-700">Grade:</span>
+                    <span className="text-gray-600">{question.grade}</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="font-medium text-gray-700">Book:</span>
+                    <span className="text-gray-600">{question.book}</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="font-medium text-gray-700">Chapter:</span>
+                    <span className="text-gray-600">{question.chapter}</span>
+                  </div>
+                </div>
               </div>
 
-              {/* Actions */}
-              <div className="flex flex-col sm:flex-row gap-2">
+              {/* Card Footer - Actions */}
+              <div className="bg-gray-50 border-t border-gray-200 px-3 sm:px-4 py-2.5 flex gap-2">
                 {allowEdit && (
                   <button
                     onClick={() => handleEdit(question)}
-                    className="flex-1 px-2 sm:px-3 py-2 bg-blue-100 text-blue-600 rounded hover:bg-blue-200 text-xs sm:text-sm font-medium transition-colors"
+                    className="flex-1 px-2 sm:px-3 py-1.5 bg-blue-50 text-blue-700 hover:bg-blue-100 rounded-md text-xs sm:text-sm font-semibold transition-colors border border-blue-200"
                   >
-                    Edit
+                    <i className="ri-edit-line mr-1"></i>Edit
                   </button>
                 )}
                 {allowDelete && (
                   <button
                     onClick={() => handleDeleteQuestion(question.id)}
-                    className="flex-1 px-2 sm:px-3 py-2 bg-red-100 text-red-600 rounded hover:bg-red-200 text-xs sm:text-sm font-medium transition-colors"
+                    className="flex-1 px-2 sm:px-3 py-1.5 bg-red-50 text-red-700 hover:bg-red-100 rounded-md text-xs sm:text-sm font-semibold transition-colors border border-red-200"
                   >
-                    Delete
+                    <i className="ri-delete-bin-line mr-1"></i>Delete
                   </button>
                 )}
               </div>
@@ -407,67 +417,68 @@ export default function QuestionBank({
       {/* Edit Modal */}
       {editingQuestion && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg shadow-lg p-4 sm:p-6 max-w-md w-full">
-            <h3 className="text-base sm:text-lg font-bold text-gray-900 mb-3 sm:mb-4">
+          <div className="bg-white rounded-xl shadow-2xl p-5 sm:p-6 max-w-md w-full border border-gray-200">
+            <h3 className="text-base sm:text-lg font-bold text-gray-900 mb-4 sm:mb-5 flex items-center">
+              <i className="ri-edit-2-line mr-2 text-blue-600"></i>
               Edit Question
             </h3>
 
-            <div className="space-y-3 sm:space-y-4 max-h-[60vh] overflow-y-auto">
+            <div className="space-y-3 sm:space-y-4 max-h-[60vh] overflow-y-auto pr-2">
               {/* Subject (Read-only) */}
               <div>
-                <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-xs sm:text-sm font-semibold text-gray-700 mb-1.5">
                   Subject
                 </label>
                 <input
                   type="text"
                   value={editingQuestion.subject}
                   disabled
-                  className="w-full px-2 sm:px-3 py-2 bg-gray-100 border border-gray-300 rounded-lg text-gray-600 cursor-not-allowed text-sm"
+                  className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-gray-600 cursor-not-allowed text-xs sm:text-sm"
                 />
               </div>
 
               {/* Grade (Read-only) */}
               <div>
-                <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-xs sm:text-sm font-semibold text-gray-700 mb-1.5">
                   Grade
                 </label>
                 <input
                   type="text"
                   value={editingQuestion.grade}
                   disabled
-                  className="w-full px-2 sm:px-3 py-2 bg-gray-100 border border-gray-300 rounded-lg text-gray-600 cursor-not-allowed text-sm"
+                  className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-gray-600 cursor-not-allowed text-xs sm:text-sm"
                 />
               </div>
 
               {/* Book (Read-only) */}
               <div>
-                <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-xs sm:text-sm font-semibold text-gray-700 mb-1.5">
                   Book
                 </label>
                 <input
                   type="text"
                   value={editingQuestion.book}
                   disabled
-                  className="w-full px-2 sm:px-3 py-2 bg-gray-100 border border-gray-300 rounded-lg text-gray-600 cursor-not-allowed text-sm"
+                  className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-gray-600 cursor-not-allowed text-xs sm:text-sm"
                 />
               </div>
 
               {/* Type (Read-only) */}
               <div>
-                <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-xs sm:text-sm font-semibold text-gray-700 mb-1.5">
                   Type
                 </label>
                 <input
                   type="text"
                   value={typeLabels[editingQuestion.type] || editingQuestion.type}
                   disabled
-                  className="w-full px-2 sm:px-3 py-2 bg-gray-100 border border-gray-300 rounded-lg text-gray-600 cursor-not-allowed text-sm"
+                  className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-gray-600 cursor-not-allowed text-xs sm:text-sm"
                 />
               </div>
 
               {/* Question Text (Editable) */}
               <div>
-                <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-xs sm:text-sm font-semibold text-gray-700 mb-1.5">
                   Question Text *
                 </label>
                 <textarea
@@ -479,13 +490,13 @@ export default function QuestionBank({
                     })
                   }
                   rows={3}
-                  className="w-full px-2 sm:px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-xs sm:text-sm resize-none"
                 />
               </div>
 
               {/* Chapter (Editable) */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-xs sm:text-sm font-semibold text-gray-700 mb-1.5">
                   Chapter *
                 </label>
                 <input
@@ -494,13 +505,13 @@ export default function QuestionBank({
                   onChange={(e) =>
                     setEditFormData({ ...editFormData, chapter: e.target.value })
                   }
-                  className="w-full px-2 sm:px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-xs sm:text-sm"
                 />
               </div>
 
               {/* Difficulty (Editable) */}
               <div>
-                <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-xs sm:text-sm font-semibold text-gray-700 mb-1.5">
                   Difficulty *
                 </label>
                 <select
@@ -511,9 +522,9 @@ export default function QuestionBank({
                       difficulty: e.target.value,
                     })
                   }
-                  className="w-full px-2 sm:px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-xs sm:text-sm bg-white"
                 >
-                  <option value="">Select</option>
+                  <option value="">Select difficulty</option>
                   <option value="Easy">Easy</option>
                   <option value="Medium">Medium</option>
                   <option value="Hard">Hard</option>
@@ -522,20 +533,20 @@ export default function QuestionBank({
             </div>
 
             {/* Modal Buttons */}
-            <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 mt-4 sm:mt-6">
+            <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 mt-5 sm:mt-6 pt-4 border-t border-gray-200">
               <button
                 onClick={() => {
                   setEditingQuestion(null);
                   setEditFormData({});
                 }}
-                className="flex-1 px-3 sm:px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 font-medium text-sm"
+                className="flex-1 px-3 sm:px-4 py-2.5 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 font-semibold text-xs sm:text-sm transition-colors"
               >
                 Cancel
               </button>
               <button
                 onClick={handleSaveEdit}
                 disabled={isSaving}
-                className="flex-1 px-3 sm:px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium disabled:opacity-50 text-sm"
+                className="flex-1 px-3 sm:px-4 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-semibold disabled:opacity-50 disabled:cursor-not-allowed text-xs sm:text-sm transition-colors"
               >
                 {isSaving ? "Saving..." : "Save"}
               </button>

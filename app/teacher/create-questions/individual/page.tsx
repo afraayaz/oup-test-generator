@@ -3,7 +3,7 @@
 import { useState, useMemo } from "react";
 import Sidebar from "@/components/Sidebar";
 import { useUserProfile } from "@/hooks/useUserProfile";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import QuestionForm, { QuestionFormData } from "@/components/QuestionForm";
 
 export default function TeacherCreateIndividualQuestionPage() {
@@ -11,6 +11,7 @@ export default function TeacherCreateIndividualQuestionPage() {
   const [loading, setLoading] = useState(false);
   const [successMessage, setSuccessMessage] = useState("");
   const { user } = useUserProfile();
+  const router = useRouter();
   const searchParams = useSearchParams();
 
   const defaultGrade = searchParams.get("grade") || "";
@@ -22,7 +23,26 @@ export default function TeacherCreateIndividualQuestionPage() {
     const subjects = new Set<string>();
     const books: Array<{ id: string; title: string; subject: string; grade: string; chapters?: number }> = [];
 
-    if (user?.assignedBooks) {
+    // First try to use subjectGradePairs if available (has proper structure)
+    if (user?.subjectGradePairs && user.subjectGradePairs.length > 0) {
+      user.subjectGradePairs.forEach((pair: any) => {
+        grades.add(pair.grade);
+        subjects.add(pair.subject);
+        if (pair.assignedBooks && Array.isArray(pair.assignedBooks)) {
+          pair.assignedBooks.forEach((book: any) => {
+            books.push({
+              id: book.id || book.title,
+              title: book.title,
+              subject: pair.subject, // Use subject from the pair!
+              grade: book.grade || pair.grade,
+              chapters: book.chapters || 0,
+            });
+          });
+        }
+      });
+    }
+    // Fallback to assignedBooks if subjectGradePairs not available
+    else if (user?.assignedBooks) {
       user.assignedBooks.forEach((book: any) => {
         grades.add(book.grade);
         subjects.add(book.subject);
@@ -41,7 +61,7 @@ export default function TeacherCreateIndividualQuestionPage() {
       availableSubjects: Array.from(subjects).sort(),
       submittedBooks: books,
     };
-  }, [user?.assignedBooks]);
+  }, [user?.subjectGradePairs, user?.assignedBooks]);
 
   const handleQuestionSubmit = async (questionData: QuestionFormData) => {
     setLoading(true);
@@ -74,6 +94,10 @@ export default function TeacherCreateIndividualQuestionPage() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleSwitchToBank = () => {
+    router.push("/teacher/create-questions?mode=bank");
   };
 
   if (!user) {
@@ -120,6 +144,7 @@ export default function TeacherCreateIndividualQuestionPage() {
 
             <QuestionForm
               onSubmit={handleQuestionSubmit}
+              onSwitchToBank={handleSwitchToBank}
               loading={loading}
               submittedBooks={submittedBooks}
               subjects={availableSubjects}

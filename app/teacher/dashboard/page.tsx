@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Sidebar from "@/components/Sidebar";
 import { useUserProfile } from "@/hooks/useUserProfile";
 import { useAuthGuard } from "@/hooks/useAuthGuard";
@@ -9,6 +9,7 @@ import {
   FiEdit,
   FiCheckSquare,
   FiMenu,
+  FiChevronDown,
 } from "react-icons/fi";
 import { FaBook, FaPencilAlt, FaClipboardList, FaTasks } from "react-icons/fa";
 
@@ -124,6 +125,116 @@ const AssignedBookItem = ({
   </div>
 );
 
+const QuestionCountTooltip = ({
+  totalQuestions,
+  oupQuestions,
+  schoolQuestions,
+  isVisible,
+}: {
+  totalQuestions: number;
+  oupQuestions: number;
+  schoolQuestions: number;
+  isVisible: boolean;
+}) => {
+  if (!isVisible) return null;
+  
+  return (
+    <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 z-50">
+      <div className="bg-gray-900 text-white text-xs px-3 py-2 rounded-lg whitespace-nowrap shadow-lg">
+        <div className="font-semibold mb-1">Question Breakdown:</div>
+        <div className="space-y-0.5">
+          <div>📚 OUP Bank: <span className="font-semibold">{oupQuestions}</span></div>
+          <div>🏫 School Bank: <span className="font-semibold">{schoolQuestions}</span></div>
+        </div>
+        <div className="absolute top-full left-1/2 transform -translate-x-1/2 border-4 border-transparent border-t-gray-900"></div>
+      </div>
+    </div>
+  );
+};
+
+const BookGroupSection = ({
+  groupTitle,
+  bookCount,
+  books,
+  isExpanded,
+  onToggle,
+  questionCounts,
+  schoolId,
+}: {
+  groupTitle: string;
+  bookCount: number;
+  books: { id: string; title: string; subject: string; grade: string; chapters: number }[];
+  isExpanded: boolean;
+  onToggle: () => void;
+  questionCounts: { [bookId: string]: { total: number; oup: number; school: number } };
+  schoolId: string;
+}) => {
+  const [hoveredBook, setHoveredBook] = useState<string | null>(null);
+
+  return (
+    <div className="border border-gray-200 rounded-2xl overflow-hidden bg-white">
+      <button
+        onClick={onToggle}
+        className="w-full flex items-center justify-between p-4 hover:bg-gray-50 transition-colors"
+      >
+        <div className="flex items-center gap-3">
+          <FaBook className="text-blue-600 flex-shrink-0" />
+          <div className="text-left">
+            <h4 className="font-semibold text-gray-800">{groupTitle}</h4>
+            <p className="text-xs text-gray-500">{bookCount} book{bookCount !== 1 ? 's' : ''}</p>
+          </div>
+        </div>
+        <div className={`transition-transform duration-300 ${isExpanded ? 'rotate-180' : ''}`}>
+          <FiChevronDown size={20} className="text-gray-600" />
+        </div>
+      </button>
+
+      {isExpanded && (
+        <div className="border-t border-gray-200 p-4 space-y-3 bg-gray-50">
+          {books.map((book) => {
+            const counts = questionCounts[book.id] || { total: 0, oup: 0, school: 0 };
+            return (
+              <div key={book.id} className="bg-white p-3 rounded-lg border border-gray-100">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                  <div className="flex-1 min-w-0">
+                    <h5 className="font-semibold text-gray-800 text-sm">{book.title}</h5>
+                    <div className="flex items-center gap-4 mt-1 text-xs text-gray-600">
+                      <span className="flex items-center">
+                        <FaBook className="mr-1 flex-shrink-0" />
+                        {book.chapters} Chapters
+                      </span>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3 flex-shrink-0">
+                    <div className="relative">
+                      <button
+                        onMouseEnter={() => setHoveredBook(book.id)}
+                        onMouseLeave={() => setHoveredBook(null)}
+                        className="px-3 py-1.5 bg-blue-100 text-blue-600 rounded-full text-xs font-semibold hover:bg-blue-200 transition-colors"
+                      >
+                        {counts.total} Q's
+                      </button>
+                      <QuestionCountTooltip
+                        totalQuestions={counts.total}
+                        oupQuestions={counts.oup}
+                        schoolQuestions={counts.school}
+                        isVisible={hoveredBook === book.id}
+                      />
+                    </div>
+                    <button className="text-gray-400 hover:text-gray-600 p-2">
+                      <FiEdit size={16} />
+                    </button>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+};
+
 const TodoItem = ({
   task,
   date,
@@ -153,6 +264,208 @@ export default function TeacherDashboard() {
   const { user } = useUserProfile();
   const { isAuthenticated, isLoading } = useAuthGuard();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [expandedGroups, setExpandedGroups] = useState<{ [key: string]: boolean }>({});
+  const [questionCounts, setQuestionCounts] = useState<{ [bookId: string]: { total: number; oup: number; school: number } }>({});
+  const [loadingQuestions, setLoadingQuestions] = useState(false);
+
+  // Fetch question counts for all assigned books
+  useEffect(() => {
+    console.log('🔍 useEffect triggered - Checking conditions...');
+    console.log('📚 user?.assignedBooks:', user?.assignedBooks);
+    console.log('👨‍🏫 user?.subjectGradePairs:', user?.subjectGradePairs);
+    console.log('🏫 user?.schoolId:', user?.schoolId);
+    console.log('✅ assignedBooks length:', user?.assignedBooks?.length);
+    console.log('✅ subjectGradePairs length:', user?.subjectGradePairs?.length);
+    
+    // Early return if missing required data
+    if (!user?.assignedBooks || user.assignedBooks.length === 0 || !user?.schoolId) {
+      console.log('❌ Early return: Missing assignedBooks or schoolId');
+      return;
+    }
+    
+    console.log('✅ Starting to fetch question counts for', user.assignedBooks.length, 'books');
+    console.log('📋 Assigned Books:', JSON.stringify(user.assignedBooks, null, 2));
+    setLoadingQuestions(true);
+    const fetchQuestionCounts = async () => {
+      try {
+        const counts: { [bookId: string]: { total: number; oup: number; school: number } } = {};
+        
+        // Fetch OUP questions
+        const oupUrl = `https://firestore.googleapis.com/v1/projects/quiz-app-ff0ab/databases/(default)/documents/questions/oup/items`;
+        const oupResponse = await fetch(oupUrl);
+        const oupData = oupResponse.ok ? await oupResponse.json() : { documents: [] };
+        console.log('📡 OUP Response OK:', oupResponse.ok, 'Documents:', oupData.documents?.length || 0);
+        
+        // Fetch School questions
+        const schoolUrl = `https://firestore.googleapis.com/v1/projects/quiz-app-ff0ab/databases/(default)/documents/questions/schools/${user.schoolId}`;
+        const schoolResponse = await fetch(schoolUrl);
+        const schoolData = schoolResponse.ok ? await schoolResponse.json() : { documents: [] };
+        console.log('📡 School Response OK:', schoolResponse.ok, 'Documents:', schoolData.documents?.length || 0);
+        
+        // Helper to parse Firestore values
+        const parseFirestoreValue = (value: any): any => {
+          if (value.stringValue !== undefined) return value.stringValue;
+          if (value.integerValue !== undefined) return parseInt(value.integerValue);
+          if (value.doubleValue !== undefined) return parseFloat(value.doubleValue);
+          if (value.booleanValue !== undefined) return value.booleanValue;
+          if (value.arrayValue) return (value.arrayValue.values || []).map(parseFirestoreValue);
+          if (value.mapValue) {
+            const result: Record<string, any> = {};
+            for (const [k, v] of Object.entries(value.mapValue.fields || {})) {
+              result[k] = parseFirestoreValue(v);
+            }
+            return result;
+          }
+          return null;
+        };
+        
+        // Parse OUP questions and group by book+subject+grade
+        const oupQuestions = oupData.documents || [];
+        const oupByBook: { [key: string]: number } = {};
+        console.log('🔍 Total OUP Documents:', oupQuestions.length);
+        oupQuestions.forEach((doc: any, idx: number) => {
+          const rawBook = doc.fields?.book;
+          const rawSubject = doc.fields?.subject;
+          const rawGrade = doc.fields?.grade;
+          
+          console.log(`📄 OUP Doc ${idx}:`, {
+            book: rawBook,
+            subject: rawSubject,
+            grade: rawGrade
+          });
+          
+          const book = parseFirestoreValue(rawBook);
+          const subject = parseFirestoreValue(rawSubject);
+          const grade = String(parseFirestoreValue(rawGrade) || '').replace('Grade ', '').trim();
+          
+          console.log(`  Parsed: book="${book}", subject="${subject}", grade="${grade}"`);
+          
+          if (book && subject && grade) {
+            const key = `${book.toLowerCase()}-${subject.toLowerCase()}-${grade}`;
+            oupByBook[key] = (oupByBook[key] || 0) + 1;
+            console.log(`✅ OUP Question: book="${book}", subject="${subject}", grade="${grade}" → key="${key}"`);
+          } else {
+            console.log(`⚠️ OUP Question skipped (missing fields): book="${book}", subject="${subject}", grade="${grade}"`);
+          }
+        });
+        console.log('📊 OUP Questions by Book:', oupByBook);
+        
+        // Parse School questions and group by book+subject+grade
+        const schoolQuestions = schoolData.documents || [];
+        const schoolByBook: { [key: string]: number } = {};
+        console.log('🔍 Total School Documents:', schoolQuestions.length);
+        schoolQuestions.forEach((doc: any, idx: number) => {
+          const rawBook = doc.fields?.book;
+          const rawSubject = doc.fields?.subject;
+          const rawGrade = doc.fields?.grade;
+          
+          console.log(`📄 School Doc ${idx}:`, {
+            book: rawBook,
+            subject: rawSubject,
+            grade: rawGrade
+          });
+          
+          const book = parseFirestoreValue(rawBook);
+          const subject = parseFirestoreValue(rawSubject);
+          const grade = String(parseFirestoreValue(rawGrade) || '').replace('Grade ', '').trim();
+          
+          console.log(`  Parsed: book="${book}", subject="${subject}", grade="${grade}"`);
+          
+          if (book && subject && grade) {
+            const key = `${book.toLowerCase()}-${subject.toLowerCase()}-${grade}`;
+            schoolByBook[key] = (schoolByBook[key] || 0) + 1;
+            console.log(`✅ School Question: book="${book}", subject="${subject}", grade="${grade}" → key="${key}"`);
+          } else {
+            console.log(`⚠️ School Question skipped (missing fields): book="${book}", subject="${subject}", grade="${grade}"`);
+          }
+        });
+        console.log('📊 School Questions by Book:', schoolByBook);
+        
+        // Build counts object for each book in subjectGradePairs
+        // This ensures we have the subject information
+        console.log('👨‍🏫 Teacher SubjectGradePairs:', user.subjectGradePairs);
+        console.log('👨‍🏫 Teacher Subjects:', user.subjects);
+        console.log('👨‍🏫 Teacher AssignedGrades:', user.assignedGrades);
+        console.log('👨‍🏫 Teacher AssignedBooks:', user.assignedBooks);
+        
+        // REVERSE MATCHING: If subjects aren't available, extract them from the questions!
+        // For each assigned book, find what subject(s) have questions for that book-grade combo
+        console.log('🔄 Attempting reverse matching - finding subjects from questions...');
+        
+        user.assignedBooks.forEach(book => {
+          const bookTitle = book.title.toLowerCase();
+          const bookGrade = book.grade.replace('Grade ', '').trim();
+          
+          // Look for questions matching this book-grade in both OUP and School databases
+          const matchingOupKeys = Object.keys(oupByBook).filter(key => 
+            key.startsWith(bookTitle + '-') && key.endsWith('-' + bookGrade)
+          );
+          const matchingSchoolKeys = Object.keys(schoolByBook).filter(key =>
+            key.startsWith(bookTitle + '-') && key.endsWith('-' + bookGrade)
+          );
+          
+          const allMatchingKeys = [...matchingOupKeys, ...matchingSchoolKeys];
+          console.log(`  Book "${book.title}" Grade ${book.grade}:`, { matchingOupKeys, matchingSchoolKeys, allMatchingKeys });
+          
+          // Extract subject from matching keys (format: "book-subject-grade")
+          if (allMatchingKeys.length > 0) {
+            const firstKey = allMatchingKeys[0];
+            const parts = firstKey.split('-');
+            const subject = parts[1]; // Extract subject from key
+            
+            const oupCount = matchingOupKeys.reduce((sum, key) => sum + (oupByBook[key] || 0), 0);
+            const schoolCount = matchingSchoolKeys.reduce((sum, key) => sum + (schoolByBook[key] || 0), 0);
+            
+            console.log(`    ✅ Found matching key "${firstKey}", extracted subject: "${subject}", OUP: ${oupCount}, School: ${schoolCount}`);
+            
+            counts[book.id] = {
+              oup: oupCount,
+              school: schoolCount,
+              total: oupCount + schoolCount
+            };
+          } else {
+            console.log(`    ❌ No matching questions found for book "${book.title}" Grade ${book.grade}`);
+            counts[book.id] = { oup: 0, school: 0, total: 0 };
+          }
+        });
+        
+        console.log('📚 Reverse matching complete, final counts:', counts);
+        console.log('🎯 Final OUP by Book Keys:', Object.keys(oupByBook));
+        console.log('🎯 Final School by Book Keys:', Object.keys(schoolByBook));
+        
+        setQuestionCounts(counts);
+        console.log('✅ Question counts fetched:', counts);
+      } catch (error) {
+        console.error('❌ Error fetching question counts:', error);
+      } finally {
+        setLoadingQuestions(false);
+      }
+    };
+    
+    fetchQuestionCounts();
+  }, [user?.assignedBooks, user?.schoolId]);
+
+  // Toggle group expansion
+  const toggleGroup = (groupKey: string) => {
+    setExpandedGroups(prev => ({
+      ...prev,
+      [groupKey]: !prev[groupKey]
+    }));
+  };
+
+  // Group books by Subject and Grade
+  const groupedBooks = user?.assignedBooks?.reduce((acc, book) => {
+    const groupKey = `${book.subject}-${book.grade}`;
+    if (!acc[groupKey]) {
+      acc[groupKey] = {
+        subject: book.subject,
+        grade: book.grade,
+        books: []
+      };
+    }
+    acc[groupKey].books.push(book);
+    return acc;
+  }, {} as { [key: string]: { subject: string; grade: string; books: typeof user.assignedBooks } }) || {};
 
   // Show loading while checking authentication
   if (isLoading) {
@@ -243,16 +556,18 @@ export default function TeacherDashboard() {
                 <FiPlus size={18} />
               </button>
             </div>
-            <div className="space-y-3 sm:space-y-4">
+            <div className="space-y-3">
               {user?.assignedBooks && user.assignedBooks.length > 0 ? (
-                user.assignedBooks.map((book, index) => (
-                  <AssignedBookItem
-                    key={book.id}
-                    title={book.title}
-                    subject={book.subject}
-                    chapters={book.chapters}
-                    questions={0} // You can add question count logic later
-                    status="Active"
+                Object.entries(groupedBooks).map(([groupKey, group]) => (
+                  <BookGroupSection
+                    key={groupKey}
+                    groupTitle={`${group.subject} - ${group.grade.toString().replace(/^Grade\s/, 'Grade ')}`}
+                    bookCount={group.books.length}
+                    books={group.books}
+                    isExpanded={expandedGroups[groupKey] ?? true}
+                    onToggle={() => toggleGroup(groupKey)}
+                    questionCounts={questionCounts}
+                    schoolId={user?.schoolId || ''}
                   />
                 ))
               ) : (

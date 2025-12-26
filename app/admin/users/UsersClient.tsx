@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Sidebar from '@/components/Sidebar';
 
 interface SubjectGradePair {
@@ -101,8 +101,9 @@ export default function UsersClient({ initialUsers, schools, campuses }: Props) 
 
   const [availableBooks, setAvailableBooks] = useState<{ [subject: string]: any[] }>({});
   const [loadingBooks, setLoadingBooks] = useState<{ [subject: string]: boolean }>({});
+  const [availableSubjects, setAvailableSubjects] = useState<string[]>([]);
+  const [loadingSubjects, setLoadingSubjects] = useState(false);
 
-  const availableSubjects = ['English', 'Mathematics', 'Science', 'Urdu', 'Computer', 'Social Studies', 'Islamiat', 'Pakistan Studies'];
   const availableGrades = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10'];
   const availableSections = ['A', 'B', 'C', 'D'];
 
@@ -119,6 +120,27 @@ export default function UsersClient({ initialUsers, schools, campuses }: Props) 
   const getCampusName = (campusId: string) => {
     return campuses.find(c => c.id === campusId)?.name || '';
   };
+
+  // Fetch subjects from database on component mount
+  useEffect(() => {
+    const fetchSubjectsFromAPI = async () => {
+      setLoadingSubjects(true);
+      try {
+        const response = await fetch('/api/admin/subjects');
+        if (response.ok) {
+          const data = await response.json();
+          const subjectNames = data.subjects.map((subject: any) => subject.name).sort();
+          setAvailableSubjects(subjectNames);
+        }
+      } catch (error) {
+        console.error('Error fetching subjects:', error);
+      } finally {
+        setLoadingSubjects(false);
+      }
+    };
+    
+    fetchSubjectsFromAPI();
+  }, []);
 
   const filteredUsers = users.filter(user => {
     const matchesSearch = (user.name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -188,6 +210,21 @@ export default function UsersClient({ initialUsers, schools, campuses }: Props) 
       return;
     }
 
+    // Validation: teachers must have at least one subject-grade assignment
+    if (userForm.role === 'teacher' && userForm.subjectGradePairs.length === 0) {
+      alert('Please add at least one subject-grade assignment for the teacher');
+      return;
+    }
+
+    // Validation: all subject-grade pairs must have at least one book assigned
+    if (userForm.role === 'teacher') {
+      const pairsWithoutBooks = userForm.subjectGradePairs.filter(p => p.assignedBooks.length === 0);
+      if (pairsWithoutBooks.length > 0) {
+        alert('Please assign at least one book to each subject-grade pair');
+        return;
+      }
+    }
+
     if (users.some(u => u.email === userForm.email)) {
       alert('A user with this email already exists');
       return;
@@ -195,15 +232,35 @@ export default function UsersClient({ initialUsers, schools, campuses }: Props) 
 
     setIsLoading(true);
     try {
+      // Build assignedBooks array from subjectGradePairs for teachers
+      let finalBooks: { id: string; title: string; subject: string; grade: string; chapters: number }[] = [];
+      
+      if (userForm.role === 'teacher') {
+        // For each subject-grade pair, add its books to the final books array
+        for (const pair of userForm.subjectGradePairs) {
+          finalBooks = [...finalBooks, ...pair.assignedBooks];
+        }
+      }
+
+      // Build data to send - explicitly set all fields we want to send
+      let dataToSend: any = {
+        name: userForm.name,
+        email: userForm.email,
+        password: userForm.password,
+        role: userForm.role,
+        schoolId: userForm.schoolId || '',
+        schoolName: userForm.schoolId ? getSchoolName(userForm.schoolId) : '',
+        campusId: userForm.campusId || '',
+        campusName: userForm.campusId ? getCampusName(userForm.campusId) : '',
+        userType: userType,
+        assignedBooks: finalBooks,
+        subjectGradePairs: userForm.role === 'teacher' ? userForm.subjectGradePairs : [],
+      };
+
       const response = await fetch('/api/admin/users', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ...userForm,
-          schoolName: userForm.schoolId ? getSchoolName(userForm.schoolId) : '',
-          campusName: userForm.campusId ? getCampusName(userForm.campusId) : '',
-          userType: userType
-        }),
+        body: JSON.stringify(dataToSend),
       });
 
       if (!response.ok) {
@@ -780,146 +837,249 @@ export default function UsersClient({ initialUsers, schools, campuses }: Props) 
                   </>
                 )}
 
-                {(userForm.role === 'teacher' || userForm.role === 'content_manager' || userForm.role === 'content_creator') && (
-                  <div className="space-y-4">
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Subjects</label>
-                    <div className="flex flex-wrap gap-2">
-                      {availableSubjects.map(subject => (
-                        <button
-                          key={subject}
-                          type="button"
-                          onClick={async () => {
-                            if (userForm.subjects.includes(subject)) {
-                              setUserForm(prev => ({
-                                ...prev,
-                                subjects: prev.subjects.filter(s => s !== subject),
-                                assignedBooks: prev.assignedBooks.filter(book => book.subject !== subject)
-                              }));
-                            } else {
-                              await fetchBooksBySubject(subject);
-                              const booksForSubject = availableBooks[subject] || [];
-                              setUserForm(prev => ({
-                                ...prev,
-                                subjects: [...prev.subjects, subject],
-                                assignedBooks: [...prev.assignedBooks, ...booksForSubject.map(book => ({
-                                  id: book.id,
-                                  title: book.title,
-                                  subject: subject,
-                                  grade: book.grade,
-                                  chapters: book.chapters
-                                }))]
-                              }));
-                            }
-                          }}
-                          className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-                            userForm.subjects.includes(subject)
-                              ? 'bg-emerald-600 text-white'
-                              : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                          }`}
-                        >
-                          {subject}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                )}
+
 
                 {userForm.role === 'teacher' && (
-                  <div className="space-y-4">
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Assigned Grades</label>
-                    <div className="flex flex-wrap gap-2">
-                      {availableGrades.map(grade => (
+                  <div className="space-y-4 border-t pt-4 mt-4">
+                    <div className="flex items-center justify-between mb-4">
+                      <h5 className="text-sm font-semibold text-gray-900">Subject & Grade Assignments</h5>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const pairId = `pair_${Date.now()}_${Math.random()}`;
+                          const newPair: SubjectGradePair = {
+                            id: pairId,
+                            subject: '',
+                            grade: '',
+                            assignedBooks: []
+                          };
+                          setUserForm(prev => ({
+                            ...prev,
+                            subjectGradePairs: [...prev.subjectGradePairs, newPair]
+                          }));
+                        }}
+                        className="inline-flex items-center gap-2 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-medium rounded-lg transition-colors"
+                      >
+                        <i className="ri-add-line"></i>
+                        Add Subject-Grade
+                      </button>
+                    </div>
+
+                    {userForm.subjectGradePairs.length === 0 ? (
+                      <div className="p-6 bg-gray-50 rounded-lg border-2 border-dashed border-gray-300 text-center">
+                        <i className="ri-book-line text-3xl text-gray-400 mb-2"></i>
+                        <p className="text-sm text-gray-600 mb-3">No subject-grade assignments yet</p>
                         <button
-                          key={grade}
                           type="button"
                           onClick={() => {
+                            const pairId = `pair_${Date.now()}_${Math.random()}`;
+                            const newPair: SubjectGradePair = {
+                              id: pairId,
+                              subject: '',
+                              grade: '',
+                              assignedBooks: []
+                            };
                             setUserForm(prev => ({
                               ...prev,
-                              assignedGrades: prev.assignedGrades.includes(grade)
-                                ? prev.assignedGrades.filter(g => g !== grade)
-                                : [...prev.assignedGrades, grade]
+                              subjectGradePairs: [...prev.subjectGradePairs, newPair]
                             }));
                           }}
-                          className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-                            userForm.assignedGrades.includes(grade)
-                              ? 'bg-orange-600 text-white'
-                              : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                          }`}
+                          className="inline-flex items-center gap-2 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium rounded-lg"
                         >
-                          Grade {grade}
+                          <i className="ri-add-line"></i>
+                          Add Assignment
                         </button>
-                      ))}
-                    </div>
-                  </div>
-                )}
+                      </div>
+                    ) : (
+                      <div className="space-y-3">
+                        {userForm.subjectGradePairs.map((pair) => (
+                          <div key={pair.id} className="border border-gray-200 rounded-lg p-4 bg-gray-50">
+                            <div className="flex gap-3 mb-3">
+                              {/* Subject Dropdown */}
+                              <div className="flex-1">
+                                <label className="block text-xs font-medium text-gray-700 mb-1">Subject</label>
+                                <select
+                                  value={pair.subject}
+                                  onChange={async (e) => {
+                                    const newSubject = e.target.value;
+                                    setUserForm(prev => ({
+                                      ...prev,
+                                      subjectGradePairs: prev.subjectGradePairs.map(p => 
+                                        p.id === pair.id ? { ...p, subject: newSubject, grade: '', assignedBooks: [] } : p
+                                      )
+                                    }));
+                                    if (newSubject) {
+                                      await fetchBooksBySubject(newSubject);
+                                    }
+                                  }}
+                                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 bg-white"
+                                >
+                                  <option value="">Select Subject...</option>
+                                  {availableSubjects.map(subject => (
+                                    <option key={subject} value={subject}>{subject}</option>
+                                  ))}
+                                </select>
+                              </div>
 
-                {userForm.role === 'teacher' && userForm.subjects.length > 0 && (
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Assign Books</label>
-                    <div className="space-y-4">
-                      {userForm.subjects.map(subject => (
-                        <div key={subject} className="border border-gray-200 rounded-lg p-4">
-                          <div className="flex items-center justify-between mb-3">
-                            <h4 className="font-medium text-gray-900">{subject}</h4>
-                            {loadingBooks[subject] && (
-                              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-emerald-600"></div>
+                              {/* Grade Dropdown */}
+                              <div className="flex-1">
+                                <label className="block text-xs font-medium text-gray-700 mb-1">Grade</label>
+                                <select
+                                  value={pair.grade}
+                                  onChange={(e) => {
+                                    setUserForm(prev => ({
+                                      ...prev,
+                                      subjectGradePairs: prev.subjectGradePairs.map(p => 
+                                        p.id === pair.id ? { ...p, grade: e.target.value } : p
+                                      )
+                                    }));
+                                  }}
+                                  disabled={!pair.subject}
+                                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 bg-white disabled:bg-gray-100 disabled:cursor-not-allowed"
+                                >
+                                  <option value="">Select Grade...</option>
+                                  {availableGrades.map(grade => (
+                                    <option key={grade} value={grade}>Grade {grade}</option>
+                                  ))}
+                                </select>
+                              </div>
+
+                              {/* Remove Button */}
+                              <div className="flex items-end">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setUserForm(prev => ({
+                                      ...prev,
+                                      subjectGradePairs: prev.subjectGradePairs.filter(p => p.id !== pair.id)
+                                    }));
+                                  }}
+                                  className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                                  title="Remove this assignment"
+                                >
+                                  <i className="ri-delete-bin-line text-lg"></i>
+                                </button>
+                              </div>
+                            </div>
+
+                            {/* Books for this Subject-Grade combination */}
+                            {pair.subject && pair.grade && (
+                              <div className="mt-3 pt-3 border-t border-gray-200 bg-white rounded p-3">
+                                <label className="block text-xs font-medium text-gray-700 mb-2">
+                                  📚 Books for {pair.subject} - Grade {pair.grade}
+                                </label>
+                                
+                                {loadingBooks[pair.subject] ? (
+                                  <p className="text-xs text-gray-500 text-center py-2">Loading books...</p>
+                                ) : (
+                                  <>
+                                    {/* Available Books Section */}
+                                    <div className="mb-2">
+                                      <p className="text-xs font-medium text-gray-600 mb-1">Available Books:</p>
+                                      {(() => {
+                                        const availableBooks_filtered = (availableBooks[pair.subject] || []).filter(book => 
+                                          book.grade === pair.grade || book.grade === `Grade ${pair.grade}`
+                                        );
+                                        const alreadyAssignedInThisPair = pair.assignedBooks.map(b => b.id);
+                                        const notYetAssigned = availableBooks_filtered.filter(book => 
+                                          !alreadyAssignedInThisPair.includes(book.id)
+                                        );
+                                        
+                                        if (notYetAssigned.length === 0) {
+                                          return <p className="text-xs text-gray-500 italic py-1">All available books are already assigned below</p>;
+                                        }
+                                        
+                                        return (
+                                          <div className="space-y-1 max-h-[100px] overflow-y-auto">
+                                            {notYetAssigned.map(book => (
+                                              <div key={book.id} className="flex items-center justify-between p-1.5 bg-blue-50 rounded border border-blue-200">
+                                                <div className="flex-1 min-w-0">
+                                                  <div className="text-xs font-medium text-gray-900 truncate">{book.title}</div>
+                                                </div>
+                                                <button
+                                                  type="button"
+                                                  onClick={() => {
+                                                    const isBookAlreadyAssigned = userForm.subjectGradePairs.some(p => 
+                                                      p.assignedBooks.some(b => b.id === book.id)
+                                                    );
+                                                    
+                                                    if (isBookAlreadyAssigned) {
+                                                      alert(`📚 "${book.title}" is already assigned to this user in another subject-grade combination.`);
+                                                      return;
+                                                    }
+                                                    
+                                                    setUserForm(prev => ({
+                                                      ...prev,
+                                                      subjectGradePairs: prev.subjectGradePairs.map(p => {
+                                                        if (p.id === pair.id) {
+                                                          return {
+                                                            ...p,
+                                                            assignedBooks: [...p.assignedBooks, {
+                                                              id: book.id,
+                                                              title: book.title,
+                                                              subject: book.subject,
+                                                              grade: book.grade,
+                                                              chapters: book.chapters
+                                                            }]
+                                                          };
+                                                        }
+                                                        return p;
+                                                      })
+                                                    }));
+                                                  }}
+                                                  className="ml-2 px-2 py-0.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium rounded transition-colors flex-shrink-0"
+                                                >
+                                                  + Assign
+                                                </button>
+                                              </div>
+                                            ))}
+                                          </div>
+                                        );
+                                      })()}
+                                    </div>
+                                    
+                                    {/* Assigned Books Section */}
+                                    {pair.assignedBooks.length > 0 && (
+                                      <div className="mt-2 pt-2 border-t border-gray-200">
+                                        <p className="text-xs font-medium text-emerald-700 mb-1">✅ Assigned Books ({pair.assignedBooks.length}):</p>
+                                        <div className="space-y-1 max-h-[100px] overflow-y-auto">
+                                          {pair.assignedBooks.map(book => (
+                                            <div key={book.id} className="flex items-center justify-between p-1.5 bg-emerald-50 rounded border border-emerald-200">
+                                              <div className="text-xs text-emerald-900">{book.title}</div>
+                                              <button
+                                                type="button"
+                                                onClick={() => {
+                                                  setUserForm(prev => ({
+                                                    ...prev,
+                                                    subjectGradePairs: prev.subjectGradePairs.map(p => {
+                                                      if (p.id === pair.id) {
+                                                        return {
+                                                          ...p,
+                                                          assignedBooks: p.assignedBooks.filter(b => b.id !== book.id)
+                                                        };
+                                                      }
+                                                      return p;
+                                                    })
+                                                  }));
+                                                }}
+                                                className="text-red-600 hover:text-red-700 hover:bg-red-50 p-0.5 rounded transition-colors flex-shrink-0"
+                                                title="Remove this book"
+                                              >
+                                                <i className="ri-close-line text-sm"></i>
+                                              </button>
+                                            </div>
+                                          ))}
+                                        </div>
+                                      </div>
+                                    )}
+                                  </>
+                                )}
+                              </div>
                             )}
                           </div>
-                          {availableBooks[subject] && availableBooks[subject].length > 0 ? (
-                            <div className="grid gap-2">
-                              {availableBooks[subject]
-                                .filter(book => userForm.assignedGrades.includes(book.grade.replace('Grade ', '')))
-                                .map(book => (
-                                  <div key={book.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                                    <div className="flex-1">
-                                      <div className="font-medium text-sm text-gray-900">{book.title}</div>
-                                      <div className="text-xs text-gray-500">
-                                        {book.grade} • {book.chapters} Chapters
-                                      </div>
-                                    </div>
-                                    <button
-                                      type="button"
-                                      onClick={() => {
-                                        const bookExists = userForm.assignedBooks.some(b => b.id === book.id);
-                                        setUserForm(prev => ({
-                                          ...prev,
-                                          assignedBooks: bookExists
-                                            ? prev.assignedBooks.filter(b => b.id !== book.id)
-                                            : [...prev.assignedBooks, {
-                                                id: book.id,
-                                                title: book.title,
-                                                subject: subject,
-                                                grade: book.grade,
-                                                chapters: book.chapters
-                                              }]
-                                        }));
-                                      }}
-                                      className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-                                        userForm.assignedBooks.some(b => b.id === book.id)
-                                          ? 'bg-emerald-600 text-white'
-                                          : 'bg-gray-200 text-gray-600 hover:bg-gray-300'
-                                      }`}
-                                    >
-                                      {userForm.assignedBooks.some(b => b.id === book.id) ? 'Assigned' : 'Assign'}
-                                    </button>
-                                  </div>
-                                ))}
-                              {availableBooks[subject].filter(book => 
-                                userForm.assignedGrades.includes(book.grade.replace('Grade ', ''))
-                              ).length === 0 && (
-                                <p className="text-sm text-gray-500 text-center py-2">
-                                  No books available for selected grades in {subject}
-                                </p>
-                              )}
-                            </div>
-                          ) : (
-                            <p className="text-sm text-gray-500 text-center py-2">
-                              {loadingBooks[subject] ? 'Loading books...' : `No books available for ${subject}`}
-                            </p>
-                          )}
-                        </div>
-                      ))}
-                    </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
@@ -927,8 +1087,9 @@ export default function UsersClient({ initialUsers, schools, campuses }: Props) 
               <div className="flex space-x-3 mt-6">
                 <button
                   type="submit"
-                  disabled={isLoading || !userForm.name || !userForm.email}
-                  className="flex-1 min-h-[44px] bg-emerald-600 hover:bg-emerald-700 disabled:bg-emerald-400 text-white font-medium py-2 px-4 rounded-lg cursor-pointer"
+                  disabled={isLoading || !userForm.name || !userForm.email || (userForm.role === 'teacher' && userForm.subjectGradePairs.length === 0)}
+                  title={userForm.role === 'teacher' && userForm.subjectGradePairs.length === 0 ? 'Please add at least one subject-grade assignment' : ''}
+                  className="flex-1 min-h-[44px] bg-emerald-600 hover:bg-emerald-700 disabled:bg-emerald-400 disabled:cursor-not-allowed text-white font-medium py-2 px-4 rounded-lg cursor-pointer"
                 >
                   {isLoading ? 'Creating...' : 'Create User'}
                 </button>

@@ -54,7 +54,7 @@ export default function Sidebar({
     },
     {
       id: "monitoring",
-      label: "Content Monitoring",
+      label: "Subject Management",
       icon: "ri-shield-check-line",
       href: "/admin/monitoring",
     },
@@ -80,22 +80,10 @@ export default function Sidebar({
       href: "/teacher/dashboard",
     },
     {
-      id: "books",
-      label: "Books & Chapters",
-      icon: "ri-book-line",
-      href: "/teacher/books",
-    },
-    {
       id: "create",
       label: "Create Questions",
       icon: "ri-file-add-line",
       href: "/teacher/create-questions",
-    },
-    {
-      id: "questions",
-      label: "My Question Bank",
-      icon: "ri-database-line",
-      href: "/teacher/my-questions",
     },
     {
       id: "quiz",

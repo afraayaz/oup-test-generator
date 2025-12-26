@@ -1,11 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import InlineMathToolbar from "./InlineMathToolbar";
 import UrduKeyboard from "./UrduKeyboard";
 
 interface QuestionFormProps {
   onSubmit: (questionData: QuestionFormData) => Promise<void>;
+  onSwitchToBank?: () => void;
   loading?: boolean;
   submittedBooks?: Array<{ id: string; title: string; subject: string; grade: string; chapters?: number }>;
   subjects?: string[];
@@ -50,6 +51,7 @@ const initialFormData: QuestionFormData = {
 
 export default function QuestionForm({
   onSubmit,
+  onSwitchToBank,
   loading = false,
   submittedBooks = [],
   subjects = ["Mathematics", "Science", "English", "History", "Geography"],
@@ -69,7 +71,7 @@ export default function QuestionForm({
   const [activeBlankId, setActiveBlankId] = useState<string | null>(null);
 
   // Initialize with defaults
-  useState(() => {
+  useEffect(() => {
     if (defaultGrade || defaultSubject || defaultBook) {
       setFormData((prev) => ({
         ...prev,
@@ -78,16 +80,16 @@ export default function QuestionForm({
         book: defaultBook || "",
       }));
     }
-  });
+  }, [defaultGrade, defaultSubject, defaultBook, grades, subjects, submittedBooks]);
 
   const optionLabels = ["A", "B", "C", "D", "E", "F"];
 
   const handleQuestionTypeChange = (type: QuestionFormData["type"]) => {
-    setFormData((prev) => ({
+    setFormData((prev: QuestionFormData): QuestionFormData => ({
       ...prev,
       type,
       options: type === "multiple" ? ["", "", "", ""] : [],
-      blanks: type === "fillblanks" ? { blank1: [] } : {},
+      blanks: type === "fillblanks" ? { blank1: [] } : ({} as { [key: string]: string[] }),
       correctAnswer: "",
     }));
   };
@@ -231,15 +233,25 @@ export default function QuestionForm({
   };
 
   const getAvailableBooks = () => {
-    if (!submittedBooks) return [];
-    return submittedBooks.filter(
-      (book) => book.grade === formData.grade && book.subject === formData.subject
-    );
+    if (!submittedBooks || !formData.grade || !formData.subject) return [];
+    
+    return submittedBooks.filter((book) => {
+      // Normalize grades for comparison (handle "6" vs "Grade 6")
+      const normalizeGrade = (grade: string) => grade.replace(/^Grade\s+/, '').trim();
+      const formGrade = normalizeGrade(formData.grade);
+      const bookGrade = normalizeGrade(book.grade);
+      
+      // Normalize subjects for comparison (case-insensitive)
+      const formSubject = formData.subject.toLowerCase().trim();
+      const bookSubject = book.subject.toLowerCase().trim();
+      
+      return bookGrade === formGrade && bookSubject === formSubject;
+    });
   };
 
   const getAvailableChapters = () => {
     if (!formData.book || !submittedBooks) return [];
-    const selectedBook = submittedBooks.find((book) => book.title === formData.book);
+    const selectedBook = submittedBooks.find((book) => book.title.toLowerCase() === formData.book.toLowerCase());
     if (!selectedBook || !selectedBook.chapters) return [];
     return Array.from({ length: selectedBook.chapters }, (_, i) => `Chapter ${i + 1}`);
   };
@@ -431,6 +443,7 @@ export default function QuestionForm({
               onBlur={() => (isMathSubject || isUrduSubject) && setFocusedMathField(null)}
               placeholder="Enter your question here"
               rows={4}
+              dir={isUrduSubject ? "rtl" : "ltr"}
               className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm ${errors.questionText ? "border-red-500" : "border-gray-300"}`}
             />
             {errors.questionText && <p className="text-red-500 text-sm mt-1">{errors.questionText}</p>}
@@ -464,6 +477,7 @@ export default function QuestionForm({
                         onFocus={() => (isMathSubject || isUrduSubject) && handleMathFieldFocus("option", i)}
                         onBlur={() => (isMathSubject || isUrduSubject) && setFocusedMathField(null)}
                         placeholder={`Option ${optionLabels[i]}`}
+                        dir={isUrduSubject ? "rtl" : "ltr"}
                         className="flex-1 px-2 sm:px-3 py-1.5 sm:py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-xs sm:text-sm"
                       />
                       {formData.options.length > 2 && (
@@ -611,6 +625,7 @@ export default function QuestionForm({
               onBlur={() => (isMathSubject || isUrduSubject) && setFocusedMathField(null)}
               placeholder="Add explanation for the correct answer"
               rows={3}
+              dir={isUrduSubject ? "rtl" : "ltr"}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
             />
           </div>
@@ -623,6 +638,14 @@ export default function QuestionForm({
             >
               Back
             </button>
+            {onSwitchToBank && (
+              <button
+                onClick={onSwitchToBank}
+                className="flex-1 px-4 sm:px-6 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors font-medium text-sm sm:text-base"
+              >
+                Go to Question Bank
+              </button>
+            )}
             <button
               onClick={handleFormSubmit}
               disabled={loading}

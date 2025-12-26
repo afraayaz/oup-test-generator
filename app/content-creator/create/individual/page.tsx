@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo } from "react";
 import Sidebar from "@/components/Sidebar";
 import { useUserProfile } from "@/hooks/useUserProfile";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import QuestionForm, { QuestionFormData } from "@/components/QuestionForm";
 
 export default function CreateIndividualQuestionPage() {
@@ -11,6 +11,7 @@ export default function CreateIndividualQuestionPage() {
   const [loading, setLoading] = useState(false);
   const [successMessage, setSuccessMessage] = useState("");
   const { user } = useUserProfile();
+  const router = useRouter();
   const searchParams = useSearchParams();
 
   // Get initial values from query params
@@ -76,6 +77,10 @@ export default function CreateIndividualQuestionPage() {
     }
   };
 
+  const handleSwitchToBank = () => {
+    router.push("/content-creator/create?mode=bank");
+  };
+
   if (!user) {
     return <div className="flex items-center justify-center h-screen">Loading...</div>;
   }
@@ -124,6 +129,7 @@ export default function CreateIndividualQuestionPage() {
 
             <QuestionForm
               onSubmit={handleQuestionSubmit}
+              onSwitchToBank={handleSwitchToBank}
               loading={loading}
               submittedBooks={submittedBooks}
               subjects={availableSubjects}

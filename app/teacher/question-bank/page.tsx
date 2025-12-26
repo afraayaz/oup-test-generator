@@ -12,7 +12,8 @@ interface Question {
   grade: string;
   chapter: string;
   book: string;
-  content: string;
+  content?: string;
+  questionText?: string;
   options: string[];
   correctAnswer: string;
   difficulty: 'easy' | 'medium' | 'hard';
@@ -293,14 +294,14 @@ export default function TeacherQuestionBankPage() {
                 <div key={question.id} className="bg-white rounded-lg p-4 border border-gray-200 hover:shadow-md transition-all">
                   <div className="flex items-start justify-between mb-3">
                     <div className="flex-1">
-                      <h3 className="font-bold text-gray-800 mb-2">{question.content}</h3>
-                      <div className="flex flex-wrap gap-2 mb-2">
-                        <span className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded">{question.subject}</span>
-                        <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded">{question.grade}</span>
-                        <span className="text-xs bg-amber-100 text-amber-700 px-2 py-1 rounded">{question.book}</span>
-                        <span className="text-xs bg-cyan-100 text-cyan-700 px-2 py-1 rounded">{question.chapter}</span>
-                        <span className="text-xs bg-purple-100 text-purple-700 px-2 py-1 rounded">{question.type.toUpperCase()}</span>
-                        <span className="text-xs bg-orange-100 text-orange-700 px-2 py-1 rounded">{question.difficulty}</span>
+                      <h3 className="font-bold text-gray-800 mb-2">{question.questionText || question.content}</h3>
+                      <div className="flex flex-wrap gap-2 mb-3">
+                        <span className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded font-medium">{question.subject}</span>
+                        <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded font-medium">{question.grade}</span>
+                        <span className="text-xs bg-amber-100 text-amber-700 px-2 py-1 rounded font-medium">{question.book}</span>
+                        <span className="text-xs bg-cyan-100 text-cyan-700 px-2 py-1 rounded font-medium border border-cyan-300">📖 {question.chapter}</span>
+                        <span className="text-xs bg-purple-100 text-purple-700 px-2 py-1 rounded font-medium">{question.type.toUpperCase()}</span>
+                        <span className="text-xs bg-orange-100 text-orange-700 px-2 py-1 rounded font-medium capitalize">{question.difficulty}</span>
                       </div>
                       <p className="text-xs text-gray-500 mt-2">
                         Added by <strong>{question.createdByName}</strong> on {new Date(question.createdAt?.toDate?.()).toLocaleDateString()}

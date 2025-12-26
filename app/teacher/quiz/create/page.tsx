@@ -367,9 +367,10 @@ export default function CreateQuizPage() {
     // Get available subjects for selected grade
     const getAvailableSubjects = () => {
       if (!selectedGrade) return [];
+      const gradeFormatted = selectedGrade.startsWith('Grade') ? selectedGrade : `Grade ${selectedGrade}`;
       const subjectsSet = new Set(
         user?.assignedBooks
-          ?.filter(b => b.grade === `Grade ${selectedGrade}`)
+          ?.filter(b => b.grade === gradeFormatted)
           .map(b => b.subject) || []
       );
       return Array.from(subjectsSet).sort();
@@ -378,8 +379,9 @@ export default function CreateQuizPage() {
     // Get available books for selected subject and grade
     const getAvailableBooks = () => {
       if (!selectedGrade || !selectedSubject) return [];
+      const gradeFormatted = selectedGrade.startsWith('Grade') ? selectedGrade : `Grade ${selectedGrade}`;
       const books = user?.assignedBooks
-        ?.filter(b => b.grade === `Grade ${selectedGrade}` && b.subject === selectedSubject)
+        ?.filter(b => b.grade === gradeFormatted && b.subject === selectedSubject)
         .map(b => b.title) || [];
       return books.sort();
     };

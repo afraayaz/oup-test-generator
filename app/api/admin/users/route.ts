@@ -149,6 +149,7 @@ export async function POST(request: Request) {
       assignedClasses,
       assignedGrades,
       assignedBooks,
+      subjectGradePairs,
       userType
     } = body;
     
@@ -256,6 +257,7 @@ export async function POST(request: Request) {
       userData.assignedClasses = assignedClasses || [];
       userData.assignedGrades = assignedGrades || [];
       userData.assignedBooks = assignedBooks || [];
+      userData.subjectGradePairs = subjectGradePairs || [];
     }
     
     if (role === 'content_manager' || role === 'content_creator') {

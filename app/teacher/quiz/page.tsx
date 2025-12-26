@@ -286,11 +286,26 @@ const QuizGeneration = () => {
   const grades = user?.assignedGrades || [];
   const subjects = user?.subjects || [];
   const assignedBooks = user?.assignedBooks || [];
+  const subjectGradePairs = user?.subjectGradePairs || [];
   
-  // Extract unique subjects and grades directly from assignedBooks for accuracy
-  let uniqueSubjects = [...new Set(assignedBooks.map(b => b.subject))];
-  // Normalize grades - remove "Grade " prefix for consistency
-  let uniqueGrades = [...new Set(assignedBooks.map(b => String(b.grade).replace('Grade ', '').trim()))];
+  // Helper function to normalize grades
+  const normalizeGrade = (grade: string): string => {
+    return String(grade).replace(/^(Grade|Class)\s+/i, '').trim();
+  };
+  
+  // Extract unique subjects and grades - prefer subjectGradePairs for Teachers
+  let uniqueSubjects: string[] = [];
+  let uniqueGrades: string[] = [];
+  
+  if (subjectGradePairs.length > 0) {
+    // Teachers with subjectGradePairs
+    uniqueGrades = [...new Set(subjectGradePairs.map(p => normalizeGrade(p.grade)))];
+    uniqueSubjects = [...new Set(subjectGradePairs.map(p => p.subject))];
+  } else {
+    // Fallback to assignedBooks
+    uniqueSubjects = [...new Set(assignedBooks.map(b => b.subject))];
+    uniqueGrades = [...new Set(assignedBooks.map(b => normalizeGrade(b.grade)))];
+  }
   
   console.log(`📋 Initial unique subjects (from school books): ${uniqueSubjects.join(', ') || '(none)'}`);
   console.log(`📋 Initial unique grades (from school books): ${uniqueGrades.join(', ') || '(none)'}`);
@@ -325,20 +340,28 @@ const QuizGeneration = () => {
     });
   }, [grades, subjects, assignedBooks, selectedQB, questions]);
   
-  // Build books object from assignedBooks and OUP questions
+  // Build books object from assignedBooks/subjectGradePairs and OUP questions
   const books: { [grade: string]: { [subject: string]: string[] } } = {};
   
   // Add school books
   uniqueGrades.forEach(grade => {
     books[String(grade)] = {};
     uniqueSubjects.forEach(subject => {
-      books[String(grade)][subject] = assignedBooks
-        .filter(book => {
-          // Normalize book grade for comparison
-          const normalizedBookGrade = String(book.grade).replace('Grade ', '').trim();
-          return normalizedBookGrade === grade && book.subject === subject;
-        })
-        .map(book => book.title);
+      if (subjectGradePairs.length > 0) {
+        // Use subjectGradePairs for Teachers
+        books[String(grade)][subject] = subjectGradePairs
+          .filter(p => normalizeGrade(p.grade) === grade && p.subject === subject)
+          .flatMap(p => p.assignedBooks || [])
+          .map(book => typeof book === 'string' ? book : book.title);
+      } else {
+        // Fallback to assignedBooks
+        books[String(grade)][subject] = assignedBooks
+          .filter(book => {
+            const normalizedBookGrade = normalizeGrade(book.grade);
+            return normalizedBookGrade === grade && book.subject === subject;
+          })
+          .map(book => book.title);
+      }
     });
   });
   
@@ -548,32 +571,164 @@ const QuizGeneration = () => {
     return Array.from(slos).sort();
   }, [questions, selectedGrade, selectedSubject, selectedBook, selectedChapters]);
 
+  // Helper function to normalize question types for consistent matching
+  const normalizeQuestionType = (qType: string): string => {
+    if (!qType) return '';
+    
+    const normalized = qType.toLowerCase().trim()
+      .replace(/\s+/g, '') // Remove spaces
+      .replace(/[_-]/g, ''); // Remove underscores and hyphens
+    
+    // Map various formats to standard types
+    const typeMap: { [key: string]: string } = {
+      // Multiple choice variations
+      'mcq': 'multiple',
+      'mcqs': 'multiple',
+      'multiplechoice': 'multiple',
+      'multipleChoice': 'multiple',
+      'multiple': 'multiple',
+      
+      // True/False variations
+      'truefalse': 'truefalse',
+      'true/false': 'truefalse',
+      'tf': 'truefalse',
+      'trueofalse': 'truefalse',
+      
+      // Short answer variations
+      'short': 'short',
+      'shortanswer': 'short',
+      'shortans': 'short',
+      'sa': 'short',
+      
+      // Long answer variations
+      'long': 'long',
+      'longanswer': 'long',
+      'longans': 'long',
+      'la': 'long',
+      'essay': 'long',
+      
+      // Fill in the blanks variations
+      'fillblanks': 'fillblanks',
+      'fillintheblanks': 'fillblanks',
+      'fitb': 'fillblanks',
+      'blanks': 'fillblanks',
+      'blanksafill': 'fillblanks',
+      'fillintheblanks': 'fillblanks',
+    };
+    
+    return typeMap[normalized] || normalized;
+  };
+
   const getQuestionCountByType = useCallback((type) => {
     if (!selectedGrade || !selectedSubject || !selectedBook) return 0;
     const selectedDifficulties = questionConfig[type]?.difficulties || [];
-    return questions.filter(q => {
-      const qGradeNormalized = (q.grade || q.class || '').toString().replace('Grade ', '').trim().toLowerCase();
-      const selectedGradeNormalized = String(selectedGrade).replace('Grade ', '').trim().toLowerCase();
+    
+    const selectedGradeNormalized = String(selectedGrade).replace(/^(Grade|Class)\s+/i, '').trim().toLowerCase();
+    const selectedSubjectLower = selectedSubject.toLowerCase();
+    const selectedBookLower = selectedBook.toLowerCase();
+    
+    let matchCount = 0;
+    let totalQuestions = 0;
+    let sampleQuestionData: any = null;
+    const typesInSelectedRange = new Set<string>();
+    const allGradeSubjectBookCombos = new Set<string>();
+    
+    questions.forEach(q => {
+      totalQuestions++;
+      
+      const qGradeRaw = (q.grade || q.class || '').toString();
+      const qGradeNormalized = qGradeRaw.replace(/^(Grade|Class)\s+/i, '').trim().toLowerCase();
       const qSubject = (q.subject || '').toLowerCase();
       const qBook = (q.book || '').toLowerCase();
-      const qChapter = q.chapter || '';
-      const qSLO = q.slo || '';
       const qType = (q.type || q.questionType || '').toLowerCase();
-      const qDifficulty = q.difficulty || 'Medium';
-      const normalizedType = qType === 'mcqs' ? 'multiple' : qType.replace('_', '');
+      const normalizedType = normalizeQuestionType(qType);
       
-      const basicMatch = qGradeNormalized === selectedGradeNormalized && 
-                        qSubject === selectedSubject.toLowerCase() && 
-                        qBook === selectedBook.toLowerCase() &&
-                        normalizedType === type;
+      // Track ALL combinations in database
+      allGradeSubjectBookCombos.add(`${qGradeNormalized}|${qSubject}|${qBook}`);
       
-      if (!basicMatch) return false;
-      if (selectedChapters.length > 0 && !selectedChapters.includes(qChapter)) return false;
-      if (selectedSLOs.length > 0 && !selectedSLOs.includes(qSLO)) return false;
-      if (selectedDifficulties.length > 0 && !selectedDifficulties.includes(qDifficulty)) return false;
+      // Track what types exist for the selected grade/subject/book
+      if (qGradeNormalized === selectedGradeNormalized && qSubject === selectedSubjectLower && qBook === selectedBookLower) {
+        typesInSelectedRange.add(`${qType}(${normalizedType})`);
+      }
       
-      return true;
-    }).length;
+      // Capture one sample for debugging
+      if (!sampleQuestionData) {
+        sampleQuestionData = {
+          grade_raw: qGradeRaw,
+          grade_norm: qGradeNormalized,
+          subject: qSubject,
+          book: qBook,
+          type: qType,
+          type_norm: normalizedType,
+        };
+      }
+      
+      // Check all matching conditions
+      const gradeMatch = qGradeNormalized === selectedGradeNormalized;
+      const subjectMatch = qSubject === selectedSubjectLower;
+      const bookMatch = qBook === selectedBookLower;
+      const typeMatch = normalizedType === type;
+      
+      if (gradeMatch && subjectMatch && bookMatch && typeMatch) {
+        const qChapter = q.chapter || '';
+        const qSLO = q.slo || '';
+        const qDifficulty = q.difficulty || 'Medium';
+        
+        if (selectedChapters.length > 0 && !selectedChapters.includes(qChapter)) return;
+        if (selectedSLOs.length > 0 && !selectedSLOs.includes(qSLO)) return;
+        if (selectedDifficulties.length > 0 && !selectedDifficulties.includes(qDifficulty)) return;
+        
+        matchCount++;
+      }
+    });
+    
+    // Log only when looking for 'multiple' to avoid spam
+    if (type === 'multiple' && process.env.NODE_ENV === 'development') {
+      // Additional debug: collect all raw types for selected combo
+      const typesForSelectedCombo = new Map<string, Set<string>>();
+      questions.forEach(q => {
+        const qGradeNormalized = (q.grade || q.class || '').toString().replace(/^(Grade|Class)\s+/i, '').trim().toLowerCase();
+        const qSubject = (q.subject || '').toLowerCase();
+        const qBook = (q.book || '').toLowerCase();
+        const qType = (q.type || q.questionType || '').toLowerCase();
+        const normalizedType = normalizeQuestionType(qType);
+        
+        if (qGradeNormalized === selectedGradeNormalized && qSubject === selectedSubjectLower && qBook === selectedBookLower) {
+          const key = `${normalizedType}`;
+          if (!typesForSelectedCombo.has(key)) {
+            typesForSelectedCombo.set(key, new Set());
+          }
+          typesForSelectedCombo.get(key)!.add(qType);
+        }
+      });
+      
+      console.log('====== QUIZ SEARCH DEBUG ======');
+      console.log('SELECTED:');
+      console.log('  grade:', selectedGrade, '=> normalized:', selectedGradeNormalized);
+      console.log('  subject:', selectedSubjectLower);
+      console.log('  book:', selectedBookLower);
+      console.log('SAMPLE QUESTION FROM DB:');
+      console.log('  grade_raw:', sampleQuestionData?.grade_raw, '=> normalized:', sampleQuestionData?.grade_norm);
+      console.log('  subject:', sampleQuestionData?.subject);
+      console.log('  book:', sampleQuestionData?.book);
+      console.log('  type:', sampleQuestionData?.type, '=> normalized:', sampleQuestionData?.type_norm);
+      console.log('ALL TYPES FOUND FOR SELECTED COMBO (raw -> normalized):');
+      if (typesForSelectedCombo.size === 0) {
+        console.log('  (NO TYPES FOUND - checking if questions have type field...)');
+      } else {
+        typesForSelectedCombo.forEach((rawTypes, normalized) => {
+          console.log(`  ${normalized}: [${Array.from(rawTypes).join(', ')}]`);
+        });
+      }
+      console.log('ALL GRADE|SUBJECT|BOOK COMBOS IN DATABASE:');
+      Array.from(allGradeSubjectBookCombos).forEach(combo => console.log('  ', combo));
+      console.log('RESULTS:');
+      console.log('  total_questions:', totalQuestions);
+      console.log('  matched_for_type_"' + type + '":', matchCount);
+      console.log('==============================');
+    }
+    
+    return matchCount;
   }, [questions, selectedGrade, selectedSubject, selectedBook, selectedChapters, selectedSLOs, questionConfig]);
 
   const getTotalConfiguredQuestions = useCallback(() => {
@@ -1668,17 +1823,32 @@ const QuizGeneration = () => {
                         className="w-full px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 min-h-[44px]"
                       >
                         <option value="">Select Subject</option>
-                        {assignedBooks
-                          .filter(b => {
-                            // Normalize book grade for comparison
-                            const normalizedBookGrade = String(b.grade).replace('Grade ', '').trim();
-                            return normalizedBookGrade === String(selectedGrade);
-                          })
-                          .map(b => b.subject)
-                          .filter((v, i, a) => a.indexOf(v) === i)
-                          .map(subject => (
-                            <option key={subject} value={subject}>{subject}</option>
-                          ))}
+                        {(() => {
+                          // Get subjects for the selected grade
+                          if (subjectGradePairs.length > 0) {
+                            // Use subjectGradePairs for Teachers
+                            const normalizedSelectedGrade = normalizeGrade(selectedGrade);
+                            return subjectGradePairs
+                              .filter(p => normalizeGrade(p.grade) === normalizedSelectedGrade)
+                              .map(p => p.subject)
+                              .filter((v, i, a) => a.indexOf(v) === i)
+                              .map(subject => (
+                                <option key={subject} value={subject}>{subject}</option>
+                              ));
+                          } else {
+                            // Fallback to assignedBooks
+                            return assignedBooks
+                              .filter(b => {
+                                const normalizedBookGrade = normalizeGrade(b.grade);
+                                return normalizedBookGrade === selectedGrade;
+                              })
+                              .map(b => b.subject)
+                              .filter((v, i, a) => a.indexOf(v) === i)
+                              .map(subject => (
+                                <option key={subject} value={subject}>{subject}</option>
+                              ));
+                          }
+                        })()}
                       </select>
                     </div>
                   )}

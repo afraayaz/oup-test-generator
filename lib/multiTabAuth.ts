@@ -15,6 +15,7 @@ export interface TabSession {
     subjects?: string[];
     assignedGrades?: string[];
     assignedBooks?: { id: string; title: string; subject: string; grade: string; chapters: number }[];
+    subjectGradePairs?: { id: string; subject: string; grade: string; assignedBooks: { id: string; title: string; subject: string; grade: string; chapters: number }[] }[];
   } | null;
   loginTime: number;
 }
@@ -70,6 +71,7 @@ export const saveTabSession = (user: any): void => {
       subjects: user.subjects || [],
       assignedGrades: user.assignedGrades || [],
       assignedBooks: user.assignedBooks || [],
+      subjectGradePairs: user.subjectGradePairs || [],
     } : null,
     loginTime: Date.now(),
   });
