@@ -392,42 +392,44 @@ export default function TeacherDashboard() {
         // For each assigned book, find what subject(s) have questions for that book-grade combo
         console.log('🔄 Attempting reverse matching - finding subjects from questions...');
         
-        user.assignedBooks.forEach(book => {
-          const bookTitle = book.title.toLowerCase();
-          const bookGrade = book.grade.replace('Grade ', '').trim();
-          
-          // Look for questions matching this book-grade in both OUP and School databases
-          const matchingOupKeys = Object.keys(oupByBook).filter(key => 
-            key.startsWith(bookTitle + '-') && key.endsWith('-' + bookGrade)
-          );
-          const matchingSchoolKeys = Object.keys(schoolByBook).filter(key =>
-            key.startsWith(bookTitle + '-') && key.endsWith('-' + bookGrade)
-          );
-          
-          const allMatchingKeys = [...matchingOupKeys, ...matchingSchoolKeys];
-          console.log(`  Book "${book.title}" Grade ${book.grade}:`, { matchingOupKeys, matchingSchoolKeys, allMatchingKeys });
-          
-          // Extract subject from matching keys (format: "book-subject-grade")
-          if (allMatchingKeys.length > 0) {
-            const firstKey = allMatchingKeys[0];
-            const parts = firstKey.split('-');
-            const subject = parts[1]; // Extract subject from key
+        if (user.assignedBooks && user.assignedBooks.length > 0) {
+          user.assignedBooks.forEach(book => {
+            const bookTitle = book.title.toLowerCase();
+            const bookGrade = book.grade.replace('Grade ', '').trim();
             
-            const oupCount = matchingOupKeys.reduce((sum, key) => sum + (oupByBook[key] || 0), 0);
-            const schoolCount = matchingSchoolKeys.reduce((sum, key) => sum + (schoolByBook[key] || 0), 0);
+            // Look for questions matching this book-grade in both OUP and School databases
+            const matchingOupKeys = Object.keys(oupByBook).filter(key => 
+              key.startsWith(bookTitle + '-') && key.endsWith('-' + bookGrade)
+            );
+            const matchingSchoolKeys = Object.keys(schoolByBook).filter(key =>
+              key.startsWith(bookTitle + '-') && key.endsWith('-' + bookGrade)
+            );
             
-            console.log(`    ✅ Found matching key "${firstKey}", extracted subject: "${subject}", OUP: ${oupCount}, School: ${schoolCount}`);
+            const allMatchingKeys = [...matchingOupKeys, ...matchingSchoolKeys];
+            console.log(`  Book "${book.title}" Grade ${book.grade}:`, { matchingOupKeys, matchingSchoolKeys, allMatchingKeys });
             
-            counts[book.id] = {
-              oup: oupCount,
-              school: schoolCount,
-              total: oupCount + schoolCount
-            };
-          } else {
-            console.log(`    ❌ No matching questions found for book "${book.title}" Grade ${book.grade}`);
-            counts[book.id] = { oup: 0, school: 0, total: 0 };
-          }
-        });
+            // Extract subject from matching keys (format: "book-subject-grade")
+            if (allMatchingKeys.length > 0) {
+              const firstKey = allMatchingKeys[0];
+              const parts = firstKey.split('-');
+              const subject = parts[1]; // Extract subject from key
+              
+              const oupCount = matchingOupKeys.reduce((sum, key) => sum + (oupByBook[key] || 0), 0);
+              const schoolCount = matchingSchoolKeys.reduce((sum, key) => sum + (schoolByBook[key] || 0), 0);
+              
+              console.log(`    ✅ Found matching key "${firstKey}", extracted subject: "${subject}", OUP: ${oupCount}, School: ${schoolCount}`);
+              
+              counts[book.id] = {
+                oup: oupCount,
+                school: schoolCount,
+                total: oupCount + schoolCount
+              };
+            } else {
+              console.log(`    ❌ No matching questions found for book "${book.title}" Grade ${book.grade}`);
+              counts[book.id] = { oup: 0, school: 0, total: 0 };
+            }
+          });
+        }
         
         console.log('📚 Reverse matching complete, final counts:', counts);
         console.log('🎯 Final OUP by Book Keys:', Object.keys(oupByBook));
