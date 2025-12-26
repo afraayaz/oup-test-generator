@@ -64,7 +64,7 @@ const QuestionCreator = () => {
     { symbol: '\\cdot', label: '·', desc: 'Dot product' },
   ];
   
-  const insertMathSymbol = (symbol) => {
+  const insertMathSymbol = (symbol: string) => {
     setFormData(prev => ({ 
       ...prev, 
       questionText: prev.questionText + symbol 
@@ -76,16 +76,16 @@ const QuestionCreator = () => {
     setShowFormulaModal(true);
   };
   
-  const latexToReadable = (latex) => {
+  const latexToReadable = (latex: string) => {
     let readable = latex;
     
     // Convert common LaTeX to Unicode/readable symbols
     readable = readable.replace(/\\frac\{([^}]+)\}\{([^}]+)\}/g, '($1/$2)');  // fractions
     readable = readable.replace(/\^2/g, '²');  // squared
     readable = readable.replace(/\^3/g, '³');  // cubed
-    readable = readable.replace(/\^([0-9])/g, (match, num) => {
+    readable = readable.replace(/\^([0-9])/g, (match: string, num: string) => {
       const superscripts = { '0': '⁰', '1': '¹', '2': '²', '3': '³', '4': '⁴', '5': '⁵', '6': '⁶', '7': '⁷', '8': '⁸', '9': '⁹' };
-      return superscripts[num] || '^' + num;
+      return superscripts[num as keyof typeof superscripts] || '^' + num;
     });
     readable = readable.replace(/\\sqrt\{([^}]+)\}/g, '√($1)');  // square root
     readable = readable.replace(/\\pi/g, 'π');
