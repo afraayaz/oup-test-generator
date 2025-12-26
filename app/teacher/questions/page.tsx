@@ -38,9 +38,9 @@ const QuestionCreator = () => {
   const [currentFormula, setCurrentFormula] = useState('');
   const [showUrduKeyboard, setShowUrduKeyboard] = useState(false);
   const [urduKeyboardField, setUrduKeyboardField] = useState('');
-  const textareaRef = useRef(null);
-  const mathFieldRef = useRef(null);
-  const keyboardRef = useRef(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const mathFieldRef = useRef<HTMLDivElement>(null);
+  const keyboardRef = useRef<any>(null);
   
   // Math symbols for easy insertion
   const mathSymbols = [
