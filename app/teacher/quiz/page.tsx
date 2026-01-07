@@ -9,9 +9,9 @@ import { MathJax, MathJaxContext } from 'better-react-mathjax';
 
 // Dynamic imports will be handled directly in the function
 
-const shuffle = (array, seed) => {
+const shuffle = (array: any[], seed?: string): any[] => {
   const seededRandom = seed 
-    ? (index) => {
+    ? (index: number): number => {
         const x = Math.sin(index + parseInt(seed.replace(/\D/g, ''))) * 10000;
         return x - Math.floor(x);
       }
@@ -19,12 +19,12 @@ const shuffle = (array, seed) => {
   return [...array].sort(() => seededRandom(array.length) - 0.5);
 };
 
-const toUrduNumber = (num) => {
+const toUrduNumber = (num: number | string): string => {
   const urduNumerals = ['۰', '۱', '۲', '۳', '۴', '۵', '۶', '۷', '۸', '۹'];
-  return num.toString().split('').map(digit => urduNumerals[parseInt(digit)] || digit).join('');
+  return num.toString().split('').map((digit: string) => urduNumerals[parseInt(digit)] || digit).join('');
 };
 
-const latexToReadable = (latex) => {
+const latexToReadable = (latex: string): string => {
   let readable = latex;
   
   // Remove \left and \right delimiters
@@ -49,35 +49,35 @@ const latexToReadable = (latex) => {
   readable = readable.replace(/\\sqrt([a-zA-Z0-9²³⁰¹⁴⁵⁶⁷⁸⁹]+)/g, '√$1');
   
   // Handle superscripts with braces ^{...}
-  readable = readable.replace(/\^\{([^{}]+)\}/g, (match, content) => {
+  readable = readable.replace(/\^\{([^{}]+)\}/g, (match: string, content: string): string => {
     // Convert single digits to Unicode superscripts
     if (/^[0-9]$/.test(content)) {
-      const superscripts = { '0': '⁰', '1': '¹', '2': '²', '3': '³', '4': '⁴', '5': '⁵', '6': '⁶', '7': '⁷', '8': '⁸', '9': '⁹' };
+      const superscripts: { [key: string]: string } = { '0': '⁰', '1': '¹', '2': '²', '3': '³', '4': '⁴', '5': '⁵', '6': '⁶', '7': '⁷', '8': '⁸', '9': '⁹' };
       return superscripts[content] || '^' + content;
     }
     return '^(' + content + ')';
   });
   
   // Handle bare superscripts
-  readable = readable.replace(/\^([0-9])/g, (match, num) => {
-    const superscripts = { '0': '⁰', '1': '¹', '2': '²', '3': '³', '4': '⁴', '5': '⁵', '6': '⁶', '7': '⁷', '8': '⁸', '9': '⁹' };
+  readable = readable.replace(/\^([0-9])/g, (match: string, num: string): string => {
+    const superscripts: { [key: string]: string } = { '0': '⁰', '1': '¹', '2': '²', '3': '³', '4': '⁴', '5': '⁵', '6': '⁶', '7': '⁷', '8': '⁸', '9': '⁹' };
     return superscripts[num] || '^' + num;
   });
   
   // Handle subscripts with braces _{...}
-  readable = readable.replace(/_\{([^{}]+)\}/g, (match, content) => {
+  readable = readable.replace(/_\{([^{}]+)\}/g, (match: string, content: string): string => {
     // Convert single digits to Unicode subscripts
     if (/^[0-9]$/.test(content)) {
-      const subscripts = { '0': '₀', '1': '₁', '2': '₂', '3': '₃', '4': '₄', '5': '₅', '6': '₆', '7': '₇', '8': '₈', '9': '₉' };
+      const subscripts: { [key: string]: string } = { '0': '₀', '1': '₁', '2': '₂', '3': '₃', '4': '₄', '5': '₅', '6': '₆', '7': '₇', '8': '₈', '9': '₉' };
       return subscripts[content] || '_' + content;
     }
     return '_(' + content + ')';
   });
   
   // Handle bare subscripts
-  readable = readable.replace(/_([0-9a-zA-Z])/g, (match, char) => {
+  readable = readable.replace(/_([0-9a-zA-Z])/g, (match: string, char: string): string => {
     if (/[0-9]/.test(char)) {
-      const subscripts = { '0': '₀', '1': '₁', '2': '₂', '3': '₃', '4': '₄', '5': '₅', '6': '₆', '7': '₇', '8': '₈', '9': '₉' };
+      const subscripts: { [key: string]: string } = { '0': '₀', '1': '₁', '2': '₂', '3': '₃', '4': '₄', '5': '₅', '6': '₆', '7': '₇', '8': '₈', '9': '₉' };
       return subscripts[char] || '_' + char;
     }
     return '_' + char;
@@ -143,7 +143,7 @@ const latexToReadable = (latex) => {
   return readable;
 };
 
-const extractLatexFromFormulas = (text) => {
+const extractLatexFromFormulas = (text: string): string => {
   if (!text || typeof text !== 'string') return text;
   
   // Replace {formula:...} with inline math delimiters $...$
@@ -177,7 +177,7 @@ const extractLatexFromFormulas = (text) => {
   return result;
 };
 
-const convertFormulasToReadable = (text) => {
+const convertFormulasToReadable = (text: string): string => {
   if (!text || typeof text !== 'string') return text;
   
   let result = text;
@@ -209,12 +209,12 @@ const convertFormulasToReadable = (text) => {
   }
   
   // Handle display math $$...$$ format (before inline to avoid conflicts)
-  result = result.replace(/\$\$([^$]+)\$\$/g, (match, latex) => {
+  result = result.replace(/\$\$([^$]+)\$\$/g, (match: string, latex: string): string => {
     return latexToReadable(latex);
   });
   
   // Handle inline math $...$ format
-  result = result.replace(/\$([^$]+)\$/g, (match, latex) => {
+  result = result.replace(/\$([^$]+)\$/g, (match: string, latex: string): string => {
     return latexToReadable(latex);
   });
   
@@ -234,8 +234,8 @@ const QuizGeneration = () => {
   const [selectedGrade, setSelectedGrade] = useState('');
   const [selectedSubject, setSelectedSubject] = useState('');
   const [selectedBook, setSelectedBook] = useState('');
-  const [selectedChapters, setSelectedChapters] = useState([]);
-  const [selectedSLOs, setSelectedSLOs] = useState([]);
+  const [selectedChapters, setSelectedChapters] = useState<string[]>([]);
+  const [selectedSLOs, setSelectedSLOs] = useState<string[]>([]);
   const [questionConfig, setQuestionConfig] = useState({
     // Basic question types (available for both Online and Offline)
     multiple: { count: 0, difficulties: ['Easy', 'Medium', 'Hard'], marks: 1 },
@@ -272,15 +272,22 @@ const QuizGeneration = () => {
   const [quizTitle, setQuizTitle] = useState('');
   const [quizType, setQuizType] = useState('Weekly');
   const [isMarked, setIsMarked] = useState(true);
-  const [generatedQuiz, setGeneratedQuiz] = useState(null);
+  const [generatedQuiz, setGeneratedQuiz] = useState<any>(null);
   const [showEditor, setShowEditor] = useState(false);
-  const [editedQuestions, setEditedQuestions] = useState([]);
-  const [questions, setQuestions] = useState([]);
+  const [editedQuestions, setEditedQuestions] = useState<any[]>([]);
+  const [questions, setQuestions] = useState<any[]>([]);
   const [hasQuestionType, setHasQuestionType] = useState(false);
-  const [randomSeed, setRandomSeed] = useState(uuidv4());
+  const [randomSeed, setRandomSeed] = useState<string>(uuidv4());
   const [isGenerating, setIsGenerating] = useState(false);
   const [availableChapters, setAvailableChapters] = useState<string[]>([]);
   const [availableSLOs, setAvailableSLOs] = useState<string[]>([]);
+  const [foundSubjectId, setFoundSubjectId] = useState(''); // Store the numeric subject ID found from API
+  const [showReplaceModal, setShowReplaceModal] = useState(false);
+  const [replaceQuestionIndex, setReplaceQuestionIndex] = useState<number | null>(null);
+  const [replacementQuestions, setReplacementQuestions] = useState<any[]>([]);
+  const [replaceLoading, setReplaceLoading] = useState<{ [key: number]: boolean }>({});
+  const [answerLines, setAnswerLines] = useState<{ [key: number]: number }>({});
+  const [defaultAnswerLines, setDefaultAnswerLines] = useState(4);
 
   // Dynamic data from user profile
   const grades = user?.assignedGrades || [];
@@ -341,7 +348,10 @@ const QuizGeneration = () => {
   }, [grades, subjects, assignedBooks, selectedQB, questions]);
   
   // Build books object from assignedBooks/subjectGradePairs and OUP questions
-  const books: { [grade: string]: { [subject: string]: string[] } } = {};
+  // Store book objects with both title and id
+  const books: { [grade: string]: { [subject: string]: any[] } } = {};
+  const bookIdMap: { [bookTitle: string]: string } = {}; // Map book title to its ID
+  const subjectIdMap: { [subjectName: string]: string } = {}; // Map subject name to its ID
   
   // Add school books
   uniqueGrades.forEach(grade => {
@@ -352,7 +362,17 @@ const QuizGeneration = () => {
         books[String(grade)][subject] = subjectGradePairs
           .filter(p => normalizeGrade(p.grade) === grade && p.subject === subject)
           .flatMap(p => p.assignedBooks || [])
-          .map(book => typeof book === 'string' ? book : book.title);
+          .map((book: any) => {
+            const bookObj = typeof book === 'string' ? { title: book } : book;
+            if (bookObj && typeof bookObj === 'object' && 'id' in bookObj && 'title' in bookObj) {
+              bookIdMap[bookObj.title as string] = bookObj.id as string;
+            }
+            // Track subject ID if available
+            if (bookObj && typeof bookObj === 'object' && 'subjectId' in bookObj) {
+              subjectIdMap[subject] = bookObj.subjectId as string;
+            }
+            return bookObj;
+          });
       } else {
         // Fallback to assignedBooks
         books[String(grade)][subject] = assignedBooks
@@ -360,7 +380,16 @@ const QuizGeneration = () => {
             const normalizedBookGrade = normalizeGrade(book.grade);
             return normalizedBookGrade === grade && book.subject === subject;
           })
-          .map(book => book.title);
+          .map((book: any) => {
+            if (book && typeof book === 'object' && 'id' in book && 'title' in book) {
+              bookIdMap[book.title] = book.id;
+            }
+            // Track subject ID if available
+            if (book && typeof book === 'object' && 'subjectId' in book) {
+              subjectIdMap[subject] = book.subjectId;
+            }
+            return book;
+          });
       }
     });
   });
@@ -393,7 +422,7 @@ const QuizGeneration = () => {
   const quizTypes = ['Weekly', 'Monthly', 'Half Yearly', 'Final Exam', 'Other'];
   const maxQuestions = 200;
   const maxTimeLimit = 300;
-  const optionLabels = (isRTL) => isRTL ? ['ا', 'ب', 'ج', 'د', 'ھ', 'و'] : ['A', 'B', 'C', 'D', 'E', 'F'];
+  const optionLabels = (isRTL: boolean): string[] => isRTL ? ['ا', 'ب', 'ج', 'د', 'ھ', 'و'] : ['A', 'B', 'C', 'D', 'E', 'F'];
 
   useEffect(() => {
     const fetchQuestions = async () => {
@@ -401,7 +430,7 @@ const QuizGeneration = () => {
         if (!user?.schoolId) return;
         
         console.log(`🔄 Fetching questions for QB: ${selectedQB}`);
-        let allQuestions = [];
+        let allQuestions: any[] = [];
         
         // Fetch from school questions if QB is 'school' or 'both'
         if (selectedQB === 'school' || selectedQB === 'both') {
@@ -436,7 +465,8 @@ const QuizGeneration = () => {
         setQuestions(allQuestions);
       } catch (error) {
         console.error('Fetch error:', error);
-        alert('Failed to fetch questions: ' + error.message);
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        alert('Failed to fetch questions: ' + errorMessage);
       }
     };
     
@@ -453,50 +483,116 @@ const QuizGeneration = () => {
   }, [selectedQB, quizFormat]);
 
   // Dynamically fetch available chapters and SLOs based on selected grade, subject, and book
+  // Chapters are consistent across all accounts, SLOs vary based on QB source and available questions
   useEffect(() => {
-    const fetchChaptersAndSLOs = () => {
-      if (!selectedGrade || !selectedSubject || !selectedBook || questions.length === 0) {
+    const fetchChaptersAndSLOs = async () => {
+      console.log('🔍 fetchChaptersAndSLOs triggered with:', { selectedSubject, selectedBook, selectedGrade });
+      
+      // Reset if missing subject/book (chapters need these)
+      if (!selectedSubject || !selectedBook) {
+        console.log('⚠️ Missing subject or book, resetting chapters');
         setAvailableChapters([]);
         setAvailableSLOs([]);
         return;
       }
 
-      // Filter questions by grade, subject, and book to get unique chapters and SLOs
-      const filtered = questions.filter(q => {
-        // Normalize grades: remove "Grade " prefix and convert to lowercase
-        const qGradeNormalized = (q.grade || q.class || '').toString().replace('Grade ', '').trim().toLowerCase();
-        const selectedGradeNormalized = String(selectedGrade).replace('Grade ', '').trim().toLowerCase();
-        const qSubject = (q.subject || '').toLowerCase();
-        const qBook = (q.book || '').toLowerCase();
+      try {
+        // Fetch chapters from API (consistent across all accounts) - doesn't require questions to be loaded
+        const bookId = bookIdMap[selectedBook];
+        const subjectId = subjectIdMap[selectedSubject];
+        const url = `/api/admin/chapters?subject=${encodeURIComponent(selectedSubject)}&book=${encodeURIComponent(selectedBook)}&bookId=${encodeURIComponent(bookId || '')}&subjectId=${encodeURIComponent(subjectId || '')}`;
+        console.log('🌐 Calling chapters API:', url, { selectedSubject, selectedBook, subjectId, bookId });
         
-        return qGradeNormalized === selectedGradeNormalized &&
-               qSubject === selectedSubject.toLowerCase() &&
-               qBook === selectedBook.toLowerCase();
-      });
+        const chaptersResponse = await fetch(url);
+        const chaptersData = await chaptersResponse.json();
+        let chapters = chaptersData.chapters || [];
+        
+        // Strip quotes from chapter names if they exist
+        chapters = chapters.map((ch: string) => {
+          let cleaned = ch.trim();
+          if ((cleaned.startsWith('"') && cleaned.endsWith('"')) || (cleaned.startsWith("'") && cleaned.endsWith("'"))) {
+            cleaned = cleaned.slice(1, -1);
+          }
+          return cleaned;
+        });
 
-      console.log('📚 Chapter Fetch Debug:', {
-        selectedGrade,
-        selectedSubject,
-        selectedBook,
-        questionsTotal: questions.length,
-        filteredQuestions: filtered.length,
-        questions: filtered.slice(0, 3) // Log first 3 for debugging
-      });
+        console.log('📚 Chapters API Response:', {
+          status: chaptersResponse.status,
+          selectedBook,
+          selectedSubject,
+          chaptersCount: chapters.length,
+          chapters,
+          chaptersDebug: chapters.map((c: string) => `"${c}"`),
+          source: chaptersData.source,
+          foundSubjectId: chaptersData.subjectId,
+          error: chaptersData.error
+        });
 
-      // Extract unique chapters and SLOs
-      const chapters = [...new Set(filtered.map(q => q.chapter).filter(Boolean))] as string[];
-      const slos = [...new Set(filtered.map(q => q.slo).filter(Boolean))] as string[];
+        setAvailableChapters(chapters);
+        
+        // Save the numeric subject ID that was found
+        if (chaptersData.subjectId) {
+          setFoundSubjectId(chaptersData.subjectId);
+          console.log('✅ Saved subject ID:', chaptersData.subjectId);
+        }
 
-      setAvailableChapters(chapters.sort());
-      setAvailableSLOs(slos.sort());
-      
-      // Reset selected chapters and SLOs when filters change
-      setSelectedChapters([]);
-      setSelectedSLOs([]);
+        // Now fetch SLOs based on selected QB source and chapters (only if questions are loaded)
+        if (!selectedGrade || questions.length === 0) {
+          console.log('ℹ️ Skipping SLO fetch - missing grade or no questions loaded');
+          setAvailableSLOs([]);
+          setSelectedChapters([]);
+          setSelectedSLOs([]);
+          return;
+        }
+
+        const selectedGradeNormalized = String(selectedGrade).replace('Grade ', '').trim().toLowerCase();
+        const selectedSubjectLower = selectedSubject.toLowerCase();
+        const selectedBookLower = selectedBook.toLowerCase();
+        const selectedBookId = bookIdMap[selectedBook];
+
+        const slosSet = new Set<string>();
+
+        questions.forEach(q => {
+          const qGradeNormalized = (q.grade || q.class || '').toString().replace('Grade ', '').trim().toLowerCase();
+          const qSubject = (q.subject || '').toLowerCase();
+          const qBook = (q.book || '').toLowerCase();
+          const qSLO = q.slo || '';
+          
+          // Match grade, subject, and book (with numeric ID support)
+          const bookMatch = qBook === selectedBookLower || 
+                           qBook === selectedBookId?.toString().toLowerCase() ||
+                           qBook === selectedBookId;
+
+          if (qGradeNormalized === selectedGradeNormalized &&
+              qSubject === selectedSubjectLower &&
+              bookMatch &&
+              qSLO) {
+            slosSet.add(qSLO);
+          }
+        });
+
+        const slos = Array.from(slosSet).sort();
+
+        console.log('✅ SLOs for QB source:', {
+          selectedQB,
+          slos,
+          sloCount: slos.length
+        });
+
+        setAvailableSLOs(slos);
+        
+        // Reset selected chapters and SLOs when filters change
+        setSelectedChapters([]);
+        setSelectedSLOs([]);
+      } catch (error) {
+        console.error('❌ Error fetching chapters and SLOs:', error);
+        setAvailableChapters([]);
+        setAvailableSLOs([]);
+      }
     };
 
     fetchChaptersAndSLOs();
-  }, [selectedGrade, selectedSubject, selectedBook, questions]);
+  }, [selectedGrade, selectedSubject, selectedBook, questions, selectedQB]);
 
   // Reset question configuration when grade/subject/book changes
   useEffect(() => {
@@ -551,25 +647,51 @@ const QuizGeneration = () => {
   const getAvailableSLOs = useCallback(() => {
     if (!selectedGrade || !selectedSubject || !selectedBook || selectedChapters.length === 0) return [];
     
+    console.log('🔎 Getting available SLOs for:', { selectedGrade, selectedSubject, selectedBook, selectedChapters, foundSubjectId });
+    
     // Filter questions by selected chapters to get SLOs
-    const slos = new Set();
+    const slos = new Set<string>();
+    const selectedGradeNormalized = String(selectedGrade).replace(/^(Grade|Class)\s+/i, '').trim().toLowerCase();
+    const selectedSubjectLower = selectedSubject.toLowerCase();
+    const selectedBookLower = selectedBook.toLowerCase();
+    
+    // Get the numeric IDs for subject and book
+    const numericSubjectId = foundSubjectId || subjectIdMap[selectedSubject] || selectedSubject;
+    const numericBookId = (bookIdMap[selectedBook] || selectedBook) as string;
+    
+    console.log('📌 Using IDs:', { numericSubjectId, numericBookId, selectedSubject, selectedBook, foundSubjectId });
+    
     questions.forEach(q => {
-      const qGradeNormalized = (q.grade || q.class || '').toString().replace('Grade ', '').trim().toLowerCase();
-      const selectedGradeNormalized = String(selectedGrade).replace('Grade ', '').trim().toLowerCase();
-      const qSubject = (q.subject || '').toLowerCase();
-      const qBook = (q.book || '').toLowerCase();
-      const qChapter = q.chapter || '';
+      const qGradeNormalized = (q.grade || q.class || '').toString().replace(/^(Grade|Class)\s+/i, '').trim().toLowerCase();
+      const qSubject = (q.subject || '').toString().toLowerCase();
+      const qBook = (q.book || '').toString().toLowerCase();
+      let qChapter = q.chapter || '';
       const qSLO = q.slo || '';
-      if (qGradeNormalized === selectedGradeNormalized && 
-          qSubject === selectedSubject.toLowerCase() && 
-          qBook === selectedBook.toLowerCase() && 
-          selectedChapters.includes(qChapter) && 
-          qSLO) {
+      
+      // Clean up chapter name - remove quotes if present
+      if (qChapter.startsWith('"') && qChapter.endsWith('"')) {
+        qChapter = qChapter.slice(1, -1);
+      } else if (qChapter.startsWith("'") && qChapter.endsWith("'")) {
+        qChapter = qChapter.slice(1, -1);
+      }
+      
+      // Check if this question matches our selected grade/subject/book
+      // Try both numeric IDs and display names
+      const gradeMatch = qGradeNormalized === selectedGradeNormalized;
+      const subjectMatch = qSubject === selectedSubjectLower || qSubject === numericSubjectId.toLowerCase();
+      const bookMatch = qBook === selectedBookLower || qBook === numericBookId.toLowerCase();
+      const chapterMatch = selectedChapters.includes(qChapter);
+      
+      if (gradeMatch && subjectMatch && bookMatch && chapterMatch && qSLO) {
+        console.log('✅ SLO Match found:', { qChapter, qSLO, qSubject, numericSubjectId });
         slos.add(qSLO);
       }
     });
-    return Array.from(slos).sort();
-  }, [questions, selectedGrade, selectedSubject, selectedBook, selectedChapters]);
+    
+    const sloArray = Array.from(slos).sort();
+    console.log(`✅ Available SLOs (${sloArray.length}):`, sloArray);
+    return sloArray;
+  }, [questions, selectedGrade, selectedSubject, selectedBook, selectedChapters, bookIdMap, subjectIdMap, foundSubjectId]);
 
   // Helper function to normalize question types for consistent matching
   const normalizeQuestionType = (qType: string): string => {
@@ -613,19 +735,23 @@ const QuizGeneration = () => {
       'fitb': 'fillblanks',
       'blanks': 'fillblanks',
       'blanksafill': 'fillblanks',
-      'fillintheblanks': 'fillblanks',
     };
     
     return typeMap[normalized] || normalized;
   };
 
-  const getQuestionCountByType = useCallback((type) => {
+  const getQuestionCountByType = useCallback((type: string): number => {
     if (!selectedGrade || !selectedSubject || !selectedBook) return 0;
-    const selectedDifficulties = questionConfig[type]?.difficulties || [];
+    const selectedDifficulties = (questionConfig as any)[type]?.difficulties || [];
+    const selectedDifficultiesLower = selectedDifficulties.map((d: string) => d.toLowerCase());
     
     const selectedGradeNormalized = String(selectedGrade).replace(/^(Grade|Class)\s+/i, '').trim().toLowerCase();
     const selectedSubjectLower = selectedSubject.toLowerCase();
     const selectedBookLower = selectedBook.toLowerCase();
+    
+    // Get the numeric IDs for subject and book
+    const numericSubjectId = foundSubjectId || subjectIdMap[selectedSubject] || selectedSubject;
+    const numericBookId = bookIdMap[selectedBook] || selectedBook;
     
     let matchCount = 0;
     let totalQuestions = 0;
@@ -638,16 +764,18 @@ const QuizGeneration = () => {
       
       const qGradeRaw = (q.grade || q.class || '').toString();
       const qGradeNormalized = qGradeRaw.replace(/^(Grade|Class)\s+/i, '').trim().toLowerCase();
-      const qSubject = (q.subject || '').toLowerCase();
-      const qBook = (q.book || '').toLowerCase();
+      const qSubject = (q.subject || '').toString().toLowerCase();
+      const qBook = (q.book || '').toString().toLowerCase();
       const qType = (q.type || q.questionType || '').toLowerCase();
       const normalizedType = normalizeQuestionType(qType);
       
       // Track ALL combinations in database
       allGradeSubjectBookCombos.add(`${qGradeNormalized}|${qSubject}|${qBook}`);
       
-      // Track what types exist for the selected grade/subject/book
-      if (qGradeNormalized === selectedGradeNormalized && qSubject === selectedSubjectLower && qBook === selectedBookLower) {
+      // Track what types exist for the selected grade/subject/book (try both display names and numeric IDs)
+      const subjectTypeMatch = qSubject === selectedSubjectLower || qSubject === numericSubjectId.toLowerCase();
+      const bookTypeMatch = qBook === selectedBookLower || qBook === numericBookId.toLowerCase();
+      if (qGradeNormalized === selectedGradeNormalized && subjectTypeMatch && bookTypeMatch) {
         typesInSelectedRange.add(`${qType}(${normalizedType})`);
       }
       
@@ -660,23 +788,51 @@ const QuizGeneration = () => {
           book: qBook,
           type: qType,
           type_norm: normalizedType,
+          numericSubjectId,
+          numericBookId
         };
       }
       
-      // Check all matching conditions
+      // Check all matching conditions (try both display names and numeric IDs)
       const gradeMatch = qGradeNormalized === selectedGradeNormalized;
-      const subjectMatch = qSubject === selectedSubjectLower;
-      const bookMatch = qBook === selectedBookLower;
+      const subjectMatch = qSubject === selectedSubjectLower || qSubject === numericSubjectId.toLowerCase();
+      const bookMatch = qBook === selectedBookLower || qBook === numericBookId.toLowerCase();
       const typeMatch = normalizedType === type;
       
       if (gradeMatch && subjectMatch && bookMatch && typeMatch) {
-        const qChapter = q.chapter || '';
+        let qChapter = (q.chapter || '').trim();
+        // Remove surrounding quotes if present
+        if ((qChapter.startsWith('"') && qChapter.endsWith('"')) || (qChapter.startsWith("'") && qChapter.endsWith("'"))) {
+          qChapter = qChapter.slice(1, -1);
+        }
         const qSLO = q.slo || '';
-        const qDifficulty = q.difficulty || 'Medium';
+        const qDifficulty = (q.difficulty || 'Medium').toString();
+        const qDifficultyLower = qDifficulty.toLowerCase();
         
-        if (selectedChapters.length > 0 && !selectedChapters.includes(qChapter)) return;
+        // Debug chapter matching
+        if (selectedChapters.length > 0 && qChapter) {
+          const isChapterMatch = selectedChapters.includes(qChapter);
+          if (!isChapterMatch && type === 'multiple') {
+            console.log('❌ Chapter mismatch:', {
+              qChapter: `"${qChapter}"`,
+              selectedChapters,
+              selectedChaptersDebug: selectedChapters.map(c => `"${c}"`),
+              isIncluded: isChapterMatch,
+              selectedCount: selectedChapters.length
+            });
+          }
+        }
+        
+        if (selectedChapters.length > 0 && !selectedChapters.includes(qChapter)) {
+          // Skip this question if chapter doesn't match and we have selected chapters
+          // But first, try matching without quotes in case data has quotes
+          const qChapterUnquoted = qChapter.replace(/^["']|["']$/g, '');
+          if (!selectedChapters.includes(qChapterUnquoted)) {
+            return;
+          }
+        }
         if (selectedSLOs.length > 0 && !selectedSLOs.includes(qSLO)) return;
-        if (selectedDifficulties.length > 0 && !selectedDifficulties.includes(qDifficulty)) return;
+        if (selectedDifficultiesLower.length > 0 && !selectedDifficultiesLower.includes(qDifficultyLower)) return;
         
         matchCount++;
       }
@@ -735,36 +891,144 @@ const QuizGeneration = () => {
     return Object.values(questionConfig).reduce((sum, config) => sum + config.count, 0);
   }, [questionConfig]);
 
-  const generateQuestions = useCallback((overrideSeed = null) => {
+  const generateQuestions = useCallback((overrideSeed: string | null = null): any[] => {
     const seedToUse = overrideSeed || randomSeed;
     
     // Build questions based on questionConfig
-    let allQuestions = [];
+    let allQuestions: any[] = [];
     let questionCounter = 1;
+
+    // Debug: Show what questions exist for this grade/subject/book
+    const debugQuestionsForCombo = questions.filter(q => {
+      const qGradeNormalized = (q.grade || q.class || '').toString().replace(/^(Grade|Class)\s+/i, '').trim().toLowerCase();
+      const selectedGradeNormalized = String(selectedGrade).replace(/^(Grade|Class)\s+/i, '').trim().toLowerCase();
+      const qSubject = (q.subject || '').toLowerCase();
+      const qBook = (q.book || '').toLowerCase();
+      
+      const gradeMatch = qGradeNormalized === selectedGradeNormalized;
+      const subjectMatch = qSubject === selectedSubject.toLowerCase();
+      const bookMatch = qBook === selectedBook.toLowerCase();
+      
+      return gradeMatch && subjectMatch && bookMatch;
+    });
+
+    if (debugQuestionsForCombo.length > 0 && process.env.NODE_ENV === 'development') {
+      console.log('📊 DEBUG: Questions found for grade/subject/book:', {
+        grade: selectedGrade,
+        subject: selectedSubject,
+        book: selectedBook,
+        totalFound: debugQuestionsForCombo.length,
+        types: [...new Set(debugQuestionsForCombo.map(q => {
+          const raw = q.type || q.questionType || 'UNKNOWN';
+          const normalized = normalizeQuestionType((raw || '').toLowerCase());
+          return `${raw} -> ${normalized}`;
+        }))],
+        sampleQuestion: {
+          type: debugQuestionsForCombo[0].type,
+          questionType: debugQuestionsForCombo[0].questionType,
+          difficulty: debugQuestionsForCombo[0].difficulty,
+          chapter: debugQuestionsForCombo[0].chapter,
+          slo: debugQuestionsForCombo[0].slo,
+          questionText: (debugQuestionsForCombo[0].questionText || '').substring(0, 50),
+        },
+      });
+    }
 
     Object.entries(questionConfig).forEach(([type, config]) => {
       if (config.count === 0) return;
 
       // Filter questions for this type with selected difficulties
       const typeQuestions = questions.filter(q => {
-        const qGradeNormalized = (q.grade || q.class || '').toString().replace('Grade ', '').trim().toLowerCase();
-        const selectedGradeNormalized = String(selectedGrade).replace('Grade ', '').trim().toLowerCase();
+        const qGradeNormalized = (q.grade || q.class || '').toString().replace(/^(Grade|Class)\s+/i, '').trim().toLowerCase();
+        const selectedGradeNormalized = String(selectedGrade).replace(/^(Grade|Class)\s+/i, '').trim().toLowerCase();
         const qSubject = (q.subject || '').toLowerCase();
         const qBook = (q.book || '').toLowerCase();
-        const qChapter = q.chapter || '';
-        const qSLO = q.slo || '';
+        let qChapter = (q.chapter || '').trim();
+        // Remove surrounding quotes if present and normalize
+        if ((qChapter.startsWith('"') && qChapter.endsWith('"')) || (qChapter.startsWith("'") && qChapter.endsWith("'"))) {
+          qChapter = qChapter.slice(1, -1).trim();
+        }
+        const qSLO = (q.slo || '').trim();
         const qType = (q.type || q.questionType || '').toLowerCase();
-        const qDifficulty = q.difficulty || 'Medium';
-        const normalizedType = qType === 'mcqs' ? 'multiple' : qType.replace('_', '');
+        const qDifficulty = (q.difficulty || 'Medium').toString();
+        const qDifficultyLower = qDifficulty.toLowerCase();
+        const normalizedType = normalizeQuestionType(qType);
+        
+        // Book matching: check both display name and numeric ID from bookIdMap
+        const selectedBookLower = selectedBook.toLowerCase();
+        const selectedBookId = bookIdMap[selectedBook];
+        const bookMatch = qBook === selectedBookLower || 
+                         qBook === selectedBookId?.toString().toLowerCase() ||
+                         qBook === selectedBookId;
 
-        return qGradeNormalized === selectedGradeNormalized &&
-               qSubject === selectedSubject.toLowerCase() &&
-               qBook === selectedBook.toLowerCase() &&
-               (selectedChapters.length === 0 || selectedChapters.includes(qChapter)) &&
-               (selectedSLOs.length === 0 || selectedSLOs.includes(qSLO)) &&
-               normalizedType === type &&
-               (config.difficulties.length === 0 || config.difficulties.includes(qDifficulty));
+        // Basic matches (grade, subject, book, type, difficulty)
+        const gradeMatch = qGradeNormalized === selectedGradeNormalized;
+        const subjectMatch = qSubject === selectedSubject.toLowerCase();
+        const typeMatch = normalizedType === type;
+        const difficultiesLower = (config.difficulties || ['Easy', 'Medium', 'Hard']).map(d => d.toLowerCase());
+        const difficultyMatch = difficultiesLower.length === 0 || difficultiesLower.includes(qDifficultyLower);
+        
+        // Chapter and SLO matching - be lenient if data is missing
+        let chapterMatch = true;
+        let sloMatch = true;
+        
+        // If chapters were selected, try to match - but don't exclude questions without chapter data
+        if (selectedChapters.length > 0) {
+          if (qChapter) {
+            chapterMatch = selectedChapters.some(ch => {
+              const chTrimmed = ch.trim();
+              return qChapter === chTrimmed || 
+                     qChapter.toLowerCase() === chTrimmed.toLowerCase();
+            });
+          }
+          // If question has no chapter data, still allow it (chapterMatch stays true)
+        }
+        
+        // If SLOs were selected, try to match - but don't exclude questions without SLO data
+        if (selectedSLOs.length > 0) {
+          if (qSLO) {
+            sloMatch = selectedSLOs.some(slo => {
+              const sloTrimmed = slo.trim();
+              return qSLO === sloTrimmed || 
+                     qSLO.toLowerCase() === sloTrimmed.toLowerCase();
+            });
+          }
+          // If question has no SLO data, still allow it (sloMatch stays true)
+        }
+        
+        const allMatch = gradeMatch && subjectMatch && bookMatch && chapterMatch && sloMatch && typeMatch && difficultyMatch;
+        
+        // Log questions that don't match to help debug
+        if (!allMatch && type === 'multiple' && q.questionText && q.questionText.substring(0, 50)) {
+          console.log(`❌ Question excluded: "${q.questionText.substring(0, 50)}..."`, {
+            gradeMatch,
+            subjectMatch,
+            bookMatch,
+            typeMatch,
+            difficultyMatch,
+            chapterMatch,
+            sloMatch,
+            qChapter,
+            selectedChapters,
+            qSLO,
+            selectedSLOs,
+          });
+        }
+
+        return gradeMatch && subjectMatch && bookMatch && chapterMatch && sloMatch && typeMatch && difficultyMatch;
       });
+
+      if (process.env.NODE_ENV === 'development') {
+        console.log(`📊 Questions of type "${type}": ${typeQuestions.length} available`);
+        if (typeQuestions.length === 0 && debugQuestionsForCombo.length > 0) {
+          console.log(`⚠️  No ${type} questions found even though grade/subject/book combo has ${debugQuestionsForCombo.length} questions total`);
+          console.log('Available types in this combo:', [...new Set(debugQuestionsForCombo.map(q => {
+            const raw = q.type || q.questionType;
+            const normalized = normalizeQuestionType((raw || '').toLowerCase());
+            return `${raw}=>${normalized}`;
+          }))]);
+        }
+      }
 
       // Shuffle and select the required count
       const selectedQuestions = shuffle(typeQuestions, seedToUse).slice(0, config.count);
@@ -786,12 +1050,21 @@ const QuizGeneration = () => {
           interactiveData = q.interactiveData;
           answer = { value: 'interactive', text: 'See interactive data' };
         } else if (qType === 'multiple') {
-          options = shuffle(q.options.map((opt, idx) => ({
+          options = shuffle(q.options.map((opt: any, idx: number) => ({
             text: opt || `Option ${idx + 1}`,
             format: q.subject === 'Math' ? 'math' : 'text',
           })), seedToUse);
-          answer = { value: options.findIndex(opt => opt.text === q.correctAnswer), text: q.correctAnswer };
-          if (answer.value === -1 || !q.correctAnswer) return;
+          // Normalize correct answer: handle arrays, comma-separated, and case-insensitive matching
+          let correctCandidate: any = q.correctAnswer;
+          if (Array.isArray(correctCandidate)) {
+            correctCandidate = correctCandidate[0] || '';
+          }
+          if (typeof correctCandidate === 'string' && correctCandidate.includes(',')) {
+            correctCandidate = correctCandidate.split(',')[0].trim();
+          }
+          const idx = options.findIndex(opt => (opt.text || '').toString().trim().toLowerCase() === (correctCandidate || '').toString().trim().toLowerCase());
+          answer = { value: idx, text: q.correctAnswer };
+          if (idx === -1 || !q.correctAnswer) return;
         } else if (qType === 'truefalse') {
           const trueFalseOptions = [
             { text: 'True', format: 'text' },
@@ -805,7 +1078,8 @@ const QuizGeneration = () => {
             interactiveData = q.interactiveData;
             answer = { value: 'interactive', text: 'See interactive data' };
           } else {
-            answer = { value: Object.fromEntries(Object.entries(q.blanks || {}).map(([k, v]) => [k, v || []])), text: q.correctAnswer || '' };
+            // For regular fillblanks, use correctAnswer directly
+            answer = { value: q.correctAnswer || '', text: q.correctAnswer || '' };
           }
         } else {
           answer = { value: q.correctAnswer || '', text: q.correctAnswer || '' };
@@ -873,8 +1147,8 @@ const QuizGeneration = () => {
         return;
       }
 
-    const sanitizeObject = (obj) => {
-      const sanitized = {};
+    const sanitizeObject = (obj: any): any => {
+      const sanitized: { [key: string]: any } = {};
       for (const [key, value] of Object.entries(obj)) {
         sanitized[key] = value === undefined ? null : Array.isArray(value)
           ? value.map(item => item && typeof item === 'object' ? sanitizeObject(item) : item ?? null)
@@ -936,13 +1210,14 @@ const QuizGeneration = () => {
       alert(`Quiz '${quizTitle}' created with ${questions.length} questions.`);
     } catch (error) {
       console.error('Error saving quiz:', error);
-      alert('Error saving quiz: ' + error.message);
+      const errorMsg = error instanceof Error ? error.message : String(error);
+      alert('Error saving quiz: ' + errorMsg);
     } finally {
       setIsGenerating(false);
     }
   };
 
-  const handleEditQuestion = (index, field, value) => setEditedQuestions(prev => {
+  const handleEditQuestion = (index: number, field: string, value: any) => setEditedQuestions(prev => {
     const newQuestions = [...prev];
     newQuestions[index] = { ...newQuestions[index], [field]: value };
     return newQuestions;
@@ -983,8 +1258,154 @@ const QuizGeneration = () => {
       setGeneratedQuiz(sanitizedQuiz);
       alert('Quiz updated successfully!');
     } catch (error) {
-      alert('Error saving changes: ' + error.message);
+      const errorMsg = error instanceof Error ? error.message : String(error);
+      alert('Error saving changes: ' + errorMsg);
     }
+  };
+
+  const openReplaceModal = async (index: number) => {
+    const currentQuestion = editedQuestions[index];
+    setReplaceQuestionIndex(index);
+    setReplaceLoading(prev => ({ ...prev, [index]: true }));
+    
+    try {
+      // Fetch available questions of the same type
+      const response = await fetch(`/api/teacher/questions?qb=${selectedQB}`, {
+        headers: {
+          'x-user-id': user?.uid || '',
+          'x-school-id': user?.schoolId || '',
+          'x-user-role': user?.role || '',
+        },
+      });
+      
+      if (!response.ok) {
+        console.error('API response not OK:', response.status, response.statusText);
+        throw new Error(`API returned ${response.status}: ${response.statusText}`);
+      }
+      
+      const data = await response.json();
+      console.log('📋 Fetched questions for replacement:', { totalFetched: data?.questions?.length || 0, currentQuestionType: currentQuestion.type, currentQuestionGrade: currentQuestion.grade, currentQuestionSubject: currentQuestion.subject });
+      
+      if (!data.questions || !Array.isArray(data.questions)) {
+        console.error('Invalid response format:', data);
+        throw new Error('Invalid response format from API');
+      }
+      
+      // Filter questions: same type, same subject, same grade, and exclude currently selected question
+      const filteredQuestions = data.questions.filter((q: any) => {
+        const qType = normalizeQuestionType((q.type || q.questionType || '').toLowerCase());
+        const selectedType = normalizeQuestionType(currentQuestion.type.toLowerCase());
+        const qGrade = String(q.grade || '').replace(/^(Grade|Class)\s+/i, '').trim().toLowerCase();
+        const questionGrade = String(currentQuestion.grade || '').replace(/^(Grade|Class)\s+/i, '').trim().toLowerCase();
+        const qSubject = (q.subject || '').toLowerCase();
+        const questionSubject = (currentQuestion.subject || '').toLowerCase();
+        
+        const matches = qType === selectedType && 
+                       qGrade === questionGrade && 
+                       qSubject === questionSubject;
+        
+        if (matches && q.id !== currentQuestion.id) {
+          return true;
+        }
+        return false;
+      });
+      
+      console.log('📌 Filtered replacement questions:', { count: filteredQuestions.length, type: normalizeQuestionType(currentQuestion.type.toLowerCase()), grade: currentQuestion.grade, subject: currentQuestion.subject });
+      
+      if (filteredQuestions.length === 0) {
+        alert(`No replacement questions found for type: ${currentQuestion.type}, Grade: ${currentQuestion.grade}, Subject: ${currentQuestion.subject}`);
+      } else {
+        // Automatically select a random question
+        const randomReplacement = filteredQuestions[Math.floor(Math.random() * filteredQuestions.length)];
+        replaceQuestion(randomReplacement, index);
+      }
+    } catch (error) {
+      console.error('Error fetching replacement questions:', error);
+      alert('Error fetching replacement questions: ' + (error instanceof Error ? error.message : String(error)));
+    } finally {
+      setReplaceLoading(prev => ({ ...prev, [index]: false }));
+    }
+  };
+
+  const replaceQuestion = (newQuestion: any, index: number) => {
+    if (index === null) return;
+    
+    // Convert the question to the same format as editedQuestions
+    let answerValue: any;
+    
+    if (newQuestion.type === 'multiple' || newQuestion.type === 'mcq') {
+      // For MCQ, find the correct answer index(es)
+      const correctAns = newQuestion.correctAnswer?.toString().trim();
+      const optionsArray = newQuestion.options || [];
+      
+      // Check if there are multiple correct answers (separated by comma)
+      if (correctAns?.includes(',')) {
+        // Multiple correct answers
+        const correctAnswers = correctAns.split(',').map((ans: string) => ans.trim());
+        const foundIndices: number[] = [];
+        
+        correctAnswers.forEach((ans: string) => {
+          let foundIndex = optionsArray.findIndex((opt: any) => (opt || '').toString().trim() === ans);
+          
+          // If not found by exact match, try case-insensitive
+          if (foundIndex === -1) {
+            foundIndex = optionsArray.findIndex((opt: any) => 
+              (opt || '').toString().toLowerCase().trim() === ans.toLowerCase().trim()
+            );
+          }
+          
+          if (foundIndex >= 0) {
+            foundIndices.push(foundIndex);
+          }
+        });
+        
+        answerValue = foundIndices.length > 0 ? foundIndices : 0;
+      } else {
+        // Single correct answer
+        let foundIndex = optionsArray.findIndex((opt: any) => (opt || '').toString().trim() === correctAns);
+        
+        // If not found by exact match, try case-insensitive
+        if (foundIndex === -1) {
+          foundIndex = optionsArray.findIndex((opt: any) => 
+            (opt || '').toString().toLowerCase().trim() === correctAns?.toLowerCase().trim()
+          );
+        }
+        
+        answerValue = foundIndex >= 0 ? foundIndex : 0;
+      }
+    } else if (newQuestion.type === 'truefalse') {
+      answerValue = newQuestion.correctAnswer?.toLowerCase() === 'true';
+    } else {
+      answerValue = newQuestion.correctAnswer;
+    }
+    
+    const formattedQuestion = {
+      id: newQuestion.id,
+      type: normalizeQuestionType((newQuestion.type || newQuestion.questionType || '').toLowerCase()),
+      grade: newQuestion.grade,
+      subject: newQuestion.subject,
+      difficulty: newQuestion.difficulty,
+      slo: newQuestion.slo || '',
+      marks: editedQuestions[index].marks, // Keep original marks
+      question: { 
+        text: newQuestion.questionText, 
+        format: newQuestion.subject === 'Math' ? 'math' : 'text', 
+        isRTL: newQuestion.subject === 'Urdu' 
+      },
+      options: (newQuestion.type === 'multiple' || newQuestion.type === 'mcq') ? newQuestion.options?.map((opt: any) => ({
+        text: opt || '',
+        format: newQuestion.subject === 'Math' ? 'math' : 'text',
+      })) || [] : [],
+      answer: {
+        value: answerValue,
+        text: newQuestion.correctAnswer || ''
+      },
+      explanation: newQuestion.explanation ? { text: newQuestion.explanation } : null,
+    };
+    
+    const newQuestions = [...editedQuestions];
+    newQuestions[index] = formattedQuestion;
+    setEditedQuestions(newQuestions);
   };
 
   const handleReshuffle = () => {
@@ -1000,7 +1421,7 @@ const QuizGeneration = () => {
     if (!generatedQuiz) return;
     
     // Helper function to replace {blank#} placeholders with underscores
-    const replaceBlanks = (text) => {
+    const replaceBlanks = (text: any): any => {
       if (!text || typeof text !== 'string') return text;
       return text.replace(/\{blank\d+\}/g, '________');
     };
@@ -1012,7 +1433,7 @@ const QuizGeneration = () => {
         ...q.question,
         text: replaceBlanks(q.question.text)
       },
-      options: q.options?.map(opt => ({
+      options: q.options?.map((opt: any) => ({
         ...opt,
         text: replaceBlanks(opt.text)
       })),
@@ -1043,26 +1464,27 @@ const QuizGeneration = () => {
         </script>
         <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js"></script>
         <style>
-          body { font-family: Arial, sans-serif; margin: 40px; line-height: 1.6; color: #333; direction: ltr; }
-          .header { border-bottom: 3px solid #3b82f6; padding-bottom: 20px; margin-bottom: 30px; }
-          .title { font-size: 28px; font-weight: bold; color: #1f2937; text-align: center; margin-bottom: 15px; }
-          .header-table { width: 100%; border-collapse: collapse; margin-bottom: 15px; border: 2px solid #000; }
-          .header-table td { padding: 8px 12px; font-size: 14px; color: #000; vertical-align: middle; border: 1px solid #000; }
-          .header-table .label { font-weight: bold; width: 25%; background-color: #f8f9fa; }
-          .header-table .value { width: 25%; }
-          .name-field { min-height: 20px; }
-          .question { margin-bottom: 25px; page-break-inside: avoid; }
-          .question-number { margin-bottom: 8px; overflow: hidden; display: flex; justify-content: space-between; align-items: center; }
-          .question-number-urdu { font-family: 'Noto Nastaliq Urdu', sans-serif; direction: rtl; text-align: right; font-weight: bold; font-size: 18px; }
-          .question-number-marks { font-family: Arial, sans-serif; direction: ltr; text-align: right; font-weight: bold; }
-          .question-number-marks-urdu { font-family: Arial, sans-serif; direction: ltr; text-align: left; font-weight: bold; }
-          .question-number-english { font-family: Arial, sans-serif; direction: ltr; text-align: left; font-weight: bold; font-size: 18px; }
-          .question-text { font-size: 16px; margin-bottom: 12px; font-weight: 500; }
-          .options { margin-bottom: 10px; }
-          .option { margin-bottom: 5px; font-size: 14px; }
-          .urdu { font-family: 'Noto Nastaliq Urdu', sans-serif; direction: rtl; text-align: right; margin-right: 20px; }
+          @import url('https://fonts.googleapis.com/css2?family=Noto+Nastaliq+Urdu:wght@400;700&display=swap');
+          body { font-family: 'Cambria', Georgia, serif; margin: 40px; line-height: 1.8; color: #2c3e50; direction: ltr; font-size: 16px; }
+          .header { border-bottom: 1px solid #2c3e50; padding-bottom: 12px; margin-bottom: 20px; }
+          .title { font-family: 'Calibri', 'Arial', sans-serif; font-size: 26px; font-weight: bold; color: #1a1a1a; text-align: center; margin-bottom: 12px; letter-spacing: 0.5px; }
+          .header-table { width: 100%; border-collapse: collapse; margin-bottom: 12px; border: 1px solid #1a1a1a; font-family: 'Calibri', 'Arial', sans-serif; }
+          .header-table td { padding: 6px 8px; font-size: 12px; color: #1a1a1a; vertical-align: middle; border: 0.5px solid #999999; }
+          .header-table .label { font-weight: 600; width: 25%; background-color: #ecf0f1; font-family: 'Calibri', 'Arial', sans-serif; }
+          .header-table .value { width: 25%; font-family: 'Cambria', Georgia, serif; }
+          .name-field { min-height: 12px; }
+          .question { margin-bottom: 28px; page-break-inside: avoid; }
+          .question-number { margin-bottom: 10px; overflow: hidden; display: flex; justify-content: space-between; align-items: center; }
+          .question-number-urdu { font-family: 'Noto Nastaliq Urdu', serif; direction: rtl; text-align: right; font-weight: 700; font-size: 19px; }
+          .question-number-marks { font-family: 'Calibri', 'Arial', sans-serif; direction: ltr; text-align: right; font-weight: 600; font-size: 14px; }
+          .question-number-marks-urdu { font-family: 'Calibri', 'Arial', sans-serif; direction: ltr; text-align: left; font-weight: 600; font-size: 14px; }
+          .question-number-english { font-family: 'Calibri', 'Arial', sans-serif; direction: ltr; text-align: left; font-weight: 600; font-size: 19px; }
+          .question-text { font-family: 'Cambria', Georgia, serif; font-size: 17px; margin-bottom: 14px; font-weight: 500; color: #1a1a1a; line-height: 1.7; }
+          .options { margin-bottom: 12px; }
+          .option { margin-bottom: 6px; font-size: 16px; font-family: 'Cambria', Georgia, serif; color: #2c3e50; line-height: 1.6; }
+          .urdu { font-family: 'Noto Nastaliq Urdu', serif; direction: rtl; text-align: right; margin-right: 20px; }
           .page-break { page-break-before: always; }
-          @media print { body { margin: 20px; } .page-break { page-break-before: always; } }
+          @media print { body { margin: 20px; font-family: 'Cambria', Georgia, serif; } .page-break { page-break-before: always; } }
         </style>
       </head>
       <body>
@@ -1116,7 +1538,7 @@ const QuizGeneration = () => {
                   q.type === 'multiple' && q.options?.length
                     ? `<div class="options ${q.question.isRTL ? 'urdu' : ''}">${q.options
                         .map(
-                          (opt, j) =>
+                          (opt: any, j: number) =>
                             `<div class="option">${q.question.isRTL ? optionLabels(true)[j] : String.fromCharCode(65 + j)}. ${opt.format === 'math' ? '\\(' + opt.text + '\\)' : opt.text}</div>`
                         )
                         .join('')}</div>`
@@ -1128,6 +1550,15 @@ const QuizGeneration = () => {
                     : q.type === 'fillblanks'
                     ? ''
                     : `<div class="options ${q.question.isRTL ? 'urdu' : ''}"><div class="option">${q.question.isRTL ? 'نیچے اپنا جواب لکھیں۔' : 'Write your answer below.'}</div></div>`
+                }
+                ${
+                  (q.type === 'short' || q.type === 'long')
+                    ? `<div class="answer-lines" style="margin-top: 12px;">
+                        ${Array.from({ length: answerLines[(editedQuestions.indexOf(q) + '-lines') as any] ?? defaultAnswerLines }).map(() => 
+                          `<div style="border-bottom: 1px solid #333; height: 24px; margin-bottom: 8px;"></div>`
+                        ).join('')}
+                      </div>`
+                    : ''
                 }
               </div>
               ${(i + 1) % 5 === 0 && i < processedQuestions.length - 1 ? '<div class="page-break"></div>' : ''}
@@ -1144,9 +1575,9 @@ const QuizGeneration = () => {
       
       // Wait for MathJax to load and render before printing
       const checkMathJax = setInterval(() => {
-        if (newWindow.MathJax && newWindow.MathJax.typesetPromise) {
+        if ((newWindow as any).MathJax && (newWindow as any).MathJax.typesetPromise) {
           clearInterval(checkMathJax);
-          newWindow.MathJax.typesetPromise().then(() => {
+          (newWindow as any).MathJax.typesetPromise().then(() => {
             setTimeout(() => {
               newWindow.print();
               alert('Quiz PDF ready! Use print dialog to save as PDF.');
@@ -1168,7 +1599,7 @@ const QuizGeneration = () => {
     if (!generatedQuiz) return;
     
     // Helper function to replace {blank#} placeholders with underscores
-    const replaceBlanks = (text) => {
+    const replaceBlanks = (text: any): any => {
       if (!text || typeof text !== 'string') return text;
       return text.replace(/\{blank\d+\}/g, '________');
     };
@@ -1180,7 +1611,7 @@ const QuizGeneration = () => {
         ...q.question,
         text: replaceBlanks(q.question.text)
       },
-      options: q.options?.map(opt => ({
+      options: q.options?.map((opt: any) => ({
         ...opt,
         text: replaceBlanks(opt.text)
       })),
@@ -1257,7 +1688,9 @@ const QuizGeneration = () => {
                       ? 'True'
                       : 'False'
                     : q.type === 'fillblanks'
-                    ? Object.entries(q.answer.value)
+                    ? typeof q.answer.value === 'string'
+                      ? q.answer.value
+                      : Object.entries(q.answer.value || {})
                         .map(([k, v]) => `${k}: ${Array.isArray(v) ? v.join(q.question.isRTL ? ' یا ' : ' or ') : v}`)
                         .join(', ')
                     : q.answer.text || q.answer.value
@@ -1276,9 +1709,9 @@ const QuizGeneration = () => {
       
       // Wait for MathJax to load and render before printing
       const checkMathJax = setInterval(() => {
-        if (newWindow.MathJax && newWindow.MathJax.typesetPromise) {
+        if ((newWindow as any).MathJax && (newWindow as any).MathJax.typesetPromise) {
           clearInterval(checkMathJax);
-          newWindow.MathJax.typesetPromise().then(() => {
+          (newWindow as any).MathJax.typesetPromise().then(() => {
             setTimeout(() => {
               newWindow.print();
               alert('Answer Key ready! Use print dialog to save as PDF.');
@@ -1321,7 +1754,7 @@ const QuizGeneration = () => {
             default: new Header({
               children: [
                 new Paragraph({
-                  children: [new TextRun({ text: generatedQuiz.title, size: 32, font: 'Arial', bold: true })],
+                  children: [new TextRun({ text: generatedQuiz.title, size: 40, font: 'Calibri', bold: true, color: '1a1a1a' })],
                   alignment: AlignmentType.LEFT,
                   spacing: { after: 200 },
                 }),
@@ -1332,7 +1765,7 @@ const QuizGeneration = () => {
             default: new Footer({
               children: [
                 new Paragraph({
-                  children: [new TextRun({ text: `Generated: ${new Date().toLocaleString()}`, size: 20, font: 'Arial' })],
+                  children: [new TextRun({ text: `Generated: ${new Date().toLocaleString()}`, size: 20, font: 'Calibri' })],
                   alignment: AlignmentType.CENTER,
                   spacing: { before: 200 },
                 }),
@@ -1358,19 +1791,19 @@ const QuizGeneration = () => {
                 new TableRow({
                   children: [
                     new TableCell({
-                      children: [new Paragraph({ children: [new TextRun({ text: 'Student Name:', bold: true, size: 20 })] })],
+                      children: [new Paragraph({ children: [new TextRun({ text: 'Student Name:', bold: true, size: 24, font: 'Calibri', color: '1a1a1a' })] })],
                       width: { size: 25, type: WidthType.PERCENTAGE },
                     }),
                     new TableCell({
-                      children: [new Paragraph({ children: [new TextRun({ text: '____________________', size: 20 })] })],
+                      children: [new Paragraph({ children: [new TextRun({ text: '____________________', size: 24, font: 'Cambria', color: '666666' })] })],
                       width: { size: 25, type: WidthType.PERCENTAGE },
                     }),
                     new TableCell({
-                      children: [new Paragraph({ children: [new TextRun({ text: 'Student ID:', bold: true, size: 20 })] })],
+                      children: [new Paragraph({ children: [new TextRun({ text: 'Student ID:', bold: true, size: 24, font: 'Calibri', color: '1a1a1a' })] })],
                       width: { size: 25, type: WidthType.PERCENTAGE },
                     }),
                     new TableCell({
-                      children: [new Paragraph({ children: [new TextRun({ text: '____________________', size: 20 })] })],
+                      children: [new Paragraph({ children: [new TextRun({ text: '____________________', size: 24, font: 'Cambria', color: '666666' })] })],
                       width: { size: 25, type: WidthType.PERCENTAGE },
                     }),
                   ],
@@ -1378,64 +1811,64 @@ const QuizGeneration = () => {
                 new TableRow({
                   children: [
                     new TableCell({
-                      children: [new Paragraph({ children: [new TextRun({ text: 'Class:', bold: true, size: 20 })] })],
+                      children: [new Paragraph({ children: [new TextRun({ text: 'Class:', bold: true, size: 24, font: 'Calibri', color: '1a1a1a' })] })],
                     }),
                     new TableCell({
-                      children: [new Paragraph({ children: [new TextRun({ text: generatedQuiz.class, size: 20 })] })],
+                      children: [new Paragraph({ children: [new TextRun({ text: generatedQuiz.class, size: 24, font: 'Cambria', color: '#2c3e50' })] })],
                     }),
                     new TableCell({
-                      children: [new Paragraph({ children: [new TextRun({ text: 'Subject:', bold: true, size: 20 })] })],
+                      children: [new Paragraph({ children: [new TextRun({ text: 'Subject:', bold: true, size: 24, font: 'Calibri', color: '1a1a1a' })] })],
                     }),
                     new TableCell({
-                      children: [new Paragraph({ children: [new TextRun({ text: generatedQuiz.subject, size: 20 })] })],
-                    }),
-                  ],
-                }),
-                new TableRow({
-                  children: [
-                    new TableCell({
-                      children: [new Paragraph({ children: [new TextRun({ text: 'Series:', bold: true, size: 20 })] })],
-                    }),
-                    new TableCell({
-                      children: [new Paragraph({ children: [new TextRun({ text: '____________________', size: 20 })] })],
-                    }),
-                    new TableCell({
-                      children: [new Paragraph({ children: [new TextRun({ text: 'Test Type:', bold: true, size: 20 })] })],
-                    }),
-                    new TableCell({
-                      children: [new Paragraph({ children: [new TextRun({ text: generatedQuiz.quizType || 'Quiz', size: 20 })] })],
+                      children: [new Paragraph({ children: [new TextRun({ text: generatedQuiz.subject, size: 24, font: 'Cambria', color: '#2c3e50' })] })],
                     }),
                   ],
                 }),
                 new TableRow({
                   children: [
                     new TableCell({
-                      children: [new Paragraph({ children: [new TextRun({ text: 'Total Marks:', bold: true, size: 20 })] })],
+                      children: [new Paragraph({ children: [new TextRun({ text: 'Series:', bold: true, size: 24, font: 'Calibri', color: '1a1a1a' })] })],
                     }),
                     new TableCell({
-                      children: [new Paragraph({ children: [new TextRun({ text: isMarked ? generatedQuiz.totalMarks.toString() : 'N/A', size: 20 })] })],
+                      children: [new Paragraph({ children: [new TextRun({ text: '____________________', size: 24, font: 'Cambria', color: '666666' })] })],
                     }),
                     new TableCell({
-                      children: [new Paragraph({ children: [new TextRun({ text: 'Total Time:', bold: true, size: 20 })] })],
+                      children: [new Paragraph({ children: [new TextRun({ text: 'Test Type:', bold: true, size: 24, font: 'Calibri', color: '1a1a1a' })] })],
                     }),
                     new TableCell({
-                      children: [new Paragraph({ children: [new TextRun({ text: `${generatedQuiz.timeLimitMinutes} minutes`, size: 20 })] })],
+                      children: [new Paragraph({ children: [new TextRun({ text: generatedQuiz.quizType || 'Quiz', size: 24, font: 'Cambria', color: '#2c3e50' })] })],
                     }),
                   ],
                 }),
                 new TableRow({
                   children: [
                     new TableCell({
-                      children: [new Paragraph({ children: [new TextRun({ text: 'Obtained Marks:', bold: true, size: 20 })] })],
+                      children: [new Paragraph({ children: [new TextRun({ text: 'Total Marks:', bold: true, size: 24, font: 'Calibri', color: '1a1a1a' })] })],
                     }),
                     new TableCell({
-                      children: [new Paragraph({ children: [new TextRun({ text: '____________________', size: 20 })] })],
+                      children: [new Paragraph({ children: [new TextRun({ text: isMarked ? generatedQuiz.totalMarks.toString() : 'N/A', size: 24, font: 'Cambria', color: '#2c3e50' })] })],
                     }),
                     new TableCell({
-                      children: [new Paragraph({ children: [new TextRun({ text: 'Date:', bold: true, size: 20 })] })],
+                      children: [new Paragraph({ children: [new TextRun({ text: 'Total Time:', bold: true, size: 24, font: 'Calibri', color: '1a1a1a' })] })],
                     }),
                     new TableCell({
-                      children: [new Paragraph({ children: [new TextRun({ text: new Date().toLocaleDateString(), size: 20 })] })],
+                      children: [new Paragraph({ children: [new TextRun({ text: `${generatedQuiz.timeLimitMinutes} minutes`, size: 24, font: 'Cambria', color: '#2c3e50' })] })],
+                    }),
+                  ],
+                }),
+                new TableRow({
+                  children: [
+                    new TableCell({
+                      children: [new Paragraph({ children: [new TextRun({ text: 'Obtained Marks:', bold: true, size: 24, font: 'Calibri', color: '1a1a1a' })] })],
+                    }),
+                    new TableCell({
+                      children: [new Paragraph({ children: [new TextRun({ text: '____________________', size: 24, font: 'Cambria', color: '666666' })] })],
+                    }),
+                    new TableCell({
+                      children: [new Paragraph({ children: [new TextRun({ text: 'Date:', bold: true, size: 24, font: 'Calibri', color: '1a1a1a' })] })],
+                    }),
+                    new TableCell({
+                      children: [new Paragraph({ children: [new TextRun({ text: new Date().toLocaleDateString(), size: 24, font: 'Cambria', color: '#2c3e50' })] })],
                     }),
                   ],
                 }),
@@ -1497,9 +1930,10 @@ const QuizGeneration = () => {
                               children: [
                                 new TextRun({ 
                                   text: `Question ${i + 1}:`, 
-                                  size: 24, 
-                                  font: 'Arial',
-                                  bold: true 
+                                  size: 28, 
+                                  font: 'Calibri',
+                                  bold: true,
+                                  color: '1a1a1a'
                                 })
                               ],
                               alignment: AlignmentType.LEFT,
@@ -1515,8 +1949,9 @@ const QuizGeneration = () => {
                                 new TextRun({ 
                                   text: `(${q.marks} marks)`, 
                                   size: 24, 
-                                  font: 'Arial',
-                                  bold: true 
+                                  font: 'Calibri',
+                                  bold: true,
+                                  color: '1a1a1a'
                                 })
                               ],
                               alignment: AlignmentType.RIGHT,
@@ -1535,9 +1970,10 @@ const QuizGeneration = () => {
                   children: [
                     new TextRun({ 
                       text: q.question.isRTL ? `سوال نمبر ${toUrduNumber(i + 1)} :` : `Question ${i + 1}:`, 
-                      size: 24, 
-                      font: q.question.isRTL ? 'Noto Nastaliq Urdu' : 'Arial',
-                      bold: true 
+                      size: 28, 
+                      font: q.question.isRTL ? 'Noto Nastaliq Urdu' : 'Calibri',
+                      bold: true,
+                      color: '1a1a1a'
                     })
                   ],
                   heading: 'Heading2',
@@ -1550,14 +1986,15 @@ const QuizGeneration = () => {
                   text: q.type === 'fillblanks' 
                     ? convertFormulasToReadable(q.question.text.replace(/\{blank\d+\}/g, '________'))
                     : convertFormulasToReadable(q.question.text), 
-                  size: 24, 
-                  font: q.question.isRTL ? 'Noto Nastaliq Urdu' : 'Arial' 
+                  size: 28, 
+                  font: q.question.isRTL ? 'Noto Nastaliq Urdu' : 'Cambria',
+                  color: '2c3e50'
                 })],
                 alignment: q.question.isRTL ? AlignmentType.RIGHT : AlignmentType.LEFT,
                 spacing: { after: 100 },
               }),
               ...(q.type === 'multiple' && q.options?.length
-                ? q.options.map((opt, j) => {
+                ? q.options.map((opt: any, j: number) => {
                     const optionLabel = q.question.isRTL ? optionLabels(true)[j] : String.fromCharCode(65 + j);
                     const optionText = convertFormulasToReadable(opt.text);
                     // For RTL (Urdu): Format as "ب. متن" (label. text)
@@ -1569,15 +2006,16 @@ const QuizGeneration = () => {
                     return new Paragraph({
                       children: [new TextRun({ 
                         text: formattedOption, 
-                        size: 24, 
-                        font: q.question.isRTL ? 'Noto Nastaliq Urdu' : 'Arial' 
+                        size: 26, 
+                        font: q.question.isRTL ? 'Noto Nastaliq Urdu' : 'Cambria',
+                        color: '2c3e50'
                       })],
                       alignment: q.question.isRTL ? AlignmentType.RIGHT : AlignmentType.LEFT,
-                      spacing: { after: 50 },
+                      spacing: { after: 60 },
                     });
                   })
                 : q.type === 'truefalse' && q.options?.length
-                ? q.options.map((opt, j) => {
+                ? q.options.map((opt: any, j: number) => {
                     const optionLabel = q.question.isRTL ? optionLabels(true)[j] : String.fromCharCode(65 + j);
                     const optionText = q.question.isRTL ? (opt.text === 'True' ? 'صحیح' : 'غلط') : opt.text;
                     // For RTL (Urdu): Format as "الف. صحیح" (label. text)
@@ -1589,11 +2027,12 @@ const QuizGeneration = () => {
                     return new Paragraph({
                       children: [new TextRun({ 
                         text: formattedOption, 
-                        size: 24, 
-                        font: q.question.isRTL ? 'Noto Nastaliq Urdu' : 'Arial' 
+                        size: 26, 
+                        font: q.question.isRTL ? 'Noto Nastaliq Urdu' : 'Cambria',
+                        color: '2c3e50'
                       })],
                       alignment: q.question.isRTL ? AlignmentType.RIGHT : AlignmentType.LEFT,
-                      spacing: { after: 50 },
+                      spacing: { after: 60 },
                     });
                   })
                 : q.type === 'fillblanks'
@@ -1602,12 +2041,26 @@ const QuizGeneration = () => {
                     new Paragraph({
                       children: [new TextRun({ 
                         text: q.question.isRTL ? 'نیچے اپنا جواب لکھیں۔' : 'Write your answer below.', 
-                        size: 24, 
-                        font: q.question.isRTL ? 'Noto Nastaliq Urdu' : 'Arial' 
+                        size: 26, 
+                        font: q.question.isRTL ? 'Noto Nastaliq Urdu' : 'Cambria',
+                        color: '2c3e50'
                       })],
                       alignment: q.question.isRTL ? AlignmentType.RIGHT : AlignmentType.LEFT,
                       spacing: { after: 50 },
                     }),
+                    // Add answer lines for short/long answer questions only (not fillblanks)
+                    ...(Array.from({ length: (answerLines as any)[`${i}-lines`] ?? defaultAnswerLines }).map(() => 
+                      new Paragraph({
+                        children: [new TextRun({ 
+                          text: '_______________________________________________________', 
+                          size: 20, 
+                          font: 'Calibri',
+                          color: '999999'
+                        })],
+                        alignment: q.question.isRTL ? AlignmentType.RIGHT : AlignmentType.LEFT,
+                        spacing: { after: 100 },
+                      })
+                    )),
                   ]),
               ...(i < editedQuestions.length - 1 && (i + 1) % 5 === 0 ? [new Paragraph({ pageBreakBefore: true })] : []),
             ]).flat(),
@@ -1620,7 +2073,7 @@ const QuizGeneration = () => {
       alert('Quiz Word document downloaded!');
     } catch (error) {
       console.error('Error generating Word document:', error);
-      alert('Error generating Word document: ' + error.message);
+      alert('Error generating Word document: ' + (error instanceof Error ? error.message : String(error)));
     }
   };
 
@@ -1873,11 +2326,15 @@ const QuizGeneration = () => {
                             selectedSubject,
                             availableBooksLength: availableBooks.length,
                             availableBooks,
+                            bookIdMap,
                             booksObject: books
                           });
-                          return availableBooks.map(bookTitle => (
-                            <option key={bookTitle} value={bookTitle}>{bookTitle}</option>
-                          ));
+                          return availableBooks.map(bookObj => {
+                            const bookTitle = typeof bookObj === 'string' ? bookObj : bookObj.title;
+                            return (
+                              <option key={bookTitle} value={bookTitle}>{bookTitle}</option>
+                            );
+                          });
                         })()}
                       </select>
                     </div>
@@ -1889,10 +2346,13 @@ const QuizGeneration = () => {
               {quizFormat && selectedBook && (
                 <div className="bg-white rounded-xl shadow-sm border p-6">
                   <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-lg font-semibold text-gray-900 flex items-center">
-                      <span className="bg-blue-600 text-white w-7 h-7 rounded-full flex items-center justify-center text-sm mr-2">2</span>
-                      Select Chapters
-                    </h3>
+                    <div>
+                      <h3 className="text-lg font-semibold text-gray-900 flex items-center">
+                        <span className="bg-blue-600 text-white w-7 h-7 rounded-full flex items-center justify-center text-sm mr-2">2</span>
+                        Select Chapters
+                      </h3>
+                      <p className="text-xs text-gray-500 mt-1">📚 Chapters are consistent across all accounts (from {selectedQB === 'both' ? 'OUP & School' : selectedQB === 'oup' ? 'OUP' : 'School'} sources)</p>
+                    </div>
                     {getAvailableChapters().length > 0 && (
                       <div className="flex gap-2">
                         <button
@@ -1939,12 +2399,38 @@ const QuizGeneration = () => {
                       <p className="text-xs text-gray-500 mt-3">{selectedChapters.length} chapter(s) selected</p>
                     </>
                   ) : (
-                    <div className="text-center py-8">
-                      <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <div className="text-center py-8 bg-gray-50 rounded-lg border-2 border-dashed border-gray-300">
+                      <svg className="mx-auto h-12 w-12 text-gray-400 mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
                       </svg>
-                      <p className="mt-2 text-sm text-gray-600">No chapters found for this book</p>
-                      <p className="text-xs text-gray-500 mt-1">Please add questions with chapters for &quot;{selectedBook}&quot; first</p>
+                      <p className="mt-2 text-sm font-medium text-gray-700">No Chapters Found</p>
+                      <p className="text-xs text-gray-600 mt-1">
+                        No chapters available for <strong>"{selectedBook}"</strong> in {selectedQB === 'both' ? 'OUP & School' : selectedQB === 'oup' ? 'OUP' : 'School'} sources
+                      </p>
+                      {selectedQB === 'school' && (
+                        <div className="text-xs text-blue-600 mt-3 space-y-1">
+                          <p>💡 <strong>How to fix this:</strong></p>
+                          <ul className="list-disc list-inside text-left inline-block">
+                            <li>Ask your admin to create chapters for "{selectedBook}"</li>
+                            <li>Or add questions with chapter information to your school's question bank</li>
+                          </ul>
+                        </div>
+                      )}
+                      {selectedQB === 'oup' && (
+                        <p className="text-xs text-blue-600 mt-2">
+                          💡 OUP chapters for "{selectedBook}" may not be available yet. Try selecting "School" or "Both" sources.
+                        </p>
+                      )}
+                      {selectedQB === 'both' && (
+                        <div className="text-xs text-blue-600 mt-3 space-y-1">
+                          <p>💡 <strong>How to fix this:</strong></p>
+                          <ul className="list-disc list-inside text-left inline-block">
+                            <li>Check if OUP has chapters for this book</li>
+                            <li>Ask your admin to create chapters in your school</li>
+                            <li>Add questions with chapter information</li>
+                          </ul>
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
@@ -1954,10 +2440,13 @@ const QuizGeneration = () => {
               {quizFormat && selectedChapters.length > 0 && getAvailableSLOs().length > 0 && (
                 <div className="bg-white rounded-xl shadow-sm border p-6">
                   <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-lg font-semibold text-gray-900 flex items-center">
-                      <span className="bg-blue-600 text-white w-7 h-7 rounded-full flex items-center justify-center text-sm mr-2">3</span>
-                      Select Learning Outcomes (SLOs)
-                    </h3>
+                    <div>
+                      <h3 className="text-lg font-semibold text-gray-900 flex items-center">
+                        <span className="bg-blue-600 text-white w-7 h-7 rounded-full flex items-center justify-center text-sm mr-2">3</span>
+                        Select Learning Outcomes (SLOs)
+                      </h3>
+                      <p className="text-xs text-gray-500 mt-1">🎯 SLOs are shown based on available questions in your selected {selectedQB === 'both' ? 'OUP & School' : selectedQB === 'oup' ? 'OUP' : 'School'} sources</p>
+                    </div>
                     <div className="flex gap-2">
                       <button
                         onClick={() => setSelectedSLOs(getAvailableSLOs())}
@@ -2007,112 +2496,163 @@ const QuizGeneration = () => {
                       <span className="ml-2 text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded-full">+ Interactive Types</span>
                     )}
                   </h3>
-                  <div className="space-y-4">
-                    {/* Filter question types based on format: Offline = basic only, Online = all types */}
-                    {questionTypes
-                      .filter(qt => quizFormat === 'Online' || !qt.isInteractive)
-                      .map(({ key, label, icon, isInteractive }) => {
-                      const available = getQuestionCountByType(key);
+                  
+                  {/* Check if any questions are available */}
+                  {(() => {
+                    const selectedGradeNormalized = String(selectedGrade).replace(/^(Grade|Class)\s+/i, '').trim().toLowerCase();
+                    const selectedSubjectLower = selectedSubject.toLowerCase();
+                    const selectedBookLower = selectedBook.toLowerCase();
+                    
+                    const availableForConfig = questions.filter(q => {
+                      const qGradeNormalized = (q.grade || q.class || '').toString().replace(/^(Grade|Class)\s+/i, '').trim().toLowerCase();
+                      const qSubject = (q.subject || '').toLowerCase();
+                      const qBook = (q.book || '').toLowerCase();
+                      const qChapter = q.chapter || '';
+                      const qSLO = q.slo || '';
+                      
+                      const gradeMatch = qGradeNormalized === selectedGradeNormalized;
+                      const subjectMatch = qSubject === selectedSubjectLower;
+                      const bookMatch = qBook === selectedBookLower;
+                      const chapterMatch = selectedChapters.length === 0 || selectedChapters.includes(qChapter);
+                      const sloMatch = selectedSLOs.length === 0 || selectedSLOs.includes(qSLO);
+                      
+                      return gradeMatch && subjectMatch && bookMatch && chapterMatch && sloMatch;
+                    }).length;
+
+                    if (availableForConfig === 0) {
                       return (
-                        <div key={key} className="border rounded-lg p-4 bg-gray-50">
-                          <div className="flex items-center justify-between mb-3">
-                            <div className="flex items-center gap-2 flex-wrap">
-                              <i className={`${icon} ${isInteractive ? 'text-purple-600' : 'text-blue-600'}`}></i>
-                              <span className="font-medium text-gray-900">{label}</span>
-                              {isInteractive && (
-                                <span className="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full">Interactive</span>
-                              )}
-                              <span className="text-xs text-gray-500">({available} available)</span>
-                            </div>
-                          </div>
-                          <div className="space-y-3">
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                              <div>
-                                <label className="block text-xs font-medium text-gray-600 mb-1">Quantity</label>
-                                <input
-                                  type="number"
-                                  min="0"
-                                  max={available}
-                                  value={questionConfig[key].count}
-                                  onChange={e => setQuestionConfig(prev => ({
-                                    ...prev,
-                                    [key]: { ...prev[key], count: Math.min(parseInt(e.target.value) || 0, available) }
-                                  }))}
-                                  className="w-full px-3 py-2 border rounded text-sm focus:ring-2 focus:ring-blue-500"
-                                  placeholder="0"
-                                />
-                              </div>
-                              <div>
-                                <label className="block text-xs font-medium text-gray-600 mb-1">Marks Each</label>
-                                <input
-                                  type="number"
-                                  min="0.5"
-                                  step="0.5"
-                                  value={questionConfig[key].marks}
-                                  onChange={e => setQuestionConfig(prev => ({
-                                    ...prev,
-                                    [key]: { ...prev[key], marks: parseFloat(e.target.value) || 0 }
-                                  }))}
-                                  className="w-full px-3 py-2 border rounded text-sm focus:ring-2 focus:ring-blue-500"
-                                  placeholder="1"
-                                />
-                              </div>
-                            </div>
-                            <div>
-                              <label className="block text-xs font-medium text-gray-600 mb-2">Difficulty Levels</label>
-                              <div className="flex flex-wrap gap-3">
-                                {['Easy', 'Medium', 'Hard'].map(difficulty => (
-                                  <label key={difficulty} className="flex items-center gap-2 cursor-pointer">
-                                    <input
-                                      type="checkbox"
-                                      checked={questionConfig[key].difficulties.includes(difficulty)}
-                                      onChange={e => {
-                                        // Prevent deselecting all difficulties
-                                        if (!e.target.checked && questionConfig[key].difficulties.length === 1) {
-                                          alert('Please select at least one difficulty level');
-                                          return;
-                                        }
-                                        
-                                        const newDifficulties = e.target.checked
-                                          ? [...questionConfig[key].difficulties, difficulty]
-                                          : questionConfig[key].difficulties.filter(d => d !== difficulty);
-                                        
-                                        setQuestionConfig(prev => ({
-                                          ...prev,
-                                          [key]: {
-                                            ...prev[key],
-                                            difficulties: newDifficulties
-                                          }
-                                        }));
-                                      }}
-                                      className="w-4 h-4 text-blue-600 rounded focus:ring-2 focus:ring-blue-500"
-                                    />
-                                    <span className="text-sm text-gray-700">{difficulty}</span>
-                                  </label>
-                                ))}
-                              </div>
-                            </div>
-                          </div>
+                        <div className="bg-yellow-50 border-2 border-yellow-200 rounded-lg p-4 text-center">
+                          <svg className="mx-auto h-12 w-12 text-yellow-400 mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                          </svg>
+                          <p className="text-sm font-medium text-yellow-900 mb-1">No Questions Available</p>
+                          <p className="text-xs text-yellow-800">
+                            No questions found for the selected book, chapter(s), and SLO(s) in the <strong>{selectedQB === 'both' ? 'OUP & School' : selectedQB === 'oup' ? 'OUP' : 'School'}</strong> question bank.
+                          </p>
+                          {selectedQB === 'school' && (
+                            <p className="text-xs text-blue-700 mt-2">
+                              💡 Add questions to your school question bank for this book and chapter combination.
+                            </p>
+                          )}
                         </div>
                       );
-                    })}
-                  </div>
-                  <div className="mt-4 p-3 bg-blue-50 rounded-lg">
-                    <div className="flex justify-between text-sm">
-                      <span className="font-medium text-gray-700">Total Questions:</span>
-                      <span className="font-bold text-blue-600">
-                        {Object.values(questionConfig).reduce((sum, config) => sum + config.count, 0)}
-                      </span>
-                    </div>
-                    <div className="flex justify-between text-sm mt-1">
-                      <span className="font-medium text-gray-700">Total Marks:</span>
-                      <span className="font-bold text-blue-600">
-                        {Object.values(questionConfig).reduce((sum, config) => sum + (config.count * config.marks), 0)}
-                      </span>
-                    </div>
-                  </div>
+                    }
+
+                    return (
+                      <div className="space-y-4">
+                        {/* Filter question types based on format: Offline = basic only, Online = all types */}
+                        {questionTypes
+                          .filter(qt => quizFormat === 'Online' || !qt.isInteractive)
+                          .map(({ key, label, icon, isInteractive }) => {
+                          const available = getQuestionCountByType(key);
+                          return (
+                            <div key={key} className={`border rounded-lg p-4 ${available > 0 ? 'bg-gray-50' : 'bg-red-50 opacity-50'}`}>
+                              <div className="flex items-center justify-between mb-3">
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <i className={`${icon} ${isInteractive ? 'text-purple-600' : 'text-blue-600'}`}></i>
+                                  <span className="font-medium text-gray-900">{label}</span>
+                                  {isInteractive && (
+                                    <span className="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full">Interactive</span>
+                                  )}
+                                  <span className={`text-xs ${available > 0 ? 'text-gray-500' : 'text-red-600 font-medium'}`}>
+                                    ({available} available)
+                                    {available === 0 && ' - Not available in ' + selectedQB}
+                                  </span>
+                                </div>
+                              </div>
+                              {available > 0 && (
+                                <div className="space-y-3">
+                                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                    <div>
+                                      <label className="block text-xs font-medium text-gray-600 mb-1">Quantity</label>
+                                      <input
+                                        type="number"
+                                        min="0"
+                                        max={available}
+                                        value={(questionConfig as any)[key].count}
+                                        onChange={e => setQuestionConfig(prev => ({
+                                          ...prev,
+                                          [key]: { ...(prev as any)[key], count: Math.min(parseInt(e.target.value) || 0, available) }
+                                        }))}
+                                        className="w-full px-3 py-2 border rounded text-sm focus:ring-2 focus:ring-blue-500"
+                                        placeholder="0"
+                                      />
+                                    </div>
+                                    <div>
+                                      <label className="block text-xs font-medium text-gray-600 mb-1">Marks Each</label>
+                                      <input
+                                        type="number"
+                                        min="0.5"
+                                        step="0.5"
+                                        value={(questionConfig as any)[key].marks}
+                                        onChange={e => setQuestionConfig(prev => ({
+                                          ...prev,
+                                          [key]: { ...(prev as any)[key], marks: parseFloat(e.target.value) || 0 }
+                                        }))}
+                                        className="w-full px-3 py-2 border rounded text-sm focus:ring-2 focus:ring-blue-500"
+                                        placeholder="1"
+                                      />
+                                    </div>
+                                  </div>
+                                  <div>
+                                    <label className="block text-xs font-medium text-gray-600 mb-2">Difficulty Levels</label>
+                                    <div className="flex flex-wrap gap-3">
+                                      {['Easy', 'Medium', 'Hard'].map(difficulty => (
+                                        <label key={difficulty} className="flex items-center gap-2 cursor-pointer">
+                                          <input
+                                            type="checkbox"
+                                            checked={(questionConfig as any)[key].difficulties.includes(difficulty)}
+                                            onChange={e => {
+                                              // Prevent deselecting all difficulties
+                                              if (!e.target.checked && (questionConfig as any)[key].difficulties.length === 1) {
+                                                alert('Please select at least one difficulty level');
+                                                return;
+                                              }
+                                              
+                                              const newDifficulties = e.target.checked
+                                                ? [...(questionConfig as any)[key].difficulties, difficulty]
+                                                : (questionConfig as any)[key].difficulties.filter((d: string) => d !== difficulty);
+                                              
+                                              setQuestionConfig(prev => ({
+                                                ...prev,
+                                                [key]: {
+                                                  ...(prev as any)[key],
+                                                  difficulties: newDifficulties
+                                                }
+                                              }));
+                                            }}
+                                            className="w-4 h-4 text-blue-600 rounded focus:ring-2 focus:ring-blue-500"
+                                          />
+                                          <span className="text-sm text-gray-700">{difficulty}</span>
+                                        </label>
+                                      ))}
+                                    </div>
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    );
+                  })()}
                 </div>
               )}
+
+              <div className="mt-4 p-3 bg-blue-50 rounded-lg">
+                <div className="flex justify-between text-sm">
+                  <span className="font-medium text-gray-700">Total Questions:</span>
+                  <span className="font-bold text-blue-600">
+                    {Object.values(questionConfig).reduce((sum, config) => sum + config.count, 0)}
+                  </span>
+                </div>
+                <div className="flex justify-between text-sm mt-1">
+                  <span className="font-medium text-gray-700">Total Marks:</span>
+                  <span className="font-bold text-blue-600">
+                    {Object.values(questionConfig).reduce((sum, config) => sum + (config.count * config.marks), 0)}
+                  </span>
+                </div>
+              </div>
             </div>
             <div className="space-y-6">
               {/* Course Assignment Details - HIDDEN */}
@@ -2325,20 +2865,37 @@ const QuizGeneration = () => {
 
                   {editedQuestions.map((q, index) => (
                     <div key={index} className="mb-4 p-4 border rounded-lg">
-                      <div className="flex justify-between">
+                      <div className="flex justify-between items-center">
                         <h5 className={`font-medium ${q.question.isRTL ? 'text-right font-noto-nastaliq' : ''}`}>
                           Question {index + 1} ({q.type})
                         </h5>
-                        {isMarked && (
-                          <input
-                            type="number"
-                            value={q.marks}
-                            onChange={e => handleEditQuestion(index, 'marks', parseFloat(e.target.value) || 1)}
-                            min="0"
-                            step="0.5"
-                            className="w-20 px-2 py-1 border rounded"
-                          />
-                        )}
+                        <div className="flex items-center space-x-2">
+                          <button
+                            onClick={() => openReplaceModal(index)}
+                            className="px-3 py-1 text-sm bg-orange-500 hover:bg-orange-600 text-white rounded disabled:bg-gray-400"
+                            title="Replace this question with another of the same type"
+                            disabled={replaceLoading[index]}
+                          >
+                            {replaceLoading[index] ? (
+                              <svg className="animate-spin h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
+                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                              </svg>
+                            ) : (
+                              <><i className="ri-refresh-line mr-1"></i>Replace</>
+                            )}
+                          </button>
+                          {isMarked && (
+                            <input
+                              type="number"
+                              value={q.marks}
+                              onChange={e => handleEditQuestion(index, 'marks', parseFloat(e.target.value) || 1)}
+                              min="0"
+                              step="0.5"
+                              className="w-20 px-2 py-1 border rounded"
+                            />
+                          )}
+                        </div>
                       </div>
                       <MathJax dynamic>
                         <textarea
@@ -2350,26 +2907,30 @@ const QuizGeneration = () => {
                         {q.type === 'multiple' && q.options?.length > 0 ? (
                           <div className="mt-2">
                             <label className="block text-sm font-medium text-gray-700 mb-2">Options:</label>
-                            {q.options.map((opt, i) => (
-                              <div key={i} className={`flex items-center space-x-2 mb-2 ${q.question.isRTL ? 'space-x-reverse' : ''}`}>
-                                <span className={`font-semibold ${q.question.isRTL ? 'font-noto-nastaliq' : ''} ${q.answer.value === i ? 'text-green-600' : ''}`}>
-                                  {q.question.isRTL ? optionLabels(true)[i] : String.fromCharCode(65 + i)}.
-                                </span>
-                                <input
-                                  value={opt.text}
-                                  onChange={e => {
-                                    const newOptions = [...q.options];
-                                    newOptions[i] = { ...newOptions[i], text: e.target.value };
-                                    handleEditQuestion(index, 'options', newOptions);
-                                  }}
-                                  className={`flex-1 p-2 border rounded ${q.question.isRTL ? 'text-right font-noto-nastaliq' : ''} ${q.answer.value === i ? 'bg-green-50 border-green-400' : ''}`}
-                                  dir={q.question.isRTL ? 'rtl' : 'ltr'}
-                                />
-                                {q.answer.value === i && (
-                                  <span className="text-green-600 text-xs font-semibold whitespace-nowrap">✓ Correct</span>
-                                )}
-                              </div>
-                            ))}
+                            {q.options.map((opt: any, i: number) => {
+                              // Check if this option is marked as correct (handle both single and multiple correct answers)
+                              const isCorrect = Array.isArray(q.answer.value) ? q.answer.value.includes(i) : q.answer.value === i;
+                              return (
+                                <div key={i} className={`flex items-center space-x-2 mb-2 ${q.question.isRTL ? 'space-x-reverse' : ''}`}>
+                                  <span className={`font-semibold ${q.question.isRTL ? 'font-noto-nastaliq' : ''} ${isCorrect ? 'text-green-600' : ''}`}>
+                                    {q.question.isRTL ? optionLabels(true)[i] : String.fromCharCode(65 + i)}.
+                                  </span>
+                                  <input
+                                    value={opt.text}
+                                    onChange={e => {
+                                      const newOptions = [...q.options];
+                                      newOptions[i] = { ...newOptions[i], text: e.target.value };
+                                      handleEditQuestion(index, 'options', newOptions);
+                                    }}
+                                    className={`flex-1 p-2 border rounded ${q.question.isRTL ? 'text-right font-noto-nastaliq' : ''} ${isCorrect ? 'bg-green-50 border-green-400' : ''}`}
+                                    dir={q.question.isRTL ? 'rtl' : 'ltr'}
+                                  />
+                                  {isCorrect && (
+                                    <span className="text-green-600 text-xs font-semibold whitespace-nowrap">✓ Correct</span>
+                                  )}
+                                </div>
+                              );
+                            })}
                           </div>
                         ) : q.type === 'truefalse' ? (
                           <div className={`mt-2 ${q.question.isRTL ? 'text-right font-noto-nastaliq' : ''}`}>
@@ -2388,12 +2949,31 @@ const QuizGeneration = () => {
                           </div>
                         ) : (
                           <div className={`mt-2 p-3 bg-blue-50 border border-blue-200 rounded ${q.question.isRTL ? 'text-right font-noto-nastaliq' : ''}`}>
-                            <div className="text-xs font-medium text-blue-700 mb-1">
+                            <div className="text-xs font-medium text-blue-700 mb-2">
                               {q.type === 'short' ? 'Short Answer' : q.type === 'long' ? 'Long Answer' : 'Fill in the Blanks'} - Expected Answer:
                             </div>
-                            <div className="text-sm text-blue-900">
-                              {q.type === 'fillblanks' ? JSON.stringify(q.answer.value, null, 2) : q.answer.text}
+                            <div className="text-sm text-blue-900 mb-3">
+                              {q.type === 'fillblanks' 
+                                ? (typeof q.answer.value === 'string' ? q.answer.value : Object.entries(q.answer.value || {}).map(([key, val]: [string, any]) => (
+                                    <div key={key} className="py-1">
+                                      <strong>{key}:</strong> {Array.isArray(val) ? val.join(q.question.isRTL ? ' یا ' : ' or ') : val}
+                                    </div>
+                                  )))
+                                : q.answer.text}
                             </div>
+                            {(q.type === 'short' || q.type === 'long') && (
+                              <div className="flex items-center gap-2 pt-2 border-t border-blue-200">
+                                <label className="text-xs font-medium text-blue-700">Answer Lines (for printable export):</label>
+                                <input
+                                  type="number"
+                                  value={(answerLines as any)[`${index}-lines`] ?? defaultAnswerLines}
+                                  onChange={e => setAnswerLines({ ...answerLines, [`${index}-lines`]: Math.max(1, parseInt(e.target.value) || 1) })}
+                                  min="1"
+                                  max="10"
+                                  className="w-16 px-2 py-1 border border-blue-300 rounded text-center text-sm"
+                                />
+                              </div>
+                            )}
                           </div>
                         )}
                         {q.explanation?.text && (
@@ -2441,6 +3021,8 @@ const QuizGeneration = () => {
               </div>
             </div>
           )}
+          
+          {/* Replace Question Modal - REMOVED */}
         </div>
       </div>
     </div>

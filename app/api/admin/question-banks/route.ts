@@ -1,5 +1,4 @@
-import { db } from '@/firebase/firebase';
-import { collection, getDocs, query, where } from 'firebase/firestore';
+import { db } from '@/lib/firebaseAdmin';
 import { NextRequest, NextResponse } from 'next/server';
 
 // GET - Get all school QBs (OUP admin only)
@@ -15,13 +14,20 @@ export async function GET(request: NextRequest) {
     }
 
     // Get all school QBs stats
-    const statsSnapshot = await getDocs(
-      collection(db, 'question-bank-stats/schools')
-    );
+    const statsSnapshot = await db.collection('question-bank-stats').doc('schools').get();
+    
+    if (!statsSnapshot.exists) {
+      return NextResponse.json({
+        success: true,
+        schoolQBs: [],
+        totalSchools: 0
+      });
+    }
 
-    const schoolQBs = statsSnapshot.docs.map(doc => ({
-      schoolId: doc.id,
-      ...doc.data()
+    const data = statsSnapshot.data() || {};
+    const schoolQBs = Object.entries(data).map(([schoolId, stats]: [string, any]) => ({
+      schoolId,
+      ...stats
     }));
 
     return NextResponse.json({

@@ -5,7 +5,7 @@ import MatchingBuilder from "@/components/MatchingBuilder";
 import OrderingBuilder from "@/components/OrderingBuilder";
 import FillBlanksBuilder from "@/components/FillBlanksBuilder";
 import CategorizationBuilder from "@/components/CategorizationBuilder";
-import PreviewWrapper from "../interactiveQuiz/previews/PreviewWrapper";
+import PreviewWrapper from "../../teacher/interactiveQuiz/previews/PreviewWrapper";
 import Sidebar from "@/components/Sidebar";
 import { db } from "@/firebase/firebase";
 import { collection, addDoc, getDocs, query, where, getDoc, doc } from "firebase/firestore";
@@ -39,12 +39,12 @@ interface DiagramLabel {
 const DiagramLabelingBuilder = ({ question, onUpdate }: { question: DragDropQuestion; onUpdate: (updated: DragDropQuestion) => void; }) => {
   const [backgroundImage, setBackgroundImage] = useState<string | undefined>(question.backgroundImage);
   const [labels, setLabels] = useState<DiagramLabel[]>(
-    question.dragItems?.map((item, idx) => ({
+    (question.dragItems as any[])?.map((item: any, idx: number) => ({
       id: item.id,
       number: idx + 1,
-      answer: item.text,
-      x: (item as any).x,
-      y: (item as any).y
+      answer: item.text || item.label || '',
+      x: item.x,
+      y: item.y
     })) || []
   );
   const [newAnswer, setNewAnswer] = useState("");
@@ -58,7 +58,7 @@ const DiagramLabelingBuilder = ({ question, onUpdate }: { question: DragDropQues
     onUpdate({
       ...question,
       layoutMode: "image",
-      dragItems: labels.map(label => ({ id: label.id, text: label.answer })),
+      dragItems: labels.map(label => ({ id: label.id, label: label.answer, type: 'text' } as any)),
       backgroundImage,
     });
   }, [labels, backgroundImage]);
@@ -419,72 +419,63 @@ export default function CreateInteractiveQuiz() {
   const [gradeSubjectMap, setGradeSubjectMap] = useState<Record<string, string[]>>({});
   const difficulties = ['Easy', 'Medium', 'Hard'];
 
-  // Fetch grades and subjects from user profile
+  // Fetch grades and subjects from user profile (Content Creator)
   useEffect(() => {
     if (!user) {
       console.log('⏳ User profile still loading...');
       return;
     }
 
-    console.log('📊 User profile loaded:', {
-      hasSubjectGradePairs: !!user?.subjectGradePairs?.length,
+    console.log('📊 User profile loaded (Content Creator):', {
       hasAssignedBooks: !!user?.assignedBooks?.length,
-      subjectGradePairsCount: user?.subjectGradePairs?.length || 0,
       assignedBooksCount: user?.assignedBooks?.length || 0,
+      assignedBooks: user?.assignedBooks,
     });
 
-    // Extract grades from user's subjectGradePairs or assignedBooks
-    let availableGrades: string[] = [];
+    // For Content Creators: Show all grades 1-8
+    let availableGrades: string[] = ['1', '2', '3', '4', '5', '6', '7', '8'];
     let gradeSubjectMapping: Record<string, string[]> = {};
+    let allAssignedSubjects: Set<string> = new Set();
 
-    if (user?.subjectGradePairs && user.subjectGradePairs.length > 0) {
-      // Extract unique grades from subjectGradePairs
-      const gradeSet = new Set<string>();
-      const gradeSubjectSet: Record<string, Set<string>> = {};
-
-      user.subjectGradePairs.forEach((pair: any) => {
-        const grade = String(pair.grade || '').trim();
-        const subject = String(pair.subject || '').trim();
-        
-        if (grade) {
-          gradeSet.add(grade);
-          if (!gradeSubjectSet[grade]) gradeSubjectSet[grade] = new Set();
-          if (subject) gradeSubjectSet[grade].add(subject);
-        }
-      });
-
-      availableGrades = Array.from(gradeSet).sort();
-      
-      // Convert Set to arrays
-      Object.keys(gradeSubjectSet).forEach(grade => {
-        gradeSubjectMapping[grade] = Array.from(gradeSubjectSet[grade]).sort();
-      });
-
-      console.log('✅ Grades from subjectGradePairs:', availableGrades, 'Mapping:', gradeSubjectMapping);
-    } else if (user?.assignedBooks && user.assignedBooks.length > 0) {
-      // Fallback: extract from assignedBooks
-      const gradeSet = new Set<string>();
+    // Build subject mapping from assignedBooks - filter subjects by grade
+    if (user?.assignedBooks && user.assignedBooks.length > 0) {
       const gradeSubjectSet: Record<string, Set<string>> = {};
 
       user.assignedBooks.forEach((book: any) => {
         const grade = String(book.grade || '').trim();
         const subject = String(book.subject || '').trim();
         
-        if (grade) {
-          gradeSet.add(grade);
+        if (grade && subject) {
           if (!gradeSubjectSet[grade]) gradeSubjectSet[grade] = new Set();
-          if (subject) gradeSubjectSet[grade].add(subject);
+          gradeSubjectSet[grade].add(subject);
+          allAssignedSubjects.add(subject); // Track all assigned subjects
         }
       });
 
-      availableGrades = Array.from(gradeSet).sort();
-      
-      // Convert Set to arrays
-      Object.keys(gradeSubjectSet).forEach(grade => {
-        gradeSubjectMapping[grade] = Array.from(gradeSubjectSet[grade]).sort();
+      // For each grade, show subjects that are assigned for that grade
+      availableGrades.forEach(grade => {
+        gradeSubjectMapping[grade] = gradeSubjectSet[grade] 
+          ? Array.from(gradeSubjectSet[grade]).sort()
+          : [];
       });
 
-      console.log('✅ Grades from assignedBooks:', availableGrades, 'Mapping:', gradeSubjectMapping);
+      console.log('✅ Content Creator subjects mapping by grade:', gradeSubjectMapping);
+      console.log('📚 All assigned subjects:', Array.from(allAssignedSubjects));
+
+      // Pre-fill subject with the first assigned subject (just like individual question creation)
+      if (!quizMeta.subject && allAssignedSubjects.size > 0) {
+        const firstSubject = Array.from(allAssignedSubjects).sort()[0];
+        setQuizMeta(prev => ({
+          ...prev,
+          subject: firstSubject
+        }));
+        console.log('✅ Pre-filled assigned subject:', firstSubject);
+      }
+    } else {
+      console.log('⚠️ No assignedBooks found');
+      availableGrades.forEach(grade => {
+        gradeSubjectMapping[grade] = [];
+      });
     }
 
     setGrades(availableGrades);
@@ -501,75 +492,38 @@ export default function CreateInteractiveQuiz() {
   // Update subjects when grade changes
   useEffect(() => {
     if (quizMeta.grade && gradeSubjectMap[quizMeta.grade]) {
-      setSubjects(gradeSubjectMap[quizMeta.grade]);
-      console.log('📌 Updated subjects for grade', quizMeta.grade, ':', gradeSubjectMap[quizMeta.grade]);
+      const availableSubjects = gradeSubjectMap[quizMeta.grade];
+      setSubjects(availableSubjects);
+      console.log('📌 Updated subjects for grade', quizMeta.grade, ':', availableSubjects);
     } else {
       setSubjects([]);
     }
   }, [quizMeta.grade, gradeSubjectMap]);
 
-  // Build books map from user's subjectGradePairs
+  // Build books map from user's assignedBooks (Content Creator)
   useEffect(() => {
-    if (!user?.subjectGradePairs || user.subjectGradePairs.length === 0) {
-      console.log('⚠️ No subjectGradePairs found, trying assignedBooks...');
-      
-      // Fallback to assignedBooks if subjectGradePairs is empty
-      if (!user?.assignedBooks || user.assignedBooks.length === 0) {
-        console.log('⚠️ No assigned books found');
-        setBooks({});
-        return;
-      }
-
-      const booksMap: Record<string, Record<string, Set<string>>> = {};
-      const titleToIdMap: Record<string, string> = {};
-      user.assignedBooks.forEach((book: any) => {
-        const grade = String(book.grade || '').trim();
-        const subject = String(book.subject || '').trim();
-        const bookTitle = String(book.title || '').trim();
-        const bookId = String(book.id || '').trim();
-
-        if (grade && subject && bookTitle) {
-          if (!booksMap[grade]) booksMap[grade] = {};
-          if (!booksMap[grade][subject]) booksMap[grade][subject] = new Set();
-          booksMap[grade][subject].add(bookTitle);
-          if (bookId) titleToIdMap[bookTitle] = bookId;
-        }
-      });
-
-      const booksArray: Record<string, Record<string, string[]>> = {};
-      Object.keys(booksMap).forEach(grade => {
-        booksArray[grade] = {};
-        Object.keys(booksMap[grade]).forEach(subject => {
-          booksArray[grade][subject] = Array.from(booksMap[grade][subject]).sort();
-        });
-      });
-
-      console.log('📚 Books map from assignedBooks:', booksArray, 'IDs:', titleToIdMap);
-      setBooks(booksArray);
-      setBookIdMap(titleToIdMap);
+    if (!user?.assignedBooks || user.assignedBooks.length === 0) {
+      console.log('⚠️ No assigned books found for content creator');
+      setBooks({});
       return;
     }
 
-    // Build from subjectGradePairs (primary source)
     const booksMap: Record<string, Record<string, Set<string>>> = {};
     const titleToIdMap: Record<string, string> = {};
 
-    user.subjectGradePairs.forEach((pair: any) => {
-      const grade = String(pair.grade || '').trim();
-      const subject = String(pair.subject || '').trim();
+    user.assignedBooks.forEach((book: any) => {
+      // Normalize grade: extract just the number from "Grade 1", "Class 1", "1", etc.
+      const gradeRaw = String(book.grade || '').trim();
+      const grade = gradeRaw.replace(/^(Grade|Class)\s+/i, '').trim();
+      const subject = String(book.subject || '').trim();
+      const bookTitle = String(book.title || '').trim();
+      const bookId = String(book.id || '').trim();
 
-      if (grade && subject && pair.assignedBooks && pair.assignedBooks.length > 0) {
+      if (grade && subject && bookTitle) {
         if (!booksMap[grade]) booksMap[grade] = {};
         if (!booksMap[grade][subject]) booksMap[grade][subject] = new Set();
-
-        pair.assignedBooks.forEach((book: any) => {
-          const bookTitle = String(book.title || '').trim();
-          const bookId = String(book.id || '').trim();
-          if (bookTitle) {
-            booksMap[grade][subject].add(bookTitle);
-            if (bookId) titleToIdMap[bookTitle] = bookId;
-          }
-        });
+        booksMap[grade][subject].add(bookTitle);
+        if (bookId) titleToIdMap[bookTitle] = bookId;
       }
     });
 
@@ -582,15 +536,15 @@ export default function CreateInteractiveQuiz() {
       });
     });
 
-    console.log('📚 Books map from subjectGradePairs:', booksArray, 'IDs:', titleToIdMap);
+    console.log('📚 Content Creator Books map built:', booksArray, 'IDs:', titleToIdMap);
     setBooks(booksArray);
     setBookIdMap(titleToIdMap);
-  }, [user?.subjectGradePairs, user?.assignedBooks]);
+  }, [user?.assignedBooks]);
 
   useEffect(() => {
     const fetchExistingQuestions = async () => {
       try {
-        const snapshot = await getDocs(collection(db, 'schoolQuestionBanks'));
+        const snapshot = await getDocs(collection(db, 'oupQuestionBanks'));
         const questionList = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         setExistingQuestions(questionList);
       } catch (error) {
@@ -645,11 +599,6 @@ export default function CreateInteractiveQuiz() {
     }
   }, [quizMeta.book, quizMeta.subject, bookIdMap]);
 
-  // Fetch chapters when book is selected
-  useEffect(() => {
-    fetchChaptersForBook();
-  }, [quizMeta.book, quizMeta.subject, fetchChaptersForBook]);
-
   const getAvailableChapters = useCallback(() => {
     if (!quizMeta.grade || !quizMeta.subject || !quizMeta.book) return [];
     const chapters = new Set<string>();
@@ -691,16 +640,21 @@ export default function CreateInteractiveQuiz() {
   }, [quizMeta.grade, quizMeta.subject, quizMeta.book, quizMeta.chapter, existingQuestions]);
 
   useEffect(() => {
-    setAvailableChapters(getAvailableChapters());
-  }, [getAvailableChapters]);
+    fetchChaptersForBook();
+  }, [quizMeta.book, quizMeta.subject, fetchChaptersForBook]);
 
   useEffect(() => {
     setAvailableSLOs(getAvailableSLOs());
   }, [getAvailableSLOs]);
 
   const getAvailableBooks = () => {
-    if (!quizMeta.grade || !quizMeta.subject) return [];
-    return books[quizMeta.grade]?.[quizMeta.subject] || [];
+    if (!quizMeta.grade || !quizMeta.subject) {
+      console.log('⚠️ getAvailableBooks: Missing grade or subject', { grade: quizMeta.grade, subject: quizMeta.subject });
+      return [];
+    }
+    const availableBooks = books[quizMeta.grade]?.[quizMeta.subject] || [];
+    console.log('📚 getAvailableBooks:', { grade: quizMeta.grade, subject: quizMeta.subject, availableBooks, booksMap: books });
+    return availableBooks;
   };
 
   const createEmptyQuestion = (type: QuizType): AnyQuestion | null => {
@@ -832,13 +786,13 @@ export default function CreateInteractiveQuiz() {
             question: question.prompt,
             interactiveData: question,
             isInteractive: true,
-            createdBy: 'teacher',
-            bankType: 'school',
+            createdBy: 'contentCreator',
+            bankType: 'oup',
             createdAt: new Date().toISOString(),
           };
           
-          // Save to school question bank for teachers
-          await addDoc(collection(db, 'schoolQuestionBanks'), questionData);
+          // Save to OUP question bank for content creators
+          await addDoc(collection(db, 'oupQuestionBanks'), questionData);
         }
         
         alert(`${questions.length} question(s) saved successfully!`);
@@ -877,7 +831,7 @@ export default function CreateInteractiveQuiz() {
   };
 
   const selectedQuestion = selectedQuestionIndex !== null ? questions[selectedQuestionIndex] : null;
-  const BuilderComponent = quizMeta.type !== "" && selectedQuestion ? builderComponents[quizMeta.type] : null;
+  const BuilderComponent = quizMeta.type && quizMeta.type !== "fill-blanks" && selectedQuestion ? (builderComponents as any)[quizMeta.type] : null;
   const validationErrors = showValidation ? validateQuiz() : [];
   
   const handleFieldTouch = (fieldName: string) => {
@@ -912,7 +866,7 @@ export default function CreateInteractiveQuiz() {
 
   return (
     <div className="flex min-h-screen bg-gray-50">
-      <Sidebar userRole="Teacher" currentPage="interactiveQuiz" open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
+      <Sidebar userRole="Content Creator" currentPage="interactiveQuiz" open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
 
       {/* Main Content Area */}
       <div className="flex-1 lg:ml-64 flex flex-col min-h-screen">
@@ -953,11 +907,11 @@ export default function CreateInteractiveQuiz() {
         {/* Main Content */}
         <div className="flex-1 flex flex-col overflow-auto">
           {/* Single Pane - No Left/Right Split */}
-          <div className="w-full bg-gradient-to-br from-gray-50 to-blue-50 flex flex-col min-h-0 overflow-y-auto">
+          <div className="w-full bg-gradient-to-br from-gray-50 to-purple-50 flex flex-col min-h-0 overflow-y-auto">
             {/* Quiz Metadata */}
-            <div className="p-6 border-b-2 border-blue-200 bg-white shadow-sm">
+            <div className="p-6 border-b-2 border-purple-200 bg-white shadow-sm">
               <h2 className="text-xl font-bold mb-4 text-gray-900 flex items-center gap-2">
-                <span className="text-blue-600">⚙️</span>
+                <span className="text-purple-600">⚙️</span>
                 Question Details
               </h2>
               <div className="grid grid-cols-2 gap-4">
@@ -980,23 +934,16 @@ export default function CreateInteractiveQuiz() {
                   )}
                 </div>
 
-                {/* Subject */}
+                {/* Subject - Pre-filled and disabled (read-only) */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Subject</label>
-                  <select
+                  <input
+                    type="text"
                     value={quizMeta.subject}
-                    onChange={(e) => setQuizMeta({ ...quizMeta, subject: e.target.value, book: '', chapter: '', slo: '' })}
-                    onBlur={() => handleFieldTouch('subject')}
-                    className={`w-full border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent ${getFieldError('subject') ? 'border-red-500 bg-red-50' : 'border-gray-300'}`}
-                  >
-                    <option value="">Select Subject</option>
-                    {subjects.map(s => (
-                      <option key={s} value={s}>{s}</option>
-                    ))}
-                  </select>
-                  {getFieldError('subject') && (
-                    <p className="mt-1 text-sm text-red-600">{getFieldError('subject')}</p>
-                  )}
+                    disabled
+                    className="w-full px-3 py-2 border rounded-lg text-sm bg-gray-100 text-gray-600 cursor-not-allowed border-gray-300"
+                  />
+                  <p className="mt-1 text-xs text-gray-500">Pre-filled based on your assignment</p>
                 </div>
 
                 {/* Book */}
@@ -1097,7 +1044,7 @@ export default function CreateInteractiveQuiz() {
 
             {/* Question List */}
             <div className="flex-1 flex flex-col">
-              <div className="p-6 border-b-2 border-blue-200 bg-white shadow-sm">
+              <div className="p-6 border-b-2 border-purple-200 bg-white shadow-sm">
                 <div className="flex items-center justify-between mb-4">
                   <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
                     <span className="text-purple-600">📋</span>
@@ -1109,7 +1056,7 @@ export default function CreateInteractiveQuiz() {
                     className={`px-4 py-2 rounded-lg font-medium transition-colors ${
                       !quizMeta.type
                         ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                        : 'bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white shadow-sm'
+                        : 'bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 text-white shadow-sm'
                     }`}
                   >
                     + Add Question
@@ -1122,20 +1069,20 @@ export default function CreateInteractiveQuiz() {
                     <p className="text-gray-600">No questions yet. {quizMeta.type ? 'Click "Add Question" to get started!' : 'Select a quiz type first.'}</p>
                   </div>
                 ) : (
-                  <div className="space-y-2 max-h-80 overflow-y-auto p-4 bg-gradient-to-b from-blue-50 to-purple-50">
+                  <div className="space-y-2 max-h-80 overflow-y-auto p-4 bg-gradient-to-b from-purple-50 to-pink-50">
                     {questions.map((q, idx) => (
                       <div
                         key={idx}
                         onClick={() => setSelectedQuestionIndex(idx)}
                         className={`p-3 rounded-lg border-2 cursor-pointer transition-all ${
                           selectedQuestionIndex === idx
-                            ? 'border-blue-500 bg-white shadow-md scale-105'
-                            : 'border-blue-200 hover:border-blue-400 hover:bg-white'
+                            ? 'border-purple-500 bg-white shadow-md scale-105'
+                            : 'border-purple-200 hover:border-purple-400 hover:bg-white'
                         }`}
                       >
                         <div className="flex items-center justify-between">
                           <div className="flex items-start gap-3 flex-1">
-                            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-purple-500 flex items-center justify-center text-sm font-medium text-white">
+                            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-sm font-medium text-white">
                               {idx + 1}
                             </div>
                             <div className="flex-1 min-w-0">

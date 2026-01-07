@@ -1,7 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-
-const FIREBASE_PROJECT_ID = 'quiz-app-ff0ab';
-const FIRESTORE_BASE_URL = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents`;
+import { db } from '@/lib/firebaseAdmin';
 
 export async function POST(request: NextRequest) {
   try {
@@ -15,31 +13,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const bookId = Date.now().toString();
     const bookData = {
-      fields: {
-        title: { stringValue: title },
-        grade: { stringValue: grade },
-        description: { stringValue: description || '' },
-        chapters: { integerValue: chapters || 0 },
-        createdAt: { timestampValue: new Date().toISOString() }
-      }
-    };
-
-    const response = await fetch(`${FIRESTORE_BASE_URL}/subjects/${subjectId}/books/${bookId}`, {
-      method: 'PATCH',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(bookData),
-    });
-
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
-
-    const createdBook = {
-      id: bookId,
       title,
       grade,
       description: description || '',
@@ -47,7 +21,9 @@ export async function POST(request: NextRequest) {
       createdAt: new Date().toISOString()
     };
 
-    return NextResponse.json({ book: createdBook });
+    const docRef = await db.collection('subjects').doc(subjectId).collection('books').add(bookData);
+
+    return NextResponse.json({ book: { id: docRef.id, ...bookData } });
   } catch (error) {
     console.error('Error creating book:', error);
     return NextResponse.json(
@@ -70,37 +46,16 @@ export async function PUT(request: NextRequest) {
     }
 
     const bookData = {
-      fields: {
-        title: { stringValue: title },
-        grade: { stringValue: grade },
-        description: { stringValue: description || '' },
-        chapters: { integerValue: chapters || 0 },
-        createdAt: { timestampValue: new Date().toISOString() }
-      }
-    };
-
-    const response = await fetch(`${FIRESTORE_BASE_URL}/subjects/${subjectId}/books/${bookId}`, {
-      method: 'PATCH',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(bookData),
-    });
-
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
-
-    const updatedBook = {
-      id: bookId,
       title,
       grade,
       description: description || '',
       chapters: chapters || 0,
-      createdAt: new Date().toISOString()
+      updatedAt: new Date().toISOString()
     };
 
-    return NextResponse.json({ book: updatedBook });
+    await db.collection('subjects').doc(subjectId).collection('books').doc(bookId).update(bookData);
+
+    return NextResponse.json({ book: { id: bookId, ...bookData } });
   } catch (error) {
     console.error('Error updating book:', error);
     return NextResponse.json(
@@ -123,16 +78,7 @@ export async function DELETE(request: NextRequest) {
       );
     }
 
-    const response = await fetch(`${FIRESTORE_BASE_URL}/subjects/${subjectId}/books/${bookId}`, {
-      method: 'DELETE',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-    });
-
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
+    await db.collection('subjects').doc(subjectId).collection('books').doc(bookId).delete();
 
     return NextResponse.json({ message: 'Book deleted successfully' });
   } catch (error) {

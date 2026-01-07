@@ -145,7 +145,7 @@ const QuestionCreator = () => {
   };
 
   // Handle Urdu keyboard input
-  const onUrduKeyPress = (button) => {
+  const onUrduKeyPress = (button: string) => {
     if (button === '{space}') {
       handleUrduInput(' ');
     } else {
@@ -153,7 +153,7 @@ const QuestionCreator = () => {
     }
   };
 
-  const handleUrduInput = (input) => {
+  const handleUrduInput = (input: string) => {
     if (urduKeyboardField.startsWith('option-')) {
       const optionIndex = parseInt(urduKeyboardField.split('-')[1]);
       const newOptions = [...formData.options];
@@ -170,7 +170,7 @@ const QuestionCreator = () => {
     }
   };
 
-  const toggleUrduKeyboard = (field) => {
+  const toggleUrduKeyboard = (field: string) => {
     if (showUrduKeyboard && urduKeyboardField === field) {
       setShowUrduKeyboard(false);
       setUrduKeyboardField('');
@@ -276,7 +276,7 @@ const QuestionCreator = () => {
     }
   }, []);
 
-  const handleChange = (e) => {
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
     setFormData((prev) => {
       const newFormData = { ...prev, [name]: value };
@@ -316,7 +316,7 @@ const QuestionCreator = () => {
     }
   };
 
-  const removeOption = (index) => {
+  const removeOption = (index: number) => {
     if (formData.options.length > 2) {
       const newOptions = formData.options.filter((_, i) => i !== index);
       setFormData((prev) => ({
@@ -343,7 +343,7 @@ const QuestionCreator = () => {
     }));
   };
 
-  const removeBlank = (blankId) => {
+  const removeBlank = (blankId: string) => {
     const newBlanks = { ...formData.blanks };
     delete newBlanks[blankId];
     setFormData((prev) => ({ ...prev, blanks: newBlanks }));
@@ -439,7 +439,7 @@ const QuestionCreator = () => {
     setCsvData([]);
   };
 
-  const handleFileUpload = (e) => {
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files[0];
     if (!file) return;
     setToast({ type: 'info', message: `Processing uploaded file...` });
@@ -662,7 +662,7 @@ const QuestionCreator = () => {
   };
 
   // Normalize formulas: convert legacy {formula:...} to $...$ for MathJax
-  const normalizeFormulas = (text) => {
+  const normalizeFormulas = (text: string) => {
     if (!text || typeof text !== 'string') return text;
     
     let result = text;

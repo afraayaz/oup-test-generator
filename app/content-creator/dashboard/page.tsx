@@ -213,20 +213,47 @@ export default function ContentCreatorDashboard() {
 
           {/* Recent Questions */}
           <div className="bg-white rounded-xl p-4 sm:p-6 shadow-sm border border-gray-100">
-            <div className="flex items-center justify-between mb-4 sm:mb-6">
+            <div className="flex items-center justify-between mb-4 sm:mb-6 gap-3">
               <h3 className="text-base sm:text-lg font-bold text-gray-900">Recent Questions</h3>
-              <button className="min-w-[44px] min-h-[44px] px-3 py-2 text-violet-600 hover:text-violet-700 text-sm font-medium hover:bg-violet-50 rounded-lg transition-colors">
+              <button className="min-w-[44px] min-h-[44px] px-3 py-2 text-violet-600 hover:text-violet-700 text-xs sm:text-sm font-medium hover:bg-violet-50 rounded-lg transition-colors flex-shrink-0">
                 View All
               </button>
             </div>
             
-            <div className="space-y-3">
+            <div className="space-y-3 sm:space-y-4">
               {recentQuestions.map((question) => (
-                <div key={question.id} className="border border-gray-200 rounded-lg p-4 hover:border-violet-300 transition-colors">
-                  <div className="flex items-start justify-between mb-3">
-                    <div className="flex-1">
-                      <p className="text-sm font-semibold text-gray-900 mb-2">{question.text}</p>
-                      <div className="flex items-center gap-2 flex-wrap mb-2">
+                <div key={question.id} className="border border-gray-200 rounded-lg p-3 sm:p-4 hover:border-violet-300 hover:shadow-sm transition-all">
+                  {/* Mobile: Stacked layout */}
+                  <div className="block sm:hidden">
+                    <p className="text-sm font-semibold text-gray-900 mb-3 line-clamp-2">{question.text}</p>
+                    <div className="grid grid-cols-2 gap-2 mb-3">
+                      <span className="px-2 py-1 bg-blue-50 text-blue-600 text-xs rounded">{question.subject}</span>
+                      <span className="px-2 py-1 bg-gray-100 text-gray-600 text-xs rounded">{question.grade}</span>
+                    </div>
+                    <div className="grid grid-cols-3 gap-2 mb-3">
+                      <span className={`px-2 py-1 text-xs rounded text-center ${
+                        question.difficulty === 'Easy' ? 'bg-green-50 text-green-600' :
+                        question.difficulty === 'Medium' ? 'bg-orange-50 text-orange-600' :
+                        'bg-red-50 text-red-600'
+                      }`}>
+                        {question.difficulty}
+                      </span>
+                      <span className="px-2 py-1 text-xs text-gray-400 text-center">{question.time}</span>
+                      <div className={`px-2 py-1 rounded-full text-xs font-semibold text-center ${
+                        question.status === 'approved' ? 'bg-green-100 text-green-700' :
+                        question.status === 'pending' ? 'bg-orange-100 text-orange-700' :
+                        'bg-red-100 text-red-700'
+                      }`}>
+                        {question.status === 'approved' ? '✓' : question.status === 'pending' ? '⏳' : '✗'}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Tablet+: Horizontal layout */}
+                  <div className="hidden sm:flex sm:items-start sm:justify-between sm:gap-4">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold text-gray-900 mb-2 line-clamp-2">{question.text}</p>
+                      <div className="flex items-center gap-2 flex-wrap">
                         <span className="px-2 py-1 bg-blue-50 text-blue-600 text-xs rounded">{question.subject}</span>
                         <span className="px-2 py-1 bg-gray-100 text-gray-600 text-xs rounded">{question.grade}</span>
                         <span className={`px-2 py-1 text-xs rounded ${
@@ -237,14 +264,16 @@ export default function ContentCreatorDashboard() {
                           {question.difficulty}
                         </span>
                       </div>
-                      <p className="text-xs text-gray-400">{question.time}</p>
                     </div>
-                    <div className={`px-3 py-1 rounded-full text-xs font-semibold ml-3 ${
-                      question.status === 'approved' ? 'bg-green-100 text-green-700' :
-                      question.status === 'pending' ? 'bg-orange-100 text-orange-700' :
-                      'bg-red-100 text-red-700'
-                    }`}>
-                      {question.status.charAt(0).toUpperCase() + question.status.slice(1)}
+                    <div className="flex items-center gap-3 flex-shrink-0">
+                      <p className="text-xs text-gray-400 whitespace-nowrap">{question.time}</p>
+                      <div className={`px-3 py-1 rounded-full text-xs font-semibold whitespace-nowrap ${
+                        question.status === 'approved' ? 'bg-green-100 text-green-700' :
+                        question.status === 'pending' ? 'bg-orange-100 text-orange-700' :
+                        'bg-red-100 text-red-700'
+                      }`}>
+                        {question.status.charAt(0).toUpperCase() + question.status.slice(1)}
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -255,18 +284,22 @@ export default function ContentCreatorDashboard() {
           {/* Quick Actions */}
           <div className="mt-6 sm:mt-8 bg-gradient-to-r from-violet-50 to-purple-50 rounded-xl p-4 sm:p-6 border border-violet-100">
             <h3 className="text-sm font-semibold text-gray-700 mb-3 sm:mb-4">Quick Actions</h3>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-              <button className="min-w-[44px] min-h-[44px] px-4 py-3 bg-white hover:bg-violet-50 text-gray-700 text-sm font-medium rounded-lg transition-colors border border-gray-200 hover:border-violet-300">
-                <i className="ri-file-add-line mr-2"></i>Create Question
+            <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3">
+              <button className="min-w-[44px] min-h-[44px] px-2 sm:px-4 py-2 sm:py-3 bg-white hover:bg-violet-50 text-gray-700 text-xs sm:text-sm font-medium rounded-lg transition-colors border border-gray-200 hover:border-violet-300 flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-2">
+                <i className="ri-file-add-line text-base sm:text-lg"></i>
+                <span className="text-center">Create</span>
               </button>
-              <button className="min-w-[44px] min-h-[44px] px-4 py-3 bg-white hover:bg-violet-50 text-gray-700 text-sm font-medium rounded-lg transition-colors border border-gray-200 hover:border-violet-300">
-                <i className="ri-draft-line mr-2"></i>View Drafts
+              <button className="min-w-[44px] min-h-[44px] px-2 sm:px-4 py-2 sm:py-3 bg-white hover:bg-violet-50 text-gray-700 text-xs sm:text-sm font-medium rounded-lg transition-colors border border-gray-200 hover:border-violet-300 flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-2">
+                <i className="ri-draft-line text-base sm:text-lg"></i>
+                <span className="text-center">Drafts</span>
               </button>
-              <button className="min-w-[44px] min-h-[44px] px-4 py-3 bg-white hover:bg-violet-50 text-gray-700 text-sm font-medium rounded-lg transition-colors border border-gray-200 hover:border-violet-300">
-                <i className="ri-database-line mr-2"></i>Question Bank
+              <button className="min-w-[44px] min-h-[44px] px-2 sm:px-4 py-2 sm:py-3 bg-white hover:bg-violet-50 text-gray-700 text-xs sm:text-sm font-medium rounded-lg transition-colors border border-gray-200 hover:border-violet-300 flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-2">
+                <i className="ri-database-line text-base sm:text-lg"></i>
+                <span className="text-center">Bank</span>
               </button>
-              <button className="min-w-[44px] min-h-[44px] px-4 py-3 bg-white hover:bg-violet-50 text-gray-700 text-sm font-medium rounded-lg transition-colors border border-gray-200 hover:border-violet-300">
-                <i className="ri-bar-chart-line mr-2"></i>My Analytics
+              <button className="min-w-[44px] min-h-[44px] px-2 sm:px-4 py-2 sm:py-3 bg-white hover:bg-violet-50 text-gray-700 text-xs sm:text-sm font-medium rounded-lg transition-colors border border-gray-200 hover:border-violet-300 flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-2">
+                <i className="ri-bar-chart-line text-base sm:text-lg"></i>
+                <span className="text-center">Analytics</span>
               </button>
             </div>
           </div>

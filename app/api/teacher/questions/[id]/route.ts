@@ -122,8 +122,12 @@ export async function DELETE(
 
     // Recalculate and update school stats
     try {
+      console.log(`🗑️ Question deleted. Recalculating stats for school: ${schoolId}`);
       const statsRef = doc(db, "school-stats", schoolId);
-      const statsDoc = await getDocs(collection(db, 'questions', 'schools', schoolId));
+      const questionsCollectionRef = collection(db, 'questions', 'schools', schoolId);
+      const statsDoc = await getDocs(questionsCollectionRef);
+      
+      console.log(`📊 Found ${statsDoc.size} remaining questions in school ${schoolId}`);
       
       const stats: any = {
         schoolId: schoolId,
@@ -144,9 +148,12 @@ export async function DELETE(
         stats.questionsByDifficulty[q.difficulty || 'Medium'] = (stats.questionsByDifficulty[q.difficulty || 'Medium'] || 0) + 1;
       });
 
+      console.log(`✅ Updated stats:`, stats);
       await setDoc(statsRef, stats, { merge: true });
+      console.log(`✅ Stats saved successfully for school ${schoolId}`);
     } catch (statsError) {
       console.error("❌ Error updating school stats after deletion:", statsError);
+      // Return success anyway since the question was deleted
     }
 
     return NextResponse.json({

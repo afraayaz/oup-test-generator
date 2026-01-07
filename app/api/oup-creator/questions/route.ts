@@ -55,10 +55,69 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json();
 
+    console.log("[OUP-Creator] Received request body:", {
+      type: body.type,
+      hasOptions: !!body.options,
+      optionsLength: (body.options || []).length,
+      optionsContent: body.options,
+      keys: Object.keys(body)
+    });
+
     const questionsRef = collection(db, 'questions', 'oup', 'items');
+    
+    // Normalize grade to always have "Grade " prefix for consistent matching
+    let normalizedGrade = body.grade || "";
+    if (normalizedGrade && !normalizedGrade.toLowerCase().startsWith('grade ') && !normalizedGrade.toLowerCase().startsWith('class ')) {
+      normalizedGrade = `Grade ${normalizedGrade}`;
+    }
+
+    // Normalize difficulty
+    let normalizedDifficulty = body.difficulty || "Medium";
+    if (normalizedDifficulty && !["Easy", "Medium", "Hard"].includes(normalizedDifficulty)) {
+      const difficultyMap: { [key: string]: string } = {
+        EASY: "Easy",
+        MEDIUM: "Medium",
+        HARD: "Hard",
+        easy: "Easy",
+        medium: "Medium",
+        hard: "Hard",
+      };
+      normalizedDifficulty = difficultyMap[normalizedDifficulty] || "Medium";
+    }
+
+    // Normalize type to standard format
+    let normalizedType = body.type || "";
+    const typeMap: { [key: string]: string } = {
+      MCQ: "multiple",
+      mcq: "multiple",
+      multiple: "multiple",
+      MULTIPLE: "multiple",
+      TRUE_FALSE: "truefalse",
+      true_false: "truefalse",
+      truefalse: "truefalse",
+      TRUEFALSE: "truefalse",
+      SHORT_ANSWER: "short",
+      short_answer: "short",
+      short: "short",
+      SHORT: "short",
+      LONG_ANSWER: "long",
+      long_answer: "long",
+      long: "long",
+      LONG: "long",
+      FILL_IN_THE_BLANK: "fillblanks",
+      fill_in_the_blank: "fillblanks",
+      fillblanks: "fillblanks",
+      FILLBLANKS: "fillblanks",
+    };
+    normalizedType = typeMap[normalizedType] || normalizedType;
 
     const newQuestion = {
       ...body,
+      type: normalizedType, // Store with normalized type
+      grade: normalizedGrade, // Store with normalized format
+      difficulty: normalizedDifficulty, // Store with normalized format
+      // Explicitly handle options array for MCQ and multiple choice questions
+      options: (normalizedType === "multiple") ? body.options || [] : [],
       createdBy: userId,
       createdByName: userName,
       createdAt: new Date(),
@@ -67,6 +126,15 @@ export async function POST(request: NextRequest) {
     };
 
     const docRef = await addDoc(questionsRef, newQuestion);
+
+    // Log for debugging
+    console.log(`[OUP-Creator] Question stored:`, {
+      id: docRef.id,
+      type: normalizedType,
+      hasOptions: normalizedType === "multiple" && (newQuestion.options || []).length > 0,
+      optionsLength: (newQuestion.options || []).length,
+      optionsContent: newQuestion.options
+    });
 
     // Update OUP stats
     await updateOUPStats(body.subject, body.grade, body.type, body.difficulty);

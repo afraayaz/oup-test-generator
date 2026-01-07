@@ -55,14 +55,16 @@ const roleLabels: Record<string, string> = {
   'school_admin': 'School Admin',
   'teacher': 'Teacher',
   'student': 'Student',
-  'content_manager': 'Content Manager'
+  'content_manager': 'Content Manager',
+  'content_creator': 'Content Creator'
 };
 
 const roleColors: Record<string, string> = {
   'school_admin': 'bg-indigo-100 text-indigo-800',
   'teacher': 'bg-orange-100 text-orange-800',
   'student': 'bg-purple-100 text-purple-800',
-  'content_manager': 'bg-violet-100 text-violet-800'
+  'content_manager': 'bg-violet-100 text-violet-800',
+  'content_creator': 'bg-fuchsia-100 text-fuchsia-800'
 };
 
 export default function UsersClient({ initialUsers, schools, campuses }: Props) {
@@ -216,6 +218,12 @@ export default function UsersClient({ initialUsers, schools, campuses }: Props) 
       return;
     }
 
+    // Validation: content creators must have at least one subject assigned
+    if (userForm.role === 'content_creator' && userForm.assignedBooks.length === 0) {
+      alert('Please assign at least one subject for the content creator');
+      return;
+    }
+
     // Validation: all subject-grade pairs must have at least one book assigned
     if (userForm.role === 'teacher') {
       const pairsWithoutBooks = userForm.subjectGradePairs.filter(p => p.assignedBooks.length === 0);
@@ -232,14 +240,17 @@ export default function UsersClient({ initialUsers, schools, campuses }: Props) 
 
     setIsLoading(true);
     try {
-      // Build assignedBooks array from subjectGradePairs for teachers
+      // Build assignedBooks array based on role
       let finalBooks: { id: string; title: string; subject: string; grade: string; chapters: number }[] = [];
       
       if (userForm.role === 'teacher') {
-        // For each subject-grade pair, add its books to the final books array
+        // For teachers: add books from each subject-grade pair
         for (const pair of userForm.subjectGradePairs) {
           finalBooks = [...finalBooks, ...pair.assignedBooks];
         }
+      } else if (userForm.role === 'content_creator') {
+        // For content creators: use assignedBooks directly
+        finalBooks = userForm.assignedBooks;
       }
 
       // Build data to send - explicitly set all fields we want to send
@@ -1083,12 +1094,118 @@ export default function UsersClient({ initialUsers, schools, campuses }: Props) 
                   </div>
                 )}
               </div>
+
+              {userForm.role === 'content_creator' && (
+                <div className="space-y-4 border-t pt-4 mt-4">
+                  <div className="flex items-center justify-between mb-4">
+                    <h5 className="text-sm font-semibold text-gray-900">Subject Assignments</h5>
+                  </div>
+
+                  {/* Subject Selection Dropdown */}
+                  <div className="flex gap-3 mb-4">
+                    <div className="flex-1">
+                      <label className="block text-xs font-medium text-gray-700 mb-1">Select Subject to Add</label>
+                      <select
+                        id="cc-subject-select"
+                        onChange={async (e) => {
+                          const subject = e.target.value;
+                          if (subject) {
+                            // Check if subject already exists
+                            if (userForm.assignedBooks.some(b => b.subject === subject)) {
+                              alert('This subject is already assigned');
+                              e.target.value = '';
+                              return;
+                            }
+                            // Fetch books for this subject
+                            await fetchBooksBySubject(subject);
+                            // Add all books for this subject
+                            const booksForSubject = (availableBooks[subject] || []);
+                            const newBooks = booksForSubject.filter(book => 
+                              !userForm.assignedBooks.some(b => b.id === book.id)
+                            ).map(book => ({
+                              ...book,
+                              subject: subject // Ensure subject field is set
+                            }));
+                            setUserForm(prev => ({
+                              ...prev,
+                              assignedBooks: [...prev.assignedBooks, ...newBooks]
+                            }));
+                            e.target.value = '';
+                          }
+                        }}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 bg-white"
+                      >
+                        <option value="">Select Subject...</option>
+                        {availableSubjects.filter(subject => !userForm.assignedBooks.some(b => b.subject === subject)).map(subject => (
+                          <option key={subject} value={subject}>{subject}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+
+                  {userForm.assignedBooks.length === 0 ? (
+                    <div className="p-6 bg-gray-50 rounded-lg border-2 border-dashed border-gray-300 text-center">
+                      <i className="ri-book-line text-3xl text-gray-400 mb-2"></i>
+                      <p className="text-sm text-gray-600 mb-3">No subjects assigned yet</p>
+                      <p className="text-xs text-gray-500">Select a subject from the dropdown above to add books</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {Array.from(new Set(userForm.assignedBooks.map(b => b.subject))).map(subject => (
+                        <div key={subject} className="border border-gray-200 rounded-lg p-4 bg-gray-50">
+                          <div className="flex items-center justify-between mb-3">
+                            <h6 className="text-sm font-semibold text-gray-900">{subject}</h6>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setUserForm(prev => ({
+                                  ...prev,
+                                  assignedBooks: prev.assignedBooks.filter(b => b.subject !== subject)
+                                }));
+                              }}
+                              className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                              title="Remove this subject"
+                            >
+                              <i className="ri-delete-bin-line text-lg"></i>
+                            </button>
+                          </div>
+
+                          {/* Books for this Subject */}
+                          <div className="space-y-1 max-h-[150px] overflow-y-auto">
+                            {userForm.assignedBooks.filter(b => b.subject === subject).map(book => (
+                              <div key={book.id} className="flex items-center justify-between p-2 bg-white rounded border border-gray-200">
+                                <div className="flex-1 min-w-0">
+                                  <div className="text-xs font-medium text-gray-900 truncate">{book.title}</div>
+                                  <div className="text-xs text-gray-500">Grade {book.grade}</div>
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setUserForm(prev => ({
+                                      ...prev,
+                                      assignedBooks: prev.assignedBooks.filter(b => b.id !== book.id)
+                                    }));
+                                  }}
+                                  className="text-red-600 hover:text-red-700 hover:bg-red-50 p-0.5 rounded transition-colors flex-shrink-0"
+                                  title="Remove this book"
+                                >
+                                  <i className="ri-close-line text-sm"></i>
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
               
               <div className="flex space-x-3 mt-6">
                 <button
                   type="submit"
-                  disabled={isLoading || !userForm.name || !userForm.email || (userForm.role === 'teacher' && userForm.subjectGradePairs.length === 0)}
-                  title={userForm.role === 'teacher' && userForm.subjectGradePairs.length === 0 ? 'Please add at least one subject-grade assignment' : ''}
+                  disabled={isLoading || !userForm.name || !userForm.email || (userForm.role === 'teacher' && userForm.subjectGradePairs.length === 0) || (userForm.role === 'content_creator' && userForm.assignedBooks.length === 0)}
+                  title={(userForm.role === 'teacher' && userForm.subjectGradePairs.length === 0) ? 'Please add at least one subject-grade assignment' : (userForm.role === 'content_creator' && userForm.assignedBooks.length === 0) ? 'Please assign at least one subject' : ''}
                   className="flex-1 min-h-[44px] bg-emerald-600 hover:bg-emerald-700 disabled:bg-emerald-400 disabled:cursor-not-allowed text-white font-medium py-2 px-4 rounded-lg cursor-pointer"
                 >
                   {isLoading ? 'Creating...' : 'Create User'}

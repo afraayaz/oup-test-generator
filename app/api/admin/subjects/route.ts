@@ -1,52 +1,25 @@
 import { NextRequest, NextResponse } from 'next/server';
-
-const FIREBASE_PROJECT_ID = 'quiz-app-ff0ab';
-const FIRESTORE_BASE_URL = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents`;
+import { db } from '@/lib/firebaseAdmin';
 
 export async function GET() {
   try {
-    const response = await fetch(`${FIRESTORE_BASE_URL}/subjects`, {
-      method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-    });
-
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
-
-    const data = await response.json();
+    const subjectsSnapshot = await db.collection('subjects').get();
     
-    // Transform Firestore data to our format
-    const subjects = data.documents ? data.documents.map((doc: any) => ({
-      id: doc.name.split('/').pop(),
-      name: doc.fields.name.stringValue,
-      createdAt: doc.fields.createdAt?.timestampValue || new Date().toISOString(),
-      books: []
-    })) : [];
+    const subjects = await Promise.all(
+      subjectsSnapshot.docs.map(async (doc) => {
+        const booksSnapshot = await db.collection('subjects').doc(doc.id).collection('books').get();
+        const books = booksSnapshot.docs.map(bookDoc => ({
+          id: bookDoc.id,
+          ...bookDoc.data(),
+        }));
 
-    // Fetch books for each subject
-    for (const subject of subjects) {
-      const booksResponse = await fetch(`${FIRESTORE_BASE_URL}/subjects/${subject.id}/books`, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      });
-
-      if (booksResponse.ok) {
-        const booksData = await booksResponse.json();
-        subject.books = booksData.documents ? booksData.documents.map((bookDoc: any) => ({
-          id: bookDoc.name.split('/').pop(),
-          title: bookDoc.fields.title.stringValue,
-          grade: bookDoc.fields.grade.stringValue,
-          description: bookDoc.fields.description?.stringValue || '',
-          chapters: parseInt(bookDoc.fields.chapters?.integerValue || '0'),
-          createdAt: bookDoc.fields.createdAt?.timestampValue || new Date().toISOString(),
-        })) : [];
-      }
-    }
+        return {
+          id: doc.id,
+          ...doc.data(),
+          books,
+        };
+      })
+    );
 
     return NextResponse.json({ subjects });
   } catch (error) {
@@ -70,28 +43,13 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const subjectId = Date.now().toString();
-    const subjectData = {
-      fields: {
-        name: { stringValue: name },
-        createdAt: { timestampValue: new Date().toISOString() }
-      }
-    };
-
-    const response = await fetch(`${FIRESTORE_BASE_URL}/subjects/${subjectId}`, {
-      method: 'PATCH',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(subjectData),
+    const subjectRef = await db.collection('subjects').add({
+      name,
+      createdAt: new Date().toISOString(),
     });
 
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
-
     const createdSubject = {
-      id: subjectId,
+      id: subjectRef.id,
       name,
       createdAt: new Date().toISOString(),
       books: []
@@ -119,29 +77,15 @@ export async function PUT(request: NextRequest) {
       );
     }
 
-    const subjectData = {
-      fields: {
-        name: { stringValue: name },
-        createdAt: { timestampValue: new Date().toISOString() }
-      }
-    };
-
-    const response = await fetch(`${FIRESTORE_BASE_URL}/subjects/${id}`, {
-      method: 'PATCH',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(subjectData),
+    await db.collection('subjects').doc(id).update({
+      name,
+      updatedAt: new Date().toISOString(),
     });
-
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
 
     const updatedSubject = {
       id,
       name,
-      createdAt: new Date().toISOString()
+      updatedAt: new Date().toISOString()
     };
 
     return NextResponse.json({ subject: updatedSubject });
@@ -166,40 +110,15 @@ export async function DELETE(request: NextRequest) {
       );
     }
 
-    // First, delete all books in this subject
-    const booksResponse = await fetch(`${FIRESTORE_BASE_URL}/subjects/${subjectId}/books`, {
-      method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-    });
-
-    if (booksResponse.ok) {
-      const booksData = await booksResponse.json();
-      if (booksData.documents) {
-        for (const bookDoc of booksData.documents) {
-          const bookId = bookDoc.name.split('/').pop();
-          await fetch(`${FIRESTORE_BASE_URL}/subjects/${subjectId}/books/${bookId}`, {
-            method: 'DELETE',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-          });
-        }
-      }
+    // Delete all books in this subject
+    const booksSnapshot = await db.collection('subjects').doc(subjectId).collection('books').get();
+    
+    for (const bookDoc of booksSnapshot.docs) {
+      await db.collection('subjects').doc(subjectId).collection('books').doc(bookDoc.id).delete();
     }
 
-    // Then delete the subject
-    const response = await fetch(`${FIRESTORE_BASE_URL}/subjects/${subjectId}`, {
-      method: 'DELETE',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-    });
-
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
+    // Delete the subject
+    await db.collection('subjects').doc(subjectId).delete();
 
     return NextResponse.json({ message: 'Subject deleted successfully' });
   } catch (error) {

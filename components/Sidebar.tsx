@@ -93,7 +93,7 @@ export default function Sidebar({
     },
     {
       id: "interactiveQuiz",
-      label: "Interactive Quiz",
+      label: "Interactive Question",
       icon: "ri-file-list-3-line",
       href: "/teacher/interactiveQuiz",
     },
@@ -204,6 +204,12 @@ export default function Sidebar({
       label: "Create Questions",
       icon: "ri-file-add-line",
       href: "/content-creator/create",
+    },
+    {
+      id: "interactiveQuiz",
+      label: "Interactive Question",
+      icon: "ri-file-list-3-line",
+      href: "/content-creator/interactiveQuiz",
     },
     {
       id: "bank",

@@ -42,6 +42,7 @@ export default function BulkUploadPage({
   });
   const [csvData, setCsvData] = useState<CSVQuestion[]>([]);
   const [isUploading, setIsUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
   const [toast, setToast] = useState<{ type: "error" | "success" | "info"; message: string } | null>(null);
   const [successMessage, setSuccessMessage] = useState("");
   const { user } = useUserProfile();
@@ -160,7 +161,9 @@ export default function BulkUploadPage({
         const jsonData = dataRows.map((row: any) => {
           const obj: { [key: string]: any } = {};
           headers.forEach((header: any, index: number) => {
-            obj[header] =
+            // Normalize header to lowercase for consistency
+            const normalizedHeader = header?.toLowerCase() || "";
+            obj[normalizedHeader] =
               row[index] !== undefined && row[index] !== null ? row[index] : "";
           });
           return obj;
@@ -179,57 +182,51 @@ export default function BulkUploadPage({
             errors.push("Invalid difficulty (must be: EASY, MEDIUM, HARD)");
           }
 
-          if (
-            ![
-              "MCQ",
-              "TRUE_FALSE",
-              "FILL_IN_THE_BLANK",
-              "SHORT_ANSWER",
-              "LONG_ANSWER",
-            ].includes(row.questionType)
-          ) {
+          // Support both 'type' and 'questiontype' column names (case-insensitive)
+          const questionTypeValue = row.type || row.questiontype || "";
+          const validTypes = ["MCQ", "mcq", "TRUE_FALSE", "FILL_IN_THE_BLANK", "SHORT_ANSWER", "LONG_ANSWER"];
+          if (!validTypes.includes(questionTypeValue)) {
             errors.push(
               "Invalid question type (must be: MCQ, TRUE_FALSE, FILL_IN_THE_BLANK, SHORT_ANSWER, LONG_ANSWER)"
             );
           }
 
-          if (row.questionType === "MCQ") {
-            const options = [row.optionA, row.optionB, row.optionC, row.optionD].filter(
+          if (["MCQ", "mcq"].includes(questionTypeValue)) {
+            const options = [row.optiona, row.optionb, row.optionc, row.optiond].filter(
               (val) => val !== "" && val !== null && val !== undefined
             );
             if (options.length < 2) errors.push("At least 2 options required");
 
-            const normalizedAnswer = row.correctAnswer?.toString().toUpperCase();
-            if (!["A", "B", "C", "D"].includes(normalizedAnswer)) {
-              errors.push("Correct answer must be A, B, C, or D");
+            if (!row.correctanswer) {
+              errors.push("Correct answer required");
             }
           }
 
-          if (row.questionType === "TRUE_FALSE") {
-            const normalizedAnswer = row.correctAnswer?.toString().toUpperCase();
+          if (["TRUE_FALSE"].includes(questionTypeValue)) {
+            const normalizedAnswer = row.correctanswer?.toString().toUpperCase();
             if (!["TRUE", "FALSE"].includes(normalizedAnswer)) {
               errors.push("Correct answer must be TRUE or FALSE");
             }
           }
 
           if (
-            ["SHORT_ANSWER", "LONG_ANSWER"].includes(row.questionType) &&
-            !row.correctAnswer
+            ["SHORT_ANSWER", "LONG_ANSWER"].includes(questionTypeValue) &&
+            !row.correctanswer
           ) {
             errors.push("Correct answer required");
           }
 
           return { 
             row: {
-              chapter: row.chapter || "",
+              chapter: (row.chapter || "").trim().replace(/^["']|["']$/g, ""),
               difficulty: row.difficulty || "",
-              questionType: row.questionType || "",
+              questionType: questionTypeValue,
               question: row.question || "",
-              optionA: row.optionA,
-              optionB: row.optionB,
-              optionC: row.optionC,
-              optionD: row.optionD,
-              correctAnswer: row.correctAnswer,
+              optionA: row.optiona,
+              optionB: row.optionb,
+              optionC: row.optionc,
+              optionD: row.optiond,
+              correctAnswer: row.correctanswer,
               explanation: row.explanation,
             },
             errors, 
@@ -285,9 +282,12 @@ export default function BulkUploadPage({
     }
 
     setIsUploading(true);
+    setUploadProgress(0);
     let inserted = 0;
+    const total = validQuestions.length;
 
-    for (const csvQuestion of validQuestions) {
+    for (let i = 0; i < total; i++) {
+      const csvQuestion = validQuestions[i];
       try {
         const row = csvQuestion.row;
 
@@ -297,10 +297,32 @@ export default function BulkUploadPage({
 
         if (row.questionType === "MCQ") {
           options = [row.optionA || "", row.optionB || "", row.optionC || "", row.optionD || ""];
-          const answerLetter = row.correctAnswer?.toString().toUpperCase();
-          const answerIndex = ["A", "B", "C", "D"].indexOf(answerLetter || "");
-          correctAnswer =
-            answerIndex >= 0 && options[answerIndex] ? options[answerIndex] : "";
+          
+          // Log to debug what we're finding
+          console.log(`[BulkUpload] MCQ Row data:`, {
+            optionA: row.optionA,
+            optionB: row.optionB,
+            optionC: row.optionC,
+            optionD: row.optionD,
+            allRowKeys: Object.keys(row),
+            allRowData: row
+          });
+          
+          // Handle correctAnswer that can be:
+          // 1. Single letter (A, B, C, D) - map to option text
+          // 2. Multiple options comma-separated (sparrow, egg) - use as-is
+          const answerStr = row.correctAnswer?.toString().trim() || "";
+          const answerLetter = answerStr.toUpperCase();
+          
+          // Check if it's a letter (A, B, C, D)
+          if (["A", "B", "C", "D"].includes(answerLetter)) {
+            const answerIndex = ["A", "B", "C", "D"].indexOf(answerLetter);
+            correctAnswer = answerIndex >= 0 && options[answerIndex] ? options[answerIndex] : "";
+          } else {
+            // It's already the option text (possibly multiple comma-separated)
+            correctAnswer = answerStr;
+          }
+          
           questionType = "multiple";
         } else if (row.questionType === "TRUE_FALSE") {
           correctAnswer = row.correctAnswer?.toString().toLowerCase() || "";
@@ -323,6 +345,24 @@ export default function BulkUploadPage({
         };
         const normalizedDifficulty = difficultyMap[row.difficulty?.toString().toUpperCase() || ""] || "Medium";
 
+        const requestBody = {
+          type: questionType,
+          subject: formData.subject,
+          grade: formData.grade,
+          book: formData.book,
+          chapter: row.chapter,
+          difficulty: normalizedDifficulty,
+          questionText: row.question,
+          options,
+          correctAnswer,
+          explanation: row.explanation || "",
+        };
+
+        // Log what we're sending
+        if (questionType === "multiple") {
+          console.log(`[BulkUpload] Sending MCQ with options:`, { options, correctAnswer });
+        }
+
         const response = await fetch(apiEndpoint, {
           method: "POST",
           headers: {
@@ -332,25 +372,22 @@ export default function BulkUploadPage({
             "x-user-role": userRoleParam,
             "x-school-id": user?.schoolId || "",
           },
-          body: JSON.stringify({
-            type: questionType,
-            subject: formData.subject,
-            grade: formData.grade,
-            book: formData.book,
-            chapter: row.chapter,
-            difficulty: normalizedDifficulty,
-            questionText: row.question,
-            options,
-            correctAnswer,
-            explanation: row.explanation || "",
-          }),
+          body: JSON.stringify(requestBody),
         });
 
-        if (response.ok) {
+        // Wait for response to be processed
+        const responseData = await response.json();
+        
+        if (response.ok && responseData.success) {
           inserted++;
         }
+        
+        // Update progress after response is received
+        setUploadProgress(((i + 1) / total) * 100);
       } catch (error) {
         console.error(error);
+        // Still update progress even on error
+        setUploadProgress(((i + 1) / total) * 100);
       }
     }
 
@@ -364,11 +401,17 @@ export default function BulkUploadPage({
     });
 
     // Clear form after success
-    setTimeout(() => {
-      setCsvData([]);
-      setFormData({ subject: "", grade: "", book: "" });
-      setToast(null);
-    }, 2000);
+    setCsvData([]);
+    // Clear the file input
+    const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
+    if (fileInput) {
+      fileInput.value = "";
+    }
+    // Do not clear the grade/subject/book dropdowns
+    // setTimeout(() => {
+    //   setFormData({ subject: "", grade: "", book: "" });
+    //   setToast(null);
+    // }, 2000);
   };
 
   return (
@@ -577,6 +620,15 @@ export default function BulkUploadPage({
                           </div>
                         )}
 
+                        {isUploading && (
+                          <div className="w-full bg-gray-200 rounded-full h-2.5 dark:bg-gray-700 my-4">
+                            <div
+                              className="bg-blue-600 h-2.5 rounded-full"
+                              style={{ width: `${uploadProgress}%` }}
+                            ></div>
+                          </div>
+                        )}
+
                         <div className="flex flex-col sm:flex-row gap-2 sm:gap-4">
                           <button
                             onClick={downloadTemplate}
@@ -599,7 +651,7 @@ export default function BulkUploadPage({
                               csvData.every((d) => d.errors.length > 0)
                             }
                           >
-                            {isUploading ? "Uploading..." : "Upload & Validate"}
+                            {isUploading ? `Uploading... ${Math.round(uploadProgress)}%` : "Upload & Validate"}
                           </button>
                           <button
                             onClick={() => {

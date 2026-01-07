@@ -6,10 +6,13 @@ import { useUserProfile } from "@/hooks/useUserProfile";
 import { useSearchParams } from "next/navigation";
 import QuestionCreationModePage from "@/components/QuestionCreationModePage";
 import QuestionBank from "@/components/QuestionBank";
+import dynamic from "next/dynamic";
+
+const CreateInteractiveQuiz = dynamic(() => import("../interactiveQuiz/page"), { ssr: false });
 
 export default function ContentCreatorCreateQuestionPage() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [mode, setMode] = useState<'create' | 'bank'>('create');
+  const [mode, setMode] = useState<'create' | 'bank' | 'interactive'>('create');
   const { user } = useUserProfile();
   const searchParams = useSearchParams();
 
@@ -22,12 +25,12 @@ export default function ContentCreatorCreateQuestionPage() {
   }, [searchParams]);
 
   // Debug log
-  React.useEffect(() => {
-    console.log('📝 CC Create page - user:', {
-      name: user?.name,
-      assignedBooksLength: user?.assignedBooks?.length,
-    });
-  }, [user]);
+  // React.useEffect(() => {
+  //   console.log('📝 CC Create page - user:', {
+  //     name: user?.name,
+  //     assignedBooksLength: user?.assignedBooks?.length,
+  //   });
+  // }, [user]);
 
   if (!user) {
     return <div className="flex items-center justify-center h-screen">Loading...</div>;
@@ -62,11 +65,11 @@ export default function ContentCreatorCreateQuestionPage() {
               </svg>
             </button>
             <h1 className="text-lg sm:text-2xl font-bold text-gray-900">
-              {mode === 'create' ? 'Create Questions' : 'My Question Bank'}
+              {mode === 'create' ? 'Create Questions' : mode === 'bank' ? 'My Question Bank' : 'Create Interactive Quiz'}
             </h1>
             
             {/* Toggle Buttons */}
-            <div className="flex gap-2">
+            <div className="flex gap-2 flex-wrap">
               <button
                 onClick={() => setMode('create')}
                 className={`px-3 sm:px-4 py-2 rounded-lg font-medium transition-colors ${
@@ -77,6 +80,17 @@ export default function ContentCreatorCreateQuestionPage() {
               >
                 <span className="hidden sm:inline">Create</span>
                 <span className="sm:hidden">+</span>
+              </button>
+              <button
+                onClick={() => setMode('interactive')}
+                className={`px-3 sm:px-4 py-2 rounded-lg font-medium transition-colors ${
+                  mode === 'interactive'
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                }`}
+              >
+                <span className="hidden sm:inline">Interactive</span>
+                <span className="sm:hidden">⚡</span>
               </button>
               <button
                 onClick={() => setMode('bank')}
@@ -103,6 +117,8 @@ export default function ContentCreatorCreateQuestionPage() {
               embeddedMode={true}
               user={user}
             />
+          ) : mode === 'interactive' ? (
+            <CreateInteractiveQuiz />
           ) : (
             <QuestionBank
               apiEndpoint="/api/oup-creator/questions"

@@ -57,26 +57,72 @@ export default function AdminQuestionBanksPage() {
       setLoading(true);
       const allBanks: QuestionBankStats[] = [];
 
-      // Fetch school QBs from school-stats collection
-      console.log('🔍 Fetching school stats from: school-stats');
+      // Fetch school QBs - RECALCULATE stats from actual questions (not cached)
+      console.log('🔍 Fetching school stats from actual questions...');
       const schoolStatsRef = collection(db, 'school-stats');
       const schoolSnapshot = await getDocs(schoolStatsRef);
       
-      console.log('📊 Found school banks:', schoolSnapshot.docs.length);
-      schoolSnapshot.docs.forEach(doc => {
-        const bankData = doc.data();
-        console.log('📌 School bank:', doc.id, bankData);
-        allBanks.push({
-          schoolId: doc.id,
-          schoolName: bankData.schoolName,
-          bankName: bankData.schoolName || doc.id,
-          bankType: 'school',
-          totalQuestions: bankData.totalQuestions || 0,
-          questionsBySubject: bankData.questionsBySubject || {},
-          questionsByGrade: bankData.questionsByGrade || {},
-          lastUpdated: bankData.lastUpdated,
-        });
-      });
+      console.log('📊 Found school documents:', schoolSnapshot.docs.length);
+      
+      // For each school, recalculate stats from actual questions
+      for (const schoolDoc of schoolSnapshot.docs) {
+        const schoolId = schoolDoc.id;
+        const schoolData = schoolDoc.data();
+        
+        try {
+          // Fetch actual questions for this school
+          const questionsRef = collection(db, 'questions', 'schools', schoolId);
+          const questionsSnapshot = await getDocs(questionsRef);
+          
+          console.log(`📌 School: ${schoolId} - Found ${questionsSnapshot.size} actual questions`);
+          
+          // Recalculate stats from actual questions
+          const stats: any = {
+            schoolId: schoolId,
+            schoolName: schoolData.schoolName || schoolId,
+            totalQuestions: questionsSnapshot.size,
+            questionsBySubject: {},
+            questionsByGrade: {},
+            questionsByType: {},
+            questionsByDifficulty: {},
+          };
+
+          questionsSnapshot.docs.forEach((doc: any) => {
+            const q = doc.data();
+            if (q.subject) stats.questionsBySubject[q.subject] = (stats.questionsBySubject[q.subject] || 0) + 1;
+            if (q.grade) stats.questionsByGrade[q.grade] = (stats.questionsByGrade[q.grade] || 0) + 1;
+            if (q.type) stats.questionsByType[q.type] = (stats.questionsByType[q.type] || 0) + 1;
+            const difficulty = q.difficulty || 'Medium';
+            stats.questionsByDifficulty[difficulty] = (stats.questionsByDifficulty[difficulty] || 0) + 1;
+          });
+
+          console.log(`✅ Recalculated stats for ${schoolId}:`, stats);
+          
+          allBanks.push({
+            schoolId: schoolId,
+            schoolName: stats.schoolName,
+            bankName: stats.schoolName || schoolId,
+            bankType: 'school',
+            totalQuestions: stats.totalQuestions,
+            questionsBySubject: stats.questionsBySubject,
+            questionsByGrade: stats.questionsByGrade,
+            lastUpdated: schoolData.lastUpdated,
+          });
+        } catch (error) {
+          console.error(`Error recalculating stats for school ${schoolId}:`, error);
+          // Fall back to cached stats if calculation fails
+          allBanks.push({
+            schoolId: schoolId,
+            schoolName: schoolData.schoolName,
+            bankName: schoolData.schoolName || schoolId,
+            bankType: 'school',
+            totalQuestions: schoolData.totalQuestions || 0,
+            questionsBySubject: schoolData.questionsBySubject || {},
+            questionsByGrade: schoolData.questionsByGrade || {},
+            lastUpdated: schoolData.lastUpdated,
+          });
+        }
+      }
 
       // Fetch OUP QB
       try {
@@ -213,18 +259,32 @@ export default function AdminQuestionBanksPage() {
       <div className="fixed top-0 right-0 bottom-0 left-0 lg:left-64 flex flex-col overflow-hidden">
         {/* Header */}
         <div className="bg-white border-b border-gray-200 px-4 sm:px-6 lg:px-8 py-4 sticky top-0 z-10 flex-shrink-0">
-          <div className="flex items-center gap-3">
-            <button
-              onClick={() => setSidebarOpen(true)}
-              className="lg:hidden min-w-[44px] min-h-[44px] w-11 h-11 flex items-center justify-center text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-              aria-label="Open menu"
-            >
-              <i className="ri-menu-line text-2xl"></i>
-            </button>
-            <div>
-              <h1 className="text-2xl font-bold text-gray-800">All Question Banks</h1>
-              <p className="text-gray-600 text-sm">Monitor and manage all question banks</p>
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => setSidebarOpen(true)}
+                className="lg:hidden min-w-[44px] min-h-[44px] w-11 h-11 flex items-center justify-center text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                aria-label="Open menu"
+              >
+                <i className="ri-menu-line text-2xl"></i>
+              </button>
+              <div>
+                <h1 className="text-2xl font-bold text-gray-800">All Question Banks</h1>
+                <p className="text-gray-600 text-sm">Monitor and manage all question banks</p>
+              </div>
             </div>
+            <button
+              onClick={() => {
+                setLoading(true);
+                fetchAllQBs();
+              }}
+              disabled={loading}
+              className="min-w-[44px] min-h-[44px] px-3 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 disabled:cursor-not-allowed text-white rounded-lg transition-colors flex items-center gap-2 text-sm font-medium"
+              title="Refresh question bank statistics"
+            >
+              <i className={`ri-refresh-line ${loading ? 'animate-spin' : ''}`}></i>
+              <span className="hidden sm:inline">Refresh</span>
+            </button>
           </div>
         </div>
 

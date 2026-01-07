@@ -1,7 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-
-const FIREBASE_PROJECT_ID = 'quiz-app-ff0ab';
-const FIRESTORE_BASE_URL = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents`;
+import { db } from '@/lib/firebaseAdmin';
 
 export async function GET(request: NextRequest) {
   try {
@@ -15,59 +13,25 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // First get all subjects to find the matching one
-    const subjectsResponse = await fetch(`${FIRESTORE_BASE_URL}/subjects`, {
-      method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-    });
+    // First find the subject with matching name
+    const subjectsSnapshot = await db.collection('subjects').where('name', '==', subjectName).get();
 
-    if (!subjectsResponse.ok) {
-      throw new Error(`HTTP error! status: ${subjectsResponse.status}`);
-    }
-
-    const subjectsData = await subjectsResponse.json();
-    
-    if (!subjectsData.documents) {
+    if (subjectsSnapshot.empty) {
       return NextResponse.json({ books: [] });
     }
 
-    // Find the subject with matching name
-    const targetSubject = subjectsData.documents.find((doc: any) => 
-      doc.fields.name.stringValue === subjectName
-    );
-
-    if (!targetSubject) {
-      return NextResponse.json({ books: [] });
-    }
-
-    const subjectId = targetSubject.name.split('/').pop();
+    const subjectDoc = subjectsSnapshot.docs[0];
+    const subjectId = subjectDoc.id;
 
     // Get books for this subject
-    const booksResponse = await fetch(`${FIRESTORE_BASE_URL}/subjects/${subjectId}/books`, {
-      method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-    });
+    const booksSnapshot = await db.collection('subjects').doc(subjectId).collection('books').get();
 
-    if (!booksResponse.ok) {
-      throw new Error(`HTTP error! status: ${booksResponse.status}`);
-    }
-
-    const booksData = await booksResponse.json();
-    
-    const books = booksData.documents ? booksData.documents.map((bookDoc: any) => ({
-      id: bookDoc.name.split('/').pop(),
-      title: bookDoc.fields.title.stringValue,
-      grade: bookDoc.fields.grade.stringValue,
-      description: bookDoc.fields.description?.stringValue || '',
-      chapters: parseInt(bookDoc.fields.chapters?.integerValue || '0'),
+    const books = booksSnapshot.docs.map(bookDoc => ({
+      id: bookDoc.id,
+      ...bookDoc.data(),
       subjectId: subjectId,
       subjectName: subjectName,
-      createdAt: bookDoc.fields.createdAt?.timestampValue || new Date().toISOString(),
-    })) : [];
+    }));
 
     return NextResponse.json({ books });
   } catch (error) {

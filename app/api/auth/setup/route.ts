@@ -1,48 +1,27 @@
 import { NextResponse } from 'next/server';
+import { db } from '@/lib/firebaseAdmin';
 
 export async function POST(request: Request) {
   try {
-    const { uid, email, role, displayName, idToken } = await request.json();
+    const { uid, email, role, displayName } = await request.json();
 
-    if (!uid || !email || !role || !idToken) {
+    if (!uid || !email || !role) {
       return NextResponse.json(
-        { error: 'Missing required fields: uid, email, role, or idToken' },
+        { error: 'Missing required fields: uid, email, or role' },
         { status: 400 }
       );
     }
 
-    const PROJECT_ID = 'quiz-app-ff0ab';
-    const FIRESTORE_URL = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/(default)/documents`;
-
-    // Create/update user document in Firestore using authenticated REST API
-    const response = await fetch(`${FIRESTORE_URL}/users/${uid}`, {
-      method: 'PATCH',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${idToken}`,
-      },
-      body: JSON.stringify({
-        fields: {
-          email: { stringValue: email },
-          role: { stringValue: role },
-          uid: { stringValue: uid },
-          createdAt: { timestampValue: new Date().toISOString() },
-          status: { stringValue: 'active' },
-          displayName: { stringValue: displayName || 'User' }
-        },
-      }),
-    });
-
-    if (!response.ok) {
-      const errorData = await response.json();
-      console.error('Firestore error:', errorData);
-      return NextResponse.json(
-        { error: `Failed to create user record: ${errorData.error?.message || 'Unknown error'}` },
-        { status: response.status }
-      );
-    }
-
-    const data = await response.json();
+    // Create/update user document in Firestore using Admin SDK
+    await db.collection('users').doc(uid).set({
+      email,
+      role,
+      uid,
+      createdAt: new Date().toISOString(),
+      status: 'active',
+      displayName: displayName || 'User',
+      updatedAt: new Date().toISOString(),
+    }, { merge: true });
     
     return NextResponse.json(
       {

@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { db } from '@/lib/firebaseAdmin';
 
 export async function POST(request: Request) {
   try {
@@ -11,43 +12,18 @@ export async function POST(request: Request) {
       );
     }
 
-    const PROJECT_ID = 'quiz-app-ff0ab';
-    const FIRESTORE_URL = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/(default)/documents`;
-
     // First try to fetch using uid (for newly created users with Firebase Auth)
-    let response = await fetch(`${FIRESTORE_URL}/users/${uid}`, {
-      method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-    });
-
+    let userDoc = await db.collection('users').doc(uid).get();
     let userData = null;
 
-    if (response.ok) {
-      // Found by uid
-      const data = await response.json();
-      userData = data;
+    if (userDoc.exists) {
+      userData = userDoc.data();
     } else {
       // If not found by uid, search by email (for old users without uid)
-      const usersResponse = await fetch(`${FIRESTORE_URL}/users?pageSize=1000`, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      });
-
-      if (usersResponse.ok) {
-        const usersData = await usersResponse.json();
-        const userDocs = usersData.documents || [];
-        const userDoc = userDocs.find((doc: any) => {
-          const emailValue = doc.fields?.email?.stringValue;
-          return emailValue === email;
-        });
-
-        if (userDoc) {
-          userData = userDoc;
-        }
+      const querySnapshot = await db.collection('users').where('email', '==', email).limit(1).get();
+      
+      if (!querySnapshot.empty) {
+        userData = querySnapshot.docs[0].data();
       }
     }
 
@@ -59,8 +35,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const role = userData.fields?.role?.stringValue || null;
-
+    const role = userData.role || null;
     return NextResponse.json(
       { role, email },
       { status: 200 }

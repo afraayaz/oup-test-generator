@@ -25,26 +25,47 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    if (!schoolId) {
+    const { searchParams } = new URL(request.url);
+    const qb = searchParams.get("qb") || "school"; // Default to 'school'
+
+    if (!schoolId && (qb === "school" || qb === "both")) {
       return NextResponse.json(
-        { error: "School ID is required" },
+        { error: "School ID is required for school questions" },
         { status: 400 }
       );
     }
 
-    // Fetch teacher questions from questions/schools/{schoolId}
-    const questionsRef = collection(db, 'questions', 'schools', schoolId);
-    const snapshot = await getDocs(questionsRef);
-    
-    const questions = snapshot.docs.map((doc) => ({
-      id: doc.id,
-      source: "teacher",
-      ...doc.data(),
-    }));
+    let allQuestions: any[] = [];
+
+    // Fetch from school questions if qb is 'school' or 'both'
+    if (qb === "school" || qb === "both") {
+      if (schoolId) {
+        const schoolQuestionsRef = collection(db, 'questions', 'schools', schoolId);
+        const schoolSnapshot = await getDocs(schoolQuestionsRef);
+        const schoolQuestions = schoolSnapshot.docs.map((doc) => ({
+          id: doc.id,
+          source: "school",
+          ...doc.data(),
+        }));
+        allQuestions = allQuestions.concat(schoolQuestions);
+      }
+    }
+
+    // Fetch from OUP questions if qb is 'oup' or 'both'
+    if (qb === "oup" || qb === "both") {
+      const oupQuestionsRef = collection(db, 'questions', 'oup', 'items');
+      const oupSnapshot = await getDocs(oupQuestionsRef);
+      const oupQuestions = oupSnapshot.docs.map((doc) => ({
+        id: doc.id,
+        source: "oup",
+        ...doc.data(),
+      }));
+      allQuestions = allQuestions.concat(oupQuestions);
+    }
 
     return NextResponse.json({
       success: true,
-      questions,
+      questions: allQuestions,
     });
   } catch (error) {
     console.error("Error fetching teacher questions:", error);
@@ -99,15 +120,45 @@ export async function POST(request: NextRequest) {
       );
     }
     const questionsRef = collection(db, 'questions', 'schools', schoolId);
-    const questionDoc = await addDoc(questionsRef, {
+    
+    // Normalize grade to always have "Grade " prefix for consistent matching in quiz builder
+    let normalizedGrade = body.grade || "";
+    if (normalizedGrade && !normalizedGrade.toLowerCase().startsWith('grade ') && !normalizedGrade.toLowerCase().startsWith('class ')) {
+      normalizedGrade = `Grade ${normalizedGrade}`;
+    }
+    
+    // Normalize difficulty to canonical title case (Easy/Medium/Hard)
+    const difficultyRaw = (body.difficulty || 'Medium').toString().trim().toLowerCase();
+    const normalizedDifficulty = difficultyRaw.startsWith('easy') ? 'Easy' :
+                                 difficultyRaw.startsWith('hard') ? 'Hard' :
+                                 'Medium';
+    
+    // Log the question being saved
+    console.log('📝 Saving question to database:', {
       type: body.type,
       subject: body.subject,
       grade: body.grade,
+      normalizedGrade,
+      book: body.book,
+      chapter: body.chapter,
+      slo: body.slo,
+      difficulty: body.difficulty,
+      questionText: body.questionText ? body.questionText.substring(0, 50) : 'MISSING',
+      hasOptions: body.type === 'multiple' && body.options && body.options.length > 0,
+      hasCorrectAnswer: !!body.correctAnswer,
+      schoolId,
+      path: `questions/schools/${schoolId}`
+    });
+    
+    const questionDoc = await addDoc(questionsRef, {
+      type: body.type,
+      subject: body.subject,
+      grade: normalizedGrade, // Store with normalized format
       book: body.book,
       chapter: body.chapter,
       topic: body.topic || "",
       slo: body.slo || "",
-      difficulty: body.difficulty || "Medium",
+      difficulty: normalizedDifficulty,
       questionText: body.questionText,
       options: body.type === "multiple" ? body.options || [] : [],
       correctAnswer: body.correctAnswer || "",

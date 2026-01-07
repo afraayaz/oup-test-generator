@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import Sidebar from "@/components/Sidebar";
 import { useUserProfile } from "@/hooks/useUserProfile";
 import { useRouter } from "next/navigation";
@@ -119,46 +119,83 @@ export default function QuestionCreationModePage({
 
   // Pre-populate subject for content creators
   useEffect(() => {
-    if (userRole === "Content Creator" && user?.subjects && user.subjects.length > 0) {
-      // Auto-select the first assigned subject for content creators
-      setFormData(prev => ({
-        ...prev,
-        subject: user.subjects[0],
-        book: "" // Reset book when subject changes
-      }));
+    console.log('📋 Pre-populate useEffect triggered:', {
+      userRole,
+      hasUser: !!user,
+      hasAssignedBooks: !!user?.assignedBooks,
+      assignedBooksCount: user?.assignedBooks?.length || 0,
+      assignedBooks: user?.assignedBooks
+    });
+
+    if (userRole === "Content Creator" && user && user.assignedBooks && user.assignedBooks.length > 0) {
+      // Get unique subjects from assignedBooks
+      const subjectSet = new Set<string>();
+      user.assignedBooks.forEach((book: any) => {
+        if (book.subject) {
+          subjectSet.add(book.subject);
+        }
+      });
+      const assignedSubjects = Array.from(subjectSet);
+      
+      console.log('✅ Assigned subjects found:', assignedSubjects);
+      
+      if (assignedSubjects.length > 0) {
+        // Auto-select the first assigned subject for content creators
+        const firstSubject = assignedSubjects[0];
+        console.log('📌 Setting subject to:', firstSubject);
+        
+        setFormData(prev => ({
+          ...prev,
+          subject: firstSubject,
+          book: "" // Reset book when subject changes
+        }));
+      }
     }
-  }, [user?.subjects, userRole]);
+  }, [user, userRole]);
 
   // Get all unique grades from user's subjectGradePairs or assignedBooks
-  const getAvailableGrades = () => {
-    // If subjectGradePairs exists (Teachers), use it
-    if (user?.subjectGradePairs && user.subjectGradePairs.length > 0) {
-      const grades = user.subjectGradePairs
-        .map((pair: any) => pair.grade)
-        .filter((value: any, index: number, self: any) => self.indexOf(value) === index);
-      return grades.sort();
-    }
-    
-    // For Content Creators: show grades 1-8 based on available books in system
-    if (userRole === "Content Creator" && systemBooks.length > 0) {
-      const grades = systemBooks
-        .map((book: any) => book.grade.replace(/^Grade\s+/i, '').trim())
-        .filter((value: any, index: number, self: any) => self.indexOf(value) === index)
-        .sort((a: string, b: string) => {
-          const numA = parseInt(a) || 0;
-          const numB = parseInt(b) || 0;
-          return numA - numB;
-        });
-      return grades;
-    }
-    
-    // Fallback: use assignedGrades if available
-    if (user?.assignedGrades && user.assignedGrades.length > 0) {
-      return [...user.assignedGrades].sort();
-    }
-    
-    return [];
-  };
+  const getAvailableGrades = useMemo(() => {
+    return () => {
+      // CONTENT CREATORS: Hard code grades 1-8
+      if (userRole === "Content Creator") {
+        const hardcodedGrades = ['1', '2', '3', '4', '5', '6', '7', '8'];
+        console.log('✅ Content Creator - Hard coded grades:', hardcodedGrades);
+        return hardcodedGrades;
+      }
+      
+      // TEACHERS: Show only assigned grades
+      if (user?.subjectGradePairs && user.subjectGradePairs.length > 0) {
+        const grades = user.subjectGradePairs
+          .map((pair: any) => pair.grade)
+          .filter((value: any, index: number, self: any) => self.indexOf(value) === index);
+        console.log('✅ Teacher - Grades from subjectGradePairs:', grades);
+        return grades.sort();
+      }
+      
+      // Fallback: use assignedBooks if no subjectGradePairs
+      if (user?.assignedBooks && user.assignedBooks.length > 0) {
+        const grades = user.assignedBooks
+          .map((book: any) => book.grade)
+          .filter((value: any, index: number, self: any) => self.indexOf(value) === index);
+        console.log('✅ Teacher - Grades from assignedBooks:', grades);
+        return grades.sort();
+      }
+      
+      // Last resort: use assignedGrades if available
+      if (user?.assignedGrades && user.assignedGrades.length > 0) {
+        console.log('✅ Teacher - Grades from assignedGrades:', user.assignedGrades);
+        return [...user.assignedGrades].sort();
+      }
+      
+      console.log('⚠️ No grades found in user data:', {
+        userRole,
+        hasSubjectGradePairs: !!user?.subjectGradePairs?.length,
+        hasAssignedBooks: !!user?.assignedBooks?.length,
+        hasAssignedGrades: !!user?.assignedGrades?.length,
+      });
+      return [];
+    };
+  }, [userRole, user?.subjectGradePairs, user?.assignedBooks, user?.assignedGrades]);
 
   // Helper function to display grade with "Class" prefix
   const displayGrade = (grade: string): string => {
@@ -167,107 +204,141 @@ export default function QuestionCreationModePage({
   };
 
   // Get subjects from user's subjectGradePairs or assignedBooks
-  const getAvailableSubjects = () => {
-    let subjects: string[] = [];
-    
-    // Helper function to normalize grades for comparison
-    const normalizeGrade = (grade: string): string => {
-      // Extract just the number: "Grade 1" -> "1", "Class 1" -> "1", "1" -> "1"
-      return grade.replace(/^(Grade|Class)\s+/i, '').trim();
+  const getAvailableSubjects = useMemo(() => {
+    return () => {
+      let subjects: string[] = [];
+      
+      // Helper function to normalize grades for comparison
+      const normalizeGrade = (grade: string): string => {
+        // Extract just the number: "Grade 1" -> "1", "Class 1" -> "1", "1" -> "1"
+        return grade.replace(/^(Grade|Class)\s+/i, '').trim();
+      };
+      
+      // If subjectGradePairs exists (Teachers), use it
+      if (user?.subjectGradePairs && user.subjectGradePairs.length > 0) {
+        // If grade is selected, show only subjects for that grade
+        if (formData.grade) {
+          const selectedGradeNormalized = normalizeGrade(formData.grade);
+          subjects = user.subjectGradePairs
+            .filter((pair: any) => normalizeGrade(pair.grade) === selectedGradeNormalized)
+            .map((pair: any) => pair.subject)
+            .filter((value: string, index: number, self: string[]) => self.indexOf(value) === index);
+        } else {
+          // No grade selected, show all subjects from pairs
+          subjects = user.subjectGradePairs
+            .map((pair: any) => pair.subject)
+            .filter((value: string, index: number, self: string[]) => self.indexOf(value) === index);
+        }
+      }
+      // For Content Creators or Teachers without subjectGradePairs
+      else if (user?.assignedBooks && user.assignedBooks.length > 0) {
+        // If grade is selected, filter by that grade
+        if (formData.grade) {
+          const selectedGradeNormalized = normalizeGrade(formData.grade);
+          subjects = user.assignedBooks
+            .filter((book: any) => normalizeGrade(book.grade) === selectedGradeNormalized)
+            .map((book: any) => book.subject)
+            .filter((value: string, index: number, self: string[]) => self.indexOf(value) === index);
+        } else {
+          // No grade selected, show all subjects
+          subjects = user.assignedBooks
+            .map((book: any) => book.subject)
+            .filter((value: string, index: number, self: string[]) => self.indexOf(value) === index);
+        }
+      }
+      // Fallback: use subjects array if available
+      else if (user?.subjects && user.subjects.length > 0) {
+        subjects = [...user.subjects];
+      }
+      
+      console.log("Debug getAvailableSubjects:", {
+        formGrade: formData.grade,
+        normalizedGrade: formData.grade ? (formData.grade.replace(/^(Grade|Class)\s+/i, '').trim()) : "none",
+        hasSubjectGradePairs: !!user?.subjectGradePairs?.length,
+        hasAssignedBooks: !!user?.assignedBooks?.length,
+        hasSubjects: !!user?.subjects?.length,
+        returnedSubjects: subjects
+      });
+      
+      return subjects.sort();
     };
-    
-    // If subjectGradePairs exists (Teachers), use it
-    if (user?.subjectGradePairs && user.subjectGradePairs.length > 0) {
-      // If grade is selected, show only subjects for that grade
-      if (formData.grade) {
-        const selectedGradeNormalized = normalizeGrade(formData.grade);
-        subjects = user.subjectGradePairs
-          .filter((pair: any) => normalizeGrade(pair.grade) === selectedGradeNormalized)
-          .map((pair: any) => pair.subject)
-          .filter((value: string, index: number, self: string[]) => self.indexOf(value) === index);
-      } else {
-        // No grade selected, show all subjects from pairs
-        subjects = user.subjectGradePairs
-          .map((pair: any) => pair.subject)
-          .filter((value: string, index: number, self: string[]) => self.indexOf(value) === index);
-      }
-    }
-    // For Content Creators or Teachers without subjectGradePairs
-    else if (user?.assignedBooks && user.assignedBooks.length > 0) {
-      // If grade is selected, filter by that grade
-      if (formData.grade) {
-        const selectedGradeNormalized = normalizeGrade(formData.grade);
-        subjects = user.assignedBooks
-          .filter((book: any) => normalizeGrade(book.grade) === selectedGradeNormalized)
-          .map((book: any) => book.subject)
-          .filter((value: string, index: number, self: string[]) => self.indexOf(value) === index);
-      } else {
-        // No grade selected, show all subjects
-        subjects = user.assignedBooks
-          .map((book: any) => book.subject)
-          .filter((value: string, index: number, self: string[]) => self.indexOf(value) === index);
-      }
-    }
-    // Fallback: use subjects array if available
-    else if (user?.subjects && user.subjects.length > 0) {
-      subjects = [...user.subjects];
-    }
-    
-    console.log("Debug getAvailableSubjects:", {
-      formGrade: formData.grade,
-      normalizedGrade: formData.grade ? (formData.grade.replace(/^(Grade|Class)\s+/i, '').trim()) : "none",
-      hasSubjectGradePairs: !!user?.subjectGradePairs?.length,
-      hasAssignedBooks: !!user?.assignedBooks?.length,
-      hasSubjects: !!user?.subjects?.length,
-      returnedSubjects: subjects
-    });
-    
-    return subjects.sort();
-  };
+  }, [formData.grade, user?.subjectGradePairs, user?.assignedBooks, user?.subjects]);
 
   // Get available books for selected grade and subject
-  const getAvailableBooks = () => {
-    let books: any[] = [];
-    
-    // Helper function to normalize grades for comparison
-    const normalizeGrade = (grade: string): string => {
-      // Extract just the number: "Grade 1" -> "1", "Class 1" -> "1", "1" -> "1"
-      return grade.replace(/^(Grade|Class)\s+/i, '').trim();
-    };
-    
-    // If subjectGradePairs exists (Teachers), use it
-    if (user?.subjectGradePairs && user.subjectGradePairs.length > 0) {
-      // Normalize grade for comparison
-      const selectedGradeNormalized = normalizeGrade(formData.grade);
+  const getAvailableBooks = useMemo(() => {
+    return () => {
+      let books: any[] = [];
       
-      // Find the matching subject-grade pair
-      const matchingPair = user.subjectGradePairs.find(
-        (pair: any) => pair.subject === formData.subject && normalizeGrade(pair.grade) === selectedGradeNormalized
+      // Helper function to normalize grades for comparison
+      const normalizeGrade = (grade: string): string => {
+        // Extract just the number: "Grade 1" -> "1", "Class 1" -> "1", "1" -> "1"
+        return grade.replace(/^(Grade|Class)\s+/i, '').trim();
+      };
+      
+      // Must have at least a subject selected
+      if (!formData.subject) {
+        return [];
+      }
+      
+      // Try subjectGradePairs first
+      if (user?.subjectGradePairs && user.subjectGradePairs.length > 0) {
+        const matchingPairs = user.subjectGradePairs.filter(
+          (pair: any) => pair.subject === formData.subject
+        );
+        
+        if (formData.grade) {
+          // Grade is selected: show books for this grade + subject only
+          const selectedGradeNormalized = normalizeGrade(formData.grade);
+          const matchingPair = matchingPairs.find(
+            (pair: any) => normalizeGrade(pair.grade) === selectedGradeNormalized
+          );
+          if (matchingPair && matchingPair.assignedBooks) {
+            books = matchingPair.assignedBooks;
+          }
+        } else if (userRole === "Content Creator") {
+          // CONTENT CREATORS ONLY: No grade selected, show all books for this subject across all grades
+          books = matchingPairs.flatMap((pair: any) => pair.assignedBooks || []);
+        }
+        // TEACHERS: require grade to be selected (books will be empty if grade not selected)
+      } 
+      // Fallback to assignedBooks
+      else if (user?.assignedBooks && user.assignedBooks.length > 0) {
+        const booksForSubject = user.assignedBooks.filter((book: any) => {
+          const bookSubject = book.subject.toString().trim().toLowerCase();
+          const selectedSubject = formData.subject.toString().trim().toLowerCase();
+          return bookSubject === selectedSubject;
+        });
+        
+        if (formData.grade) {
+          // Grade is selected: filter by both grade and subject
+          const selectedGradeNormalized = normalizeGrade(formData.grade);
+          books = booksForSubject.filter((book: any) => {
+            const bookGrade = normalizeGrade(book.grade.toString());
+            return bookGrade === selectedGradeNormalized;
+          });
+        } else if (userRole === "Content Creator") {
+          // CONTENT CREATORS ONLY: No grade selected, show all books for this subject
+          books = booksForSubject;
+        }
+        // TEACHERS: require grade to be selected (books will be empty if grade not selected)
+      }
+      
+      // Remove duplicates by title
+      const uniqueBooks = books.filter((book, index, self) => 
+        index === self.findIndex(b => b.title === book.title)
       );
       
-      if (matchingPair && matchingPair.assignedBooks) {
-        books = matchingPair.assignedBooks;
-      }
-    } 
-    // For Content Creators: filter system books by grade AND pre-selected subject
-    else if (user?.assignedBooks && user.assignedBooks.length > 0 && systemBooks.length > 0) {
-      // Filter system books by BOTH selected grade AND pre-selected subject
-      books = systemBooks.filter(book => {
-        // Normalize both grades for comparison
-        const bookGrade = normalizeGrade(book.grade.toString());
-        const selectedGrade = normalizeGrade(formData.grade.toString());
-        
-        // Normalize subject comparison (case-insensitive)
-        const bookSubject = book.subject.toString().trim().toLowerCase();
-        const selectedSubject = formData.subject.toString().trim().toLowerCase();
-        
-        // Filter by BOTH grade AND subject
-        return bookGrade === selectedGrade && bookSubject === selectedSubject;
+      console.log('📚 getAvailableBooks result:', {
+        userRole,
+        formGrade: formData.grade || 'not selected',
+        formSubject: formData.subject,
+        booksFound: uniqueBooks.length,
+        books: uniqueBooks.map(b => ({ title: b.title, grade: b.grade, subject: b.subject }))
       });
-    }
-    
-    return books.sort((a, b) => a.title.localeCompare(b.title));
-  };
+      
+      return uniqueBooks.sort((a, b) => a.title.localeCompare(b.title));
+    };
+  }, [formData.subject, formData.grade, user?.subjectGradePairs, user?.assignedBooks, userRole]);
 
   const handleGradeChange = (grade: string) => {
     setFormData({ ...formData, grade, book: "" });
@@ -281,7 +352,14 @@ export default function QuestionCreationModePage({
     setFormData({ ...formData, book });
     // Fetch chapters for the selected book
     if (book && formData.subject) {
-      const selectedBook = systemBooks.find(b => b.title === book);
+      // Try to find the book in assignedBooks first
+      let selectedBook = user?.assignedBooks?.find((b: any) => b.title === book);
+      
+      // Fallback to systemBooks if not found in assignedBooks
+      if (!selectedBook && systemBooks.length > 0) {
+        selectedBook = systemBooks.find(b => b.title === book);
+      }
+      
       if (selectedBook) {
         fetchChaptersForBook(selectedBook.id, formData.subject);
       }
@@ -527,6 +605,23 @@ export default function QuestionCreationModePage({
                 application: application,
               },
             };
+            
+            // Log first few questions for debugging
+            if (questions.length < 3) {
+              console.log(`📋 Bulk upload - Question ${i + 1}:`, {
+                type: questionObj.type,
+                subject: questionObj.subject,
+                grade: questionObj.grade,
+                book: questionObj.book,
+                chapter: questionObj.chapter,
+                slo: questionObj.slo,
+                difficulty: questionObj.difficulty,
+                questionText: questionObj.questionText.substring(0, 50),
+                options: questionObj.options.length,
+                correctAnswer: questionObj.correctAnswer
+              });
+            }
+            
             questions.push(questionObj);
           }
 
@@ -562,6 +657,9 @@ export default function QuestionCreationModePage({
             // Update progress
             const progressPercent = Math.round(((index + 1) / questions.length) * 100);
             setUploadProgress(progressPercent);
+            
+            // Small delay to allow UI to update and show progress
+            await new Promise(resolve => setTimeout(resolve, 50));
             
             try {
               console.log("📝 Sending question:", question);
@@ -648,14 +746,6 @@ export default function QuestionCreationModePage({
               Question Creation
             </h3>
 
-            {/* Debug Info */}
-            <div className="mb-4 p-3 bg-gray-100 rounded text-xs font-mono border border-gray-300">
-              <p>👤 User: {user?.name || 'N/A'}</p>
-              <p>🔐 Role: {user?.role || 'N/A'}</p>
-              <p>📚 subjectGradePairs: {user?.subjectGradePairs ? JSON.stringify(user.subjectGradePairs.length) : 'undefined'}</p>
-              <p>✅ Grades available: {getAvailableGrades().length}</p>
-            </div>
-
             <div className="flex flex-wrap gap-2 sm:gap-4 mb-4 sm:mb-6">
               <button
                 className={`flex-1 sm:flex-none min-h-[44px] px-4 py-2 rounded-lg font-medium text-sm ${
@@ -691,38 +781,38 @@ export default function QuestionCreationModePage({
             </div>
 
             {mode === "individual" ? (
-              <div className="space-y-4">
+              <div className="space-y-4 sm:space-y-5">
                 {(getAvailableGrades().length === 0) ? (
-                  <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 text-sm text-yellow-800">
-                    <p className="font-medium">No assignments found</p>
-                    <p>Please contact your school administrator to assign you subjects and books.</p>
+                  <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 sm:p-4 text-sm text-yellow-800">
+                    <p className="font-medium mb-1">No assignments found</p>
+                    <p className="text-xs sm:text-sm">Please contact your school administrator to assign you subjects and books.</p>
                   </div>
                 ) : (
                   <>
                     {/* For Content Creators: Show Subject first (pre-selected, disabled) */}
                     {userRole === "Content Creator" && (
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                        <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-2">
                           Subject *
                         </label>
                         <input
                           type="text"
                           value={formData.subject}
                           disabled
-                          className="w-full px-3 py-2 border rounded-lg text-sm bg-gray-100 text-gray-600 cursor-not-allowed"
+                          className="w-full px-3 py-2 sm:py-2.5 border rounded-lg text-sm bg-gray-100 text-gray-600 cursor-not-allowed"
                         />
                       </div>
                     )}
 
                     {/* Grade Selection */}
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                      <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-2">
                         Grade *
                       </label>
                       <select
                         value={formData.grade}
                         onChange={(e) => handleGradeChange(e.target.value)}
-                        className="w-full px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        className="w-full px-3 py-2 sm:py-2.5 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                       >
                         <option value="">Select Grade</option>
                         {getAvailableGrades().map((grade: string) => (
@@ -736,13 +826,13 @@ export default function QuestionCreationModePage({
                     {/* For Teachers: Subject Selection (conditional on grade) */}
                     {userRole === "Teacher" && formData.grade && (
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                        <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-2">
                           Subject *
                         </label>
                         <select
                           value={formData.subject}
                           onChange={(e) => handleSubjectChange(e.target.value)}
-                          className="w-full px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                          className="w-full px-3 py-2 sm:py-2.5 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                         >
                           <option value="">Select Subject</option>
                           {getAvailableSubjects().map((subject) => (
@@ -757,13 +847,13 @@ export default function QuestionCreationModePage({
                     {/* Book Selection - shown for both CC and Teachers when they have grade + subject */}
                     {formData.grade && formData.subject && (
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                        <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-2">
                           Book *
                         </label>
                         <select
                           value={formData.book}
                           onChange={(e) => handleBookChange(e.target.value)}
-                          className="w-full px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                          className="w-full px-3 py-2 sm:py-2.5 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                         >
                           <option value="">Select Book</option>
                           {getAvailableBooks().map((book) => (
@@ -782,17 +872,17 @@ export default function QuestionCreationModePage({
                     onClick={() =>
                       router.push(`${baseRoute}/individual${buildRouteParams()}`)
                     }
-                    className="w-full min-h-[44px] px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium text-sm transition-colors"
+                    className="w-full min-h-[44px] px-4 py-2 sm:py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium text-sm transition-colors"
                   >
                     Proceed to Create Question
                   </button>
                 )}
               </div>
             ) : (
-              <div className="space-y-4 mt-6">
+              <div className="space-y-4 sm:space-y-5 mt-6">
                 {!formData.book && (
-                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 text-center">
-                    <p className="text-gray-700">
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 sm:p-4 text-center">
+                    <p className="text-sm text-gray-700">
                       Select a Grade, Subject, and Book above to upload questions.
                     </p>
                   </div>
@@ -800,31 +890,31 @@ export default function QuestionCreationModePage({
 
                 {formData.book && (
                   <>
-                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                      <h3 className="font-semibold text-gray-900 mb-2">Upload Questions File</h3>
-                      <p className="text-sm text-gray-700 mb-4">
+                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 sm:p-4">
+                      <h3 className="font-semibold text-gray-900 mb-2 text-sm sm:text-base">Upload Questions File</h3>
+                      <p className="text-xs sm:text-sm text-gray-700 mb-3 sm:mb-4">
                         Select a CSV or Excel file with your questions. Download the template to see the correct format.
                       </p>
-                      <div className="flex flex-col sm:flex-row gap-3">
+                      <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
                         <button
                           onClick={downloadTemplate}
-                          className="flex-1 min-h-[44px] px-4 py-2 rounded-lg font-medium text-sm bg-green-600 text-white hover:bg-green-700 transition-colors flex items-center justify-center gap-2"
+                          className="flex-1 min-h-[44px] px-3 sm:px-4 py-2 sm:py-2.5 rounded-lg font-medium text-xs sm:text-sm bg-green-600 text-white hover:bg-green-700 transition-colors flex items-center justify-center gap-2"
                         >
                           <i className="ri-download-line"></i>
-                          Download Template
+                          <span>Download Template</span>
                         </button>
                       </div>
                     </div>
 
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                      <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-2">
                         Choose File *
                       </label>
                       <input
                         type="file"
                         accept=".xlsx,.xls,.csv"
                         onChange={handleFileChange}
-                        className="w-full px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        className="w-full px-3 py-2 sm:py-2.5 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                       />
                       <p className="text-xs text-gray-500 mt-1">
                         Supported formats: .xlsx, .xls, .csv

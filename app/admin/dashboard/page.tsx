@@ -13,6 +13,7 @@ export default function AdminDashboard() {
   const { user } = useUserProfile();
   const [isAuthorized, setIsAuthorized] = useState<boolean | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
@@ -28,39 +29,317 @@ export default function AdminDashboard() {
 
     return () => unsubscribe();
   }, [router]);
-  const [stats] = useState({
-    totalUsers: 1247,
-    totalUsersGrowth: 12,
-    questionsPending: 23,
-    schoolsActive: 15,
-    activeQuizzes: 89,
+
+  const [stats, setStats] = useState({
+    totalUsers: 0,
+    totalUsersGrowth: 0,
+    totalQuizzes: 0,
     activeQuizzesGrowth: 8,
+    questionsPending: 0,
+    schoolsActive: 0,
     avgApprovalTime: 2.4,
-    contentQuality: 94
+    contentQuality: 94,
+    schoolUsers: 0,
+    oupUsers: 0
   });
 
-  const [chartData] = useState([
-    { month: 'Jan', users: 450, quizzes: 280 },
-    { month: 'Feb', users: 580, quizzes: 380 },
-    { month: 'Mar', users: 720, quizzes: 480 },
-    { month: 'Apr', users: 890, quizzes: 620 },
-    { month: 'May', users: 1020, quizzes: 750 },
-    { month: 'Jun', users: 1180, quizzes: 880 },
-    { month: 'July', users: 1247, quizzes: 1020 }
+  const [showUserTooltip, setShowUserTooltip] = useState(false);
+
+  // Fetch dynamic data on component mount
+  useEffect(() => {
+    const fetchDashboardStats = async () => {
+      try {
+        setLoading(true);
+        
+        // Fetch users count
+        const usersResponse = await fetch('/api/admin/users');
+        const usersData = await usersResponse.json();
+        const totalUsers = usersData.users?.length || 0;
+        
+        // Count school users vs OUP users
+        const users = usersData.users || [];
+        const schoolUsers = users.filter((u: any) => u.schoolId || u.userType === 'school').length;
+        const oupUsers = users.filter((u: any) => !u.schoolId && u.userType !== 'school').length;
+
+        // Fetch schools count
+        const schoolsResponse = await fetch('/api/admin/schools');
+        const schoolsData = await schoolsResponse.json();
+        const totalSchools = schoolsData.schools?.length || 0;
+        const activeSchools = schoolsData.schools?.filter((s: any) => s.status === 'Active').length || 0;
+
+        // Fetch quizzes count
+        const quizzesResponse = await fetch('/api/quizzes');
+        const quizzesData = await quizzesResponse.json();
+        const totalQuizzes = quizzesData.quizzes?.length || 0;
+
+        // Update stats
+        setStats(prev => ({
+          ...prev,
+          totalUsers,
+          schoolUsers,
+          oupUsers,
+          totalUsersGrowth: 12,
+          totalQuizzes,
+          activeQuizzesGrowth: 8,
+          questionsPending: 23,
+          schoolsActive: activeSchools,
+        }));
+
+        setLoading(false);
+      } catch (error) {
+        console.error('Error fetching dashboard stats:', error);
+        setLoading(false);
+        // Keep showing static data if fetch fails
+      }
+    };
+
+    if (isAuthorized) {
+      fetchDashboardStats();
+    }
+  }, [isAuthorized]);
+
+  const [chartData, setChartData] = useState([
+    { month: 'Jan', users: 0, quizzes: 0 },
+    { month: 'Feb', users: 0, quizzes: 0 },
+    { month: 'Mar', users: 0, quizzes: 0 },
+    { month: 'Apr', users: 0, quizzes: 0 },
+    { month: 'May', users: 0, quizzes: 0 },
+    { month: 'Jun', users: 0, quizzes: 0 },
+    { month: 'Jul', users: 0, quizzes: 0 }
   ]);
 
-  const [contentPipelineData] = useState([
-    { name: 'Submitted', value: 156, color: '#3B82F6' },
-    { name: 'Approved', value: 98, color: '#10B981' },
-    { name: 'Rejected', value: 24, color: '#EF4444' },
-    { name: 'Pending', value: 34, color: '#F59E0B' }
+  const [contentPipelineData, setContentPipelineData] = useState([
+    { name: 'Loading...', value: 0, color: '#D1D5DB', questionsAvailable: 0, booksCount: 0, bookwiseBreakdown: [] as any[] }
   ]);
 
-  const [userRolesData] = useState([
-    { name: 'Students', value: 1089, color: '#8B5CF6' },
-    { name: 'Teachers', value: 143, color: '#F59E0B' },
-    { name: 'Admins', value: 15, color: '#10B981' }
+  const [hoveredSubject, setHoveredSubject] = useState<string | null>(null);
+
+  const [userRolesData, setUserRolesData] = useState([
+    { name: 'Students', value: 0, color: '#8B5CF6' },
+    { name: 'Teachers', value: 0, color: '#F59E0B' },
+    { name: 'Admins', value: 0, color: '#10B981' }
   ]);
+
+  // Fetch user distribution data
+  useEffect(() => {
+    const fetchUserDistribution = async () => {
+      try {
+        const usersResponse = await fetch('/api/admin/users');
+        const usersData = await usersResponse.json();
+        const users = usersData.users || [];
+
+        // Count users by role
+        const studentCount = users.filter((u: any) => u.role === 'student').length;
+        const teacherCount = users.filter((u: any) => u.role === 'teacher').length;
+        const adminCount = users.filter((u: any) => u.role === 'school_admin').length;
+
+        setUserRolesData([
+          { name: 'Students', value: studentCount, color: '#8B5CF6' },
+          { name: 'Teachers', value: teacherCount, color: '#F59E0B' },
+          { name: 'Admins', value: adminCount, color: '#10B981' }
+        ]);
+      } catch (error) {
+        console.error('Error fetching user distribution:', error);
+      }
+    };
+
+    if (isAuthorized) {
+      fetchUserDistribution();
+    }
+  }, [isAuthorized]);
+
+  // Fetch platform growth data
+  useEffect(() => {
+    const fetchPlatformGrowth = async () => {
+      try {
+        const usersResponse = await fetch('/api/admin/users');
+        const quizzesResponse = await fetch('/api/quizzes');
+        
+        const usersData = await usersResponse.json();
+        const quizzesData = await quizzesResponse.json();
+        
+        const users = usersData.users || [];
+        const quizzes = quizzesData.quizzes || [];
+
+        // Get current month and last 6 months
+        const now = new Date();
+        const months = [];
+        const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+        
+        for (let i = 6; i >= 0; i--) {
+          const date = new Date(now.getFullYear(), now.getMonth() - i, 1);
+          months.push({
+            month: monthNames[date.getMonth()],
+            monthNum: date.getMonth(),
+            year: date.getFullYear()
+          });
+        }
+
+        // Count users and quizzes by month
+        const growthData = months.map(m => {
+          const monthStart = new Date(m.year, m.monthNum, 1);
+          const monthEnd = new Date(m.year, m.monthNum + 1, 0);
+          
+          const usersInMonth = users.filter((u: any) => {
+            if (!u.createdAt) return false;
+            const createdDate = u.createdAt.toDate ? u.createdAt.toDate() : new Date(u.createdAt);
+            return createdDate >= monthStart && createdDate <= monthEnd;
+          }).length;
+          
+          const quizzesInMonth = quizzes.filter((q: any) => {
+            if (!q.createdAt) return false;
+            const createdDate = q.createdAt.toDate ? q.createdAt.toDate() : new Date(q.createdAt);
+            return createdDate >= monthStart && createdDate <= monthEnd;
+          }).length;
+
+          return {
+            month: m.month,
+            users: usersInMonth,
+            quizzes: quizzesInMonth
+          };
+        });
+
+        setChartData(growthData);
+      } catch (error) {
+        console.error('Error fetching platform growth data:', error);
+      }
+    };
+
+    if (isAuthorized) {
+      fetchPlatformGrowth();
+    }
+  }, [isAuthorized]);
+
+  // Fetch subject-wise content pipeline data
+  useEffect(() => {
+    const fetchSubjectWiseContent = async () => {
+      try {
+        const subjectsResponse = await fetch('/api/admin/subjects');
+        const subjectsData = await subjectsResponse.json();
+        const subjects = subjectsData.subjects || [];
+
+        // Build subject-wise data
+        const subjectData = await Promise.all(subjects.map(async (subject: any) => {
+          try {
+            // Get books for this subject
+            const booksResponse = await fetch(`/api/admin/books-by-subject?subject=${encodeURIComponent(subject.name || subject)}`);
+            const booksData = await booksResponse.json();
+            const booksCount = booksData.books?.length || 0;
+
+            // Get OUP questions for this subject with bookwise breakdown
+            const oupQuestionsResponse = await fetch(`/api/admin/oup-questions?subject=${encodeURIComponent(subject.name || subject)}`);
+            const oupQuestionsData = await oupQuestionsResponse.json();
+            const questionsAvailable = oupQuestionsData.total || 0;
+            const bookwiseBreakdown = oupQuestionsData.bookwiseBreakdown || [];
+
+            return {
+              name: subject.name || subject,
+              value: booksCount,
+              color: ['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#EC4899', '#06B6D4'][subjects.indexOf(subject) % 7],
+              questionsAvailable,
+              booksCount,
+              bookwiseBreakdown
+            };
+          } catch (error) {
+            console.error(`Error fetching data for subject ${subject.name}:`, error);
+            return {
+              name: subject.name || subject,
+              value: 0,
+              color: '#D1D5DB',
+              questionsAvailable: 0,
+              booksCount: 0,
+              bookwiseBreakdown: []
+            };
+          }
+        }));
+
+        setContentPipelineData(subjectData.filter(s => s.value > 0 || s.questionsAvailable > 0));
+      } catch (error) {
+        console.error('Error fetching subject-wise content:', error);
+      }
+    };
+
+    if (isAuthorized) {
+      fetchSubjectWiseContent();
+    }
+  }, [isAuthorized]);
+
+  // Fetch recent activities
+  useEffect(() => {
+    const fetchRecentActivities = async () => {
+      try {
+        const activities: any[] = [];
+        const now = new Date();
+
+        // Fetch all users to find recent registrations
+        const usersResponse = await fetch('/api/admin/users');
+        const usersData = await usersResponse.json();
+        const users = usersData.users || [];
+
+        // Check for recently created users (teachers)
+        users.forEach((user: any) => {
+          if (user.role === 'teacher' && user.createdAt) {
+            const createdDate = user.createdAt.toDate ? user.createdAt.toDate() : new Date(user.createdAt);
+            const diffMs = now.getTime() - createdDate.getTime();
+            const diffMins = Math.floor(diffMs / 60000);
+            
+            if (diffMins <= 1440) { // Last 24 hours
+              activities.push({
+                id: `teacher-${user.id}`,
+                type: 'teacher',
+                title: 'New teacher registered',
+                description: `${user.name} joined ${user.schoolName || 'a school'}`,
+                time: diffMins < 60 ? `${diffMins} mins ago` : `${Math.floor(diffMins / 60)} hours ago`,
+                actionable: false
+              });
+            }
+          }
+        });
+
+        // Fetch quizzes to find recently created quizzes
+        const quizzesResponse = await fetch('/api/quizzes');
+        const quizzesData = await quizzesResponse.json();
+        const quizzes = quizzesData.quizzes || [];
+
+        quizzes.forEach((quiz: any) => {
+          if (quiz.createdAt) {
+            const createdDate = quiz.createdAt.toDate ? quiz.createdAt.toDate() : new Date(quiz.createdAt);
+            const diffMs = now.getTime() - createdDate.getTime();
+            const diffMins = Math.floor(diffMs / 60000);
+            
+            if (diffMins <= 1440) { // Last 24 hours
+              activities.push({
+                id: `quiz-${quiz.id}`,
+                type: 'quiz',
+                title: 'Quiz created',
+                description: `${quiz.title || 'New Quiz'} for ${quiz.grade || 'a grade'}`,
+                time: diffMins < 60 ? `${diffMins} mins ago` : `${Math.floor(diffMins / 60)} hours ago`,
+                actionable: false
+              });
+            }
+          }
+        });
+
+        // Sort by time (most recent first) and limit to 8 activities
+        activities.sort((a, b) => {
+          const timeA = parseInt(a.time.split(' ')[0]) || 0;
+          const timeB = parseInt(b.time.split(' ')[0]) || 0;
+          return timeB - timeA;
+        });
+
+        setRecentActivities(activities.slice(0, 8));
+      } catch (error) {
+        console.error('Error fetching recent activities:', error);
+      }
+    };
+
+    if (isAuthorized) {
+      fetchRecentActivities();
+      // Refresh activities every 5 minutes
+      const interval = setInterval(fetchRecentActivities, 5 * 60 * 1000);
+      return () => clearInterval(interval);
+    }
+  }, [isAuthorized]);
 
   const [pendingApprovals] = useState([
     { id: 1, type: 'question', subject: 'Mathematics', grade: 'Grade 10', items: 15, teacher: 'Sarah Johnson', time: '2 hours ago', status: 'review' },
@@ -68,37 +347,13 @@ export default function AdminDashboard() {
     { id: 3, type: 'question', subject: 'Chemistry', grade: 'Grade 9', items: 8, teacher: 'Emma Davis', time: '6 hours ago', status: 'review' }
   ]);
 
-  const [recentActivities] = useState([
+  const [recentActivities, setRecentActivities] = useState([
     { 
       id: 1, 
       type: 'teacher', 
-      title: 'New teacher registered',
-      description: 'Sarah Johnson joined Oxford High School', 
-      time: '5 mins ago',
-      actionable: false
-    },
-    { 
-      id: 2, 
-      type: 'questions', 
-      title: 'Questions approved',
-      description: '15 mathematics questions approved for Grade 10', 
-      time: '9 mins ago',
-      actionable: false
-    },
-    { 
-      id: 3, 
-      type: 'quiz', 
-      title: 'Quiz created',
-      description: 'Monthly Science Assessment for Grade 9', 
-      time: '25 mins ago',
-      actionable: false
-    },
-    { 
-      id: 4, 
-      type: 'school', 
-      title: 'New school onboarded',
-      description: 'Wellington Academy joined the platform', 
-      time: '1 hour ago',
+      title: 'Loading activities...',
+      description: 'Fetching recent activity data', 
+      time: 'just now',
       actionable: false
     }
   ]);
@@ -171,7 +426,11 @@ export default function AdminDashboard() {
           {/* KPI Cards Row */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mb-6 sm:mb-8">
             {/* Total Users */}
-            <div className="bg-white rounded-xl p-6 shadow-sm hover:shadow-md transition-shadow border border-gray-100">
+            <div 
+              className="bg-white rounded-xl p-6 shadow-sm hover:shadow-md transition-shadow border border-gray-100 cursor-help"
+              onMouseEnter={() => setShowUserTooltip(true)}
+              onMouseLeave={() => setShowUserTooltip(false)}
+            >
               <div className="flex items-start justify-between mb-4">
                 <div className="w-12 h-12 bg-emerald-100 rounded-lg flex items-center justify-center">
                   <i className="ri-group-line text-2xl text-emerald-600"></i>
@@ -180,11 +439,33 @@ export default function AdminDashboard() {
                   +{stats.totalUsersGrowth}%
                 </span>
               </div>
-              <h3 className="text-3xl font-bold text-gray-900 mb-1">{stats.totalUsers.toLocaleString()}</h3>
-              <p className="text-sm text-gray-500">Total Users</p>
+              {loading ? (
+                <div className="animate-pulse">
+                  <div className="h-8 bg-gray-200 rounded w-16 mb-2"></div>
+                  <div className="h-4 bg-gray-200 rounded w-24"></div>
+                </div>
+              ) : (
+                <>
+                  <h3 className="text-3xl font-bold text-gray-900 mb-3">{stats.totalUsers.toLocaleString()}</h3>
+                  {showUserTooltip ? (
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between bg-emerald-50 rounded-lg p-2 border border-emerald-200">
+                        <span className="text-sm text-gray-600">School Users</span>
+                        <span className="text-sm font-semibold text-emerald-700">{stats.schoolUsers.toLocaleString()}</span>
+                      </div>
+                      <div className="flex items-center justify-between bg-emerald-50 rounded-lg p-2 border border-emerald-200">
+                        <span className="text-sm text-gray-600">OUP Users</span>
+                        <span className="text-sm font-semibold text-emerald-700">{stats.oupUsers.toLocaleString()}</span>
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="text-sm text-gray-500">Total Users (All Schools)</p>
+                  )}
+                </>
+              )}
             </div>
 
-            {/* Active Quizzes */}
+            {/* Total Quizzes */}
             <div className="bg-white rounded-xl p-6 shadow-sm hover:shadow-md transition-shadow border border-gray-100">
               <div className="flex items-start justify-between mb-4">
                 <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
@@ -194,8 +475,17 @@ export default function AdminDashboard() {
                   +{stats.activeQuizzesGrowth}%
                 </span>
               </div>
-              <h3 className="text-3xl font-bold text-gray-900 mb-1">{stats.activeQuizzes}</h3>
-              <p className="text-sm text-gray-500">Active Quizzes</p>
+              {loading ? (
+                <div className="animate-pulse">
+                  <div className="h-8 bg-gray-200 rounded w-16 mb-2"></div>
+                  <div className="h-4 bg-gray-200 rounded w-32"></div>
+                </div>
+              ) : (
+                <>
+                  <h3 className="text-3xl font-bold text-gray-900 mb-1">{stats.totalQuizzes}</h3>
+                  <p className="text-sm text-gray-500">Total Quizzes (Overall)</p>
+                </>
+              )}
             </div>
 
             {/* Questions Pending */}
@@ -222,8 +512,17 @@ export default function AdminDashboard() {
                   Active
                 </span>
               </div>
-              <h3 className="text-3xl font-bold text-gray-900 mb-1">{stats.schoolsActive}</h3>
-              <p className="text-sm text-gray-500">Schools Active</p>
+              {loading ? (
+                <div className="animate-pulse">
+                  <div className="h-8 bg-gray-200 rounded w-12 mb-2"></div>
+                  <div className="h-4 bg-gray-200 rounded w-24"></div>
+                </div>
+              ) : (
+                <>
+                  <h3 className="text-3xl font-bold text-gray-900 mb-1">{stats.schoolsActive}</h3>
+                  <p className="text-sm text-gray-500">Active Schools</p>
+                </>
+              )}
             </div>
           </div>
 
@@ -274,51 +573,94 @@ export default function AdminDashboard() {
             {/* User Roles Distribution */}
             <div className="bg-white rounded-xl p-4 sm:p-6 shadow-sm border border-gray-100">
               <h3 className="text-base sm:text-lg font-bold text-gray-900 mb-4 sm:mb-6">User Distribution</h3>
-              <div className="w-full overflow-hidden">
-                <ResponsiveContainer width="100%" height={250}>
-                  <PieChart>
-                    <Pie
-                      data={userRolesData}
-                      cx="50%"
-                      cy="50%"
-                      innerRadius={60}
-                      outerRadius={80}
-                      paddingAngle={5}
-                      dataKey="value"
-                    >
-                      {userRolesData.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={entry.color} />
-                      ))}
-                    </Pie>
-                    <Tooltip />
-                  </PieChart>
-                </ResponsiveContainer>
-              </div>
-              <div className="mt-4 space-y-2">
-                {userRolesData.map((role, index) => (
-                  <div key={index} className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <div className="w-3 h-3 rounded-full" style={{ backgroundColor: role.color }}></div>
-                      <span className="text-sm text-gray-600">{role.name}</span>
-                    </div>
-                    <span className="text-sm font-semibold text-gray-900">{role.value}</span>
+              {loading ? (
+                <div className="w-full flex items-center justify-center h-[250px]">
+                  <div className="text-center">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-500 mx-auto mb-2"></div>
+                    <p className="text-sm text-gray-500">Loading distribution...</p>
                   </div>
-                ))}
-              </div>
+                </div>
+              ) : (
+                <>
+                  <div className="w-full overflow-hidden">
+                    <ResponsiveContainer width="100%" height={250}>
+                      <PieChart>
+                        <Pie
+                          data={userRolesData}
+                          cx="50%"
+                          cy="50%"
+                          innerRadius={60}
+                          outerRadius={80}
+                          paddingAngle={5}
+                          dataKey="value"
+                        >
+                          {userRolesData.map((entry, index) => (
+                            <Cell key={`cell-${index}`} fill={entry.color} />
+                          ))}
+                        </Pie>
+                        <Tooltip />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  </div>
+                  <div className="mt-4 space-y-2">
+                    {userRolesData.map((role, index) => (
+                      <div key={index} className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <div className="w-3 h-3 rounded-full" style={{ backgroundColor: role.color }}></div>
+                          <span className="text-sm text-gray-600">{role.name}</span>
+                        </div>
+                        <span className="text-sm font-semibold text-gray-900">{role.value}</span>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              )}
             </div>
           </div>
 
           {/* Content Pipeline Chart */}
           <div className="bg-white rounded-xl p-4 sm:p-6 shadow-sm border border-gray-100 mb-6 sm:mb-8">
-            <h3 className="text-base sm:text-lg font-bold text-gray-900 mb-4 sm:mb-6">Content Pipeline</h3>
+            <h3 className="text-base sm:text-lg font-bold text-gray-900 mb-4 sm:mb-6">Content Pipeline by Subject</h3>
             <div className="w-full overflow-hidden">
-              <ResponsiveContainer width="100%" height={200}>
+              <ResponsiveContainer width="100%" height={250}>
                 <BarChart data={contentPipelineData}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
                   <XAxis dataKey="name" stroke="#6B7280" style={{ fontSize: '12px' }} />
                   <YAxis stroke="#6B7280" style={{ fontSize: '12px' }} />
                   <Tooltip 
                     contentStyle={{ backgroundColor: '#fff', border: '1px solid #E5E7EB', borderRadius: '8px' }}
+                    content={({ active, payload }) => {
+                      if (active && payload && payload.length) {
+                        const data = payload[0].payload;
+                        return (
+                          <div className="bg-white border border-emerald-200 rounded-lg p-3 shadow-lg max-w-xs">
+                            <p className="font-semibold text-gray-900 mb-2">{data.name}</p>
+                            <div className="space-y-2 text-sm border-b border-gray-200 pb-2 mb-2">
+                              <div className="flex justify-between gap-4">
+                                <span className="text-gray-600">Total Books:</span>
+                                <span className="font-semibold text-emerald-600">{data.booksCount}</span>
+                              </div>
+                              <div className="flex justify-between gap-4">
+                                <span className="text-gray-600">Total Questions:</span>
+                                <span className="font-semibold text-blue-600">{data.questionsAvailable}</span>
+                              </div>
+                            </div>
+                            {data.bookwiseBreakdown && data.bookwiseBreakdown.length > 0 && (
+                              <div className="space-y-1">
+                                <p className="text-xs font-semibold text-gray-700 mb-1">Book-wise Breakdown:</p>
+                                {data.bookwiseBreakdown.map((book: any, idx: number) => (
+                                  <div key={idx} className="flex justify-between gap-2 text-xs bg-gray-50 p-1.5 rounded">
+                                    <span className="text-gray-600 truncate">{book.book} ({book.grade})</span>
+                                    <span className="font-semibold text-blue-600 whitespace-nowrap">{book.questions}Q</span>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      }
+                      return null;
+                    }}
                   />
                   <Bar dataKey="value" radius={[8, 8, 0, 0]}>
                     {contentPipelineData.map((entry, index) => (

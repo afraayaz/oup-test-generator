@@ -1,5 +1,4 @@
-import { db } from '@/firebase/firebase';
-import { collection, getDocs } from 'firebase/firestore';
+import { db } from '@/lib/firebaseAdmin';
 import { NextRequest, NextResponse } from 'next/server';
 
 export async function GET(
@@ -30,8 +29,7 @@ export async function GET(
     const difficulty = request.nextUrl.searchParams.get('difficulty');
     const type = request.nextUrl.searchParams.get('type');
 
-    const questionsRef = collection(db, `questions/schools/${schoolId}`);
-    const snapshot = await getDocs(questionsRef);
+    const snapshot = await db.collection('questions').doc('schools').collection(schoolId).get();
 
     let questions: any[] = snapshot.docs.map(doc => ({
       id: doc.id,

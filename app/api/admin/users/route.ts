@@ -1,84 +1,5 @@
 import { NextResponse } from 'next/server';
-
-const PROJECT_ID = 'quiz-app-ff0ab';
-const FIRESTORE_URL = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/(default)/documents`;
-
-interface FirestoreValue {
-  stringValue?: string;
-  integerValue?: string;
-  doubleValue?: number;
-  booleanValue?: boolean;
-  timestampValue?: string;
-  arrayValue?: { values?: FirestoreValue[] };
-  mapValue?: { fields?: Record<string, FirestoreValue> };
-  nullValue?: null;
-}
-
-interface FirestoreDocument {
-  name: string;
-  fields?: Record<string, FirestoreValue>;
-}
-
-function parseFirestoreValue(value: FirestoreValue): any {
-  if (value.stringValue !== undefined) return value.stringValue;
-  if (value.integerValue !== undefined) return parseInt(value.integerValue);
-  if (value.doubleValue !== undefined) return parseFloat(String(value.doubleValue));
-  if (value.booleanValue !== undefined) return value.booleanValue;
-  if (value.nullValue !== undefined) return null;
-  if (value.timestampValue !== undefined) return value.timestampValue;
-  if (value.arrayValue !== undefined) {
-    return (value.arrayValue.values || []).map(parseFirestoreValue);
-  }
-  if (value.mapValue !== undefined) {
-    const result: Record<string, any> = {};
-    for (const [key, val] of Object.entries(value.mapValue.fields || {})) {
-      result[key] = parseFirestoreValue(val);
-    }
-    return result;
-  }
-  return null;
-}
-
-function parseDocument(doc: FirestoreDocument): { id: string; data: Record<string, any> } {
-  const pathParts = doc.name.split('/');
-  const id = pathParts[pathParts.length - 1];
-  
-  const data: Record<string, any> = {};
-  for (const [key, value] of Object.entries(doc.fields || {})) {
-    data[key] = parseFirestoreValue(value);
-  }
-  
-  return { id, data };
-}
-
-function toFirestoreValue(value: any): FirestoreValue {
-  if (value === null || value === undefined) {
-    return { nullValue: null };
-  }
-  if (typeof value === 'string') {
-    return { stringValue: value };
-  }
-  if (typeof value === 'number') {
-    if (Number.isInteger(value)) {
-      return { integerValue: String(value) };
-    }
-    return { doubleValue: value };
-  }
-  if (typeof value === 'boolean') {
-    return { booleanValue: value };
-  }
-  if (Array.isArray(value)) {
-    return { arrayValue: { values: value.map(toFirestoreValue) } };
-  }
-  if (typeof value === 'object') {
-    const fields: Record<string, FirestoreValue> = {};
-    for (const [k, v] of Object.entries(value)) {
-      fields[k] = toFirestoreValue(v);
-    }
-    return { mapValue: { fields } };
-  }
-  return { nullValue: null };
-}
+import { db, auth, deleteFirebaseUser } from '@/lib/firebaseAdmin';
 
 export async function GET(request: Request) {
   try {
@@ -87,38 +8,23 @@ export async function GET(request: Request) {
     const campusId = searchParams.get('campusId');
     const role = searchParams.get('role');
     
-    const response = await fetch(`${FIRESTORE_URL}/users`);
-    
-    if (!response.ok) {
-      const errorText = await response.text();
-      return NextResponse.json(
-        { error: `Firestore error: ${response.status}`, details: errorText },
-        { status: response.status }
-      );
-    }
-    
-    const data = await response.json();
-    
-    if (!data.documents) {
-      return NextResponse.json({ users: [] });
-    }
-    
-    let users = data.documents.map(parseDocument).map((doc: { id: string; data: Record<string, any> }) => ({
-      id: doc.id,
-      ...doc.data
-    }));
+    let query = db.collection('users');
     
     if (schoolId) {
-      users = users.filter((user: any) => user.schoolId === schoolId);
+      query = query.where('schoolId', '==', schoolId);
     }
-    
     if (campusId) {
-      users = users.filter((user: any) => user.campusId === campusId);
+      query = query.where('campusId', '==', campusId);
+    }
+    if (role) {
+      query = query.where('role', '==', role);
     }
     
-    if (role) {
-      users = users.filter((user: any) => user.role === role);
-    }
+    const snapshot = await query.get();
+    const users = snapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data(),
+    }));
     
     return NextResponse.json({ users });
   } catch (error: any) {
@@ -153,7 +59,7 @@ export async function POST(request: Request) {
       userType
     } = body;
     
-    // Validate required fields - school is only required for school users
+    // Validate required fields
     if (!name || !email || !password || !role) {
       return NextResponse.json(
         { error: 'Name, email, password, and role are required' },
@@ -183,44 +89,23 @@ export async function POST(request: Request) {
       );
     }
     
-    const existingUsersResponse = await fetch(`${FIRESTORE_URL}/users`);
-    if (existingUsersResponse.ok) {
-      const existingData = await existingUsersResponse.json();
-      if (existingData.documents) {
-        const existingUsers = existingData.documents.map(parseDocument);
-        const emailExists = existingUsers.some((u: any) => u.data.email === email);
-        if (emailExists) {
-          return NextResponse.json(
-            { error: 'A user with this email already exists' },
-            { status: 400 }
-          );
-        }
-      }
+    // Check if email already exists
+    const existingSnapshot = await db.collection('users').where('email', '==', email).get();
+    if (!existingSnapshot.empty) {
+      return NextResponse.json(
+        { error: 'A user with this email already exists' },
+        { status: 400 }
+      );
     }
 
     // Create Firebase Auth account
     let uid = '';
     try {
-      const firebaseApiKey = 'AIzaSyDdsApeXM5WsHTcx4sLVJ37dAwxOjBMTu8'; // quiz-app-ff0ab API key
-      const firebaseAuthUrl = `https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=${firebaseApiKey}`;
-      
-      const authResponse = await fetch(firebaseAuthUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          email,
-          password,
-          returnSecureToken: true,
-        }),
+      const userRecord = await auth.createUser({
+        email,
+        password,
       });
-
-      if (!authResponse.ok) {
-        const authError = await authResponse.json();
-        throw new Error(authError.error?.message || 'Failed to create Firebase Auth account');
-      }
-
-      const authData = await authResponse.json();
-      uid = authData.localId;
+      uid = userRecord.uid;
     } catch (authError: any) {
       return NextResponse.json(
         { error: `Failed to create user account: ${authError.message}` },
@@ -265,33 +150,11 @@ export async function POST(request: Request) {
       userData.assignedBooks = assignedBooks || [];
     }
     
-    const fields: Record<string, FirestoreValue> = {};
-    for (const [key, value] of Object.entries(userData)) {
-      fields[key] = toFirestoreValue(value);
-    }
-    
-    const response = await fetch(`${FIRESTORE_URL}/users`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ fields }),
-    });
-    
-    if (!response.ok) {
-      const errorText = await response.text();
-      return NextResponse.json(
-        { error: `Firestore error: ${response.status}`, details: errorText },
-        { status: response.status }
-      );
-    }
-    
-    const createdDoc = await response.json();
-    const parsed = parseDocument(createdDoc);
+    const docRef = await db.collection('users').add(userData);
     
     return NextResponse.json({ 
       success: true, 
-      user: { id: parsed.id, ...parsed.data } 
+      user: { id: docRef.id, ...userData } 
     });
   } catch (error: any) {
     console.error('API route error:', error);
@@ -316,33 +179,13 @@ export async function PUT(request: Request) {
     
     updateData.updatedAt = new Date().toISOString();
     
-    const fields: Record<string, FirestoreValue> = {};
-    for (const [key, value] of Object.entries(updateData)) {
-      fields[key] = toFirestoreValue(value);
-    }
+    await db.collection('users').doc(id).update(updateData);
     
-    const response = await fetch(`${FIRESTORE_URL}/users/${id}?updateMask.fieldPaths=${Object.keys(updateData).join('&updateMask.fieldPaths=')}`, {
-      method: 'PATCH',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ fields }),
-    });
-    
-    if (!response.ok) {
-      const errorText = await response.text();
-      return NextResponse.json(
-        { error: `Firestore error: ${response.status}`, details: errorText },
-        { status: response.status }
-      );
-    }
-    
-    const updatedDoc = await response.json();
-    const parsed = parseDocument(updatedDoc);
+    const updatedDoc = await db.collection('users').doc(id).get();
     
     return NextResponse.json({ 
       success: true, 
-      user: { id: parsed.id, ...parsed.data } 
+      user: { id: updatedDoc.id, ...updatedDoc.data() } 
     });
   } catch (error: any) {
     console.error('API route error:', error);
@@ -365,112 +208,39 @@ export async function DELETE(request: Request) {
       );
     }
 
-    // First, fetch the user to get their UID and email
-    let uid = '';
-    let userEmail = '';
-    try {
-      const userResponse = await fetch(`${FIRESTORE_URL}/users/${id}`);
-      if (userResponse.ok) {
-        const userData = await userResponse.json();
-        const uidField = userData.fields?.uid?.stringValue;
-        const emailField = userData.fields?.email?.stringValue;
-        if (uidField) uid = uidField;
-        if (emailField) userEmail = emailField;
-      }
-    } catch (error) {
-      console.error('Error fetching user UID/email:', error);
-    }
-
-    // Step 1: Delete Firebase Auth account using REST API
-    if (uid) {
-      try {
-        const firebaseApiKey = 'AIzaSyDdsApeXM5WsHTcx4sLVJ37dAwxOjBMTu8'; // quiz-app-ff0ab API key
-        
-        // Method: Use the REST API to delete the user
-        // Note: This requires a valid ID token from the user being deleted
-        // For admin deletion without token, we recommend using Firebase Admin SDK
-        // For now, we'll log the attempt and continue with Firestore deletion
-        console.log(`Preparing to delete Firebase Auth account for UID: ${uid}, Email: ${userEmail}`);
-        
-        // In production, you should use Firebase Admin SDK on a backend server with service account credentials
-        // Here's the structure for when you set it up:
-        // const admin = require('firebase-admin');
-        // await admin.auth().deleteUser(uid);
-        
-      } catch (error) {
-        console.error('Error deleting Firebase Auth account:', error);
-        // Continue with Firestore deletion even if auth deletion fails
-      }
-    }
-
-    // Step 2: Delete all quiz attempts by this user
-    try {
-      const quizAttemptsResponse = await fetch(
-        `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/(default)/documents/quizAttempts`,
-        { method: 'GET' }
-      );
-      
-      if (quizAttemptsResponse.ok) {
-        const attemptsData = await quizAttemptsResponse.json();
-        if (attemptsData.documents) {
-          for (const doc of attemptsData.documents) {
-            const pathParts = doc.name.split('/');
-            const attemptId = pathParts[pathParts.length - 1];
-            const attemptFields = doc.fields || {};
-            
-            // Check if this attempt belongs to the user being deleted
-            const userId = attemptFields.userId?.stringValue;
-            if (userId === id) {
-              await fetch(`${doc.name}`, { method: 'DELETE' });
-            }
-          }
-        }
-      }
-    } catch (error) {
-      console.error('Error deleting quiz attempts:', error);
-      // Continue with user deletion even if this fails
-    }
-
-    // Step 3: Delete all quizzes created by this user
-    try {
-      const quizzesResponse = await fetch(
-        `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/(default)/documents/quizzes`,
-        { method: 'GET' }
-      );
-      
-      if (quizzesResponse.ok) {
-        const quizzesData = await quizzesResponse.json();
-        if (quizzesData.documents) {
-          for (const doc of quizzesData.documents) {
-            const pathParts = doc.name.split('/');
-            const quizId = pathParts[pathParts.length - 1];
-            const quizFields = doc.fields || {};
-            
-            // Check if this quiz belongs to the user being deleted
-            const createdBy = quizFields.createdBy?.stringValue;
-            if (createdBy === id) {
-              await fetch(`${doc.name}`, { method: 'DELETE' });
-            }
-          }
-        }
-      }
-    } catch (error) {
-      console.error('Error deleting quizzes:', error);
-      // Continue with user deletion even if this fails
-    }
-
-    // Step 4: Delete user document
-    const response = await fetch(`${FIRESTORE_URL}/users/${id}`, {
-      method: 'DELETE',
-    });
+    // Fetch the user to get their UID and email
+    const userDoc = await db.collection('users').doc(id).get();
     
-    if (!response.ok) {
-      const errorText = await response.text();
+    if (!userDoc.exists) {
       return NextResponse.json(
-        { error: `Firestore error: ${response.status}`, details: errorText },
-        { status: response.status }
+        { error: 'User not found' },
+        { status: 404 }
       );
     }
+
+    const userData = userDoc.data();
+    const uid = userData?.uid;
+    const userEmail = userData?.email;
+
+    // Delete Firebase Auth account
+    if (uid) {
+      await deleteFirebaseUser(uid);
+    }
+
+    // Delete all quiz attempts by this user
+    const attemptsSnapshot = await db.collection('quizAttempts').where('userId', '==', id).get();
+    for (const doc of attemptsSnapshot.docs) {
+      await doc.ref.delete();
+    }
+
+    // Delete all quizzes created by this user
+    const quizzesSnapshot = await db.collection('quizzes').where('createdBy', '==', id).get();
+    for (const doc of quizzesSnapshot.docs) {
+      await doc.ref.delete();
+    }
+
+    // Delete user document
+    await db.collection('users').doc(id).delete();
     
     return NextResponse.json({ 
       success: true, 

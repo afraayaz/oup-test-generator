@@ -30,7 +30,7 @@ export interface QuestionFormData {
   difficulty: "Easy" | "Medium" | "Hard";
   questionText: string;
   options: string[];
-  correctAnswer: string;
+  correctAnswer: string | string[]; // Support both single and multiple answers
   explanation: string;
   blanks: { [key: string]: string[] };
 }
@@ -44,7 +44,7 @@ const initialFormData: QuestionFormData = {
   difficulty: "Medium",
   questionText: "",
   options: ["", "", "", ""],
-  correctAnswer: "",
+  correctAnswer: [], // Initialize as empty array for multiple answers
   explanation: "",
   blanks: {},
 };
@@ -68,7 +68,10 @@ export default function QuestionForm({
   const [toast, setToast] = useState<{ type: "error" | "success" | "info"; message: string } | null>(null);
   const [focusedMathField, setFocusedMathField] = useState<"question" | "explanation" | "option" | "blank" | null>(null);
   const [activeOptionIndex, setActiveOptionIndex] = useState(-1);
+  const [availableChapters, setAvailableChapters] = useState<string[]>([]); // Store fetched chapters
+  const [chaptersLoading, setChaptersLoading] = useState(false); // Loading state for chapters
   const [activeBlankId, setActiveBlankId] = useState<string | null>(null);
+  const [urduKeyboardFocus, setUrduKeyboardFocus] = useState<"topic" | "slo" | null>(null); // Track which field needs Urdu keyboard
 
   // Initialize with defaults
   useEffect(() => {
@@ -82,6 +85,62 @@ export default function QuestionForm({
     }
   }, [defaultGrade, defaultSubject, defaultBook, grades, subjects, submittedBooks]);
 
+  // Fetch chapters when book, subject, and grade are selected
+  useEffect(() => {
+    const fetchChapters = async () => {
+      if (!formData.book || !formData.subject || !formData.grade) {
+        setAvailableChapters([]);
+        return;
+      }
+
+      try {
+        setChaptersLoading(true);
+        
+        // Find the book object to get its ID
+        const selectedBook = submittedBooks.find(
+          (book) => book.title.toLowerCase() === formData.book.toLowerCase()
+        );
+        
+        if (!selectedBook) {
+          setAvailableChapters([]);
+          return;
+        }
+
+        // Call the chapters API
+        const response = await fetch(
+          `/api/admin/chapters?subject=${encodeURIComponent(formData.subject)}&book=${encodeURIComponent(formData.book)}&bookId=${encodeURIComponent(selectedBook.id || '')}`
+        );
+
+        if (response.ok) {
+          const data = await response.json();
+          const chapters = (data.chapters || []).map((ch: string) => {
+            // Remove quotes if present
+            let cleaned = ch.trim();
+            if ((cleaned.startsWith('"') && cleaned.endsWith('"')) || (cleaned.startsWith("'") && cleaned.endsWith("'"))) {
+              cleaned = cleaned.slice(1, -1);
+            }
+            return cleaned;
+          });
+
+          if (chapters.length === 0) {
+            setAvailableChapters([]); // Will show "No chapter available yet"
+          } else {
+            setAvailableChapters(chapters);
+          }
+        } else {
+          setAvailableChapters([]);
+        }
+      } catch (error) {
+        console.error('Error fetching chapters:', error);
+        setAvailableChapters([]);
+      } finally {
+        setChaptersLoading(false);
+      }
+    };
+
+    fetchChapters();
+  }, [formData.book, formData.subject, formData.grade, submittedBooks]);
+
   const optionLabels = ["A", "B", "C", "D", "E", "F"];
 
   const handleQuestionTypeChange = (type: QuestionFormData["type"]) => {
@@ -90,7 +149,7 @@ export default function QuestionForm({
       type,
       options: type === "multiple" ? ["", "", "", ""] : [],
       blanks: type === "fillblanks" ? { blank1: [] } : ({} as { [key: string]: string[] }),
-      correctAnswer: "",
+      correctAnswer: type === "multiple" ? [] : "", // Array for MCQ, empty string for others
     }));
   };
 
@@ -109,10 +168,22 @@ export default function QuestionForm({
   const removeOption = (index: number) => {
     if (formData.options.length > 2) {
       const newOptions = formData.options.filter((_, i) => i !== index);
+      const removedOption = formData.options[index];
+      
+      // Update correctAnswer - handle both string and array types
+      let updatedCorrectAnswer: string | string[] = formData.correctAnswer;
+      if (Array.isArray(formData.correctAnswer)) {
+        // Remove the deleted option from the array
+        updatedCorrectAnswer = formData.correctAnswer.filter(ans => ans !== removedOption);
+      } else if (formData.correctAnswer === removedOption) {
+        // If single answer and it's the removed option, clear it
+        updatedCorrectAnswer = "";
+      }
+      
       setFormData((prev) => ({
         ...prev,
         options: newOptions,
-        correctAnswer: newOptions.includes(prev.correctAnswer) ? prev.correctAnswer : "",
+        correctAnswer: updatedCorrectAnswer,
       }));
     }
   };
@@ -193,11 +264,19 @@ export default function QuestionForm({
       if (nonEmptyOptions.length < 2) {
         newErrors.options = "At least 2 options required for MCQ";
       }
-      if (!formData.correctAnswer || !formData.options.includes(formData.correctAnswer)) {
-        newErrors.correctAnswer = "Please select a correct answer";
+      // Check for multiple correct answers
+      const correctAnswersArray = Array.isArray(formData.correctAnswer) ? formData.correctAnswer : [];
+      if (correctAnswersArray.length === 0) {
+        newErrors.correctAnswer = "Please select at least one correct answer";
+      } else {
+        // Validate that all selected answers are in the options list
+        const invalidAnswers = correctAnswersArray.filter(answer => !formData.options.includes(answer));
+        if (invalidAnswers.length > 0) {
+          newErrors.correctAnswer = "All selected answers must be from the available options";
+        }
       }
     } else if (formData.type === "truefalse") {
-      if (!["true", "false"].includes(formData.correctAnswer.toLowerCase())) {
+      if (!["true", "false"].includes((formData.correctAnswer as string).toLowerCase())) {
         newErrors.correctAnswer = "Please select True or False";
       }
     } else if (formData.type === "fillblanks") {
@@ -210,7 +289,7 @@ export default function QuestionForm({
           newErrors[blankId] = `Please add answers for ${blankId}`;
         }
       }
-    } else if (!formData.correctAnswer.trim()) {
+    } else if (!(formData.correctAnswer as string).trim()) {
       newErrors.correctAnswer = "Correct answer is required";
     }
 
@@ -250,10 +329,7 @@ export default function QuestionForm({
   };
 
   const getAvailableChapters = () => {
-    if (!formData.book || !submittedBooks) return [];
-    const selectedBook = submittedBooks.find((book) => book.title.toLowerCase() === formData.book.toLowerCase());
-    if (!selectedBook || !selectedBook.chapters) return [];
-    return Array.from({ length: selectedBook.chapters }, (_, i) => `Chapter ${i + 1}`);
+    return availableChapters;
   };
 
   return (
@@ -330,19 +406,30 @@ export default function QuestionForm({
             {/* Chapter */}
             <div>
               <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1 sm:mb-2">Chapter *</label>
-              <select
-                value={formData.chapter}
-                onChange={(e) => setFormData({ ...formData, chapter: e.target.value })}
-                disabled={!formData.book}
-                className={`w-full px-2 sm:px-3 py-1.5 sm:py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100 text-xs sm:text-sm ${errors.chapter ? "border-red-500" : "border-gray-300"}`}
-              >
-                <option value="">Select Chapter</option>
-                {getAvailableChapters().map((chapter) => (
-                  <option key={chapter} value={chapter}>
-                    {chapter}
-                  </option>
-                ))}
-              </select>
+              {chaptersLoading ? (
+                <div className="w-full px-2 sm:px-3 py-1.5 sm:py-2 border border-gray-300 rounded-lg text-xs sm:text-sm text-gray-500 flex items-center gap-2">
+                  <i className="ri-loader-4-line animate-spin"></i>
+                  Loading chapters...
+                </div>
+              ) : formData.book && getAvailableChapters().length === 0 ? (
+                <div className="w-full px-2 sm:px-3 py-1.5 sm:py-2 border border-yellow-300 rounded-lg text-xs sm:text-sm text-yellow-700 bg-yellow-50">
+                  ⚠️ No chapter available yet
+                </div>
+              ) : (
+                <select
+                  value={formData.chapter}
+                  onChange={(e) => setFormData({ ...formData, chapter: e.target.value })}
+                  disabled={!formData.book}
+                  className={`w-full px-2 sm:px-3 py-1.5 sm:py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100 text-xs sm:text-sm ${errors.chapter ? "border-red-500" : "border-gray-300"}`}
+                >
+                  <option value="">Select Chapter</option>
+                  {getAvailableChapters().map((chapter) => (
+                    <option key={chapter} value={chapter}>
+                      {chapter}
+                    </option>
+                  ))}
+                </select>
+              )}
               {errors.chapter && <p className="text-red-500 text-xs sm:text-sm mt-1">{errors.chapter}</p>}
             </div>
 
@@ -354,10 +441,23 @@ export default function QuestionForm({
                   type="text"
                   value={formData.topic || ""}
                   onChange={(e) => setFormData({ ...formData, topic: e.target.value })}
-                  placeholder="e.g., Linear Equations"
+                  onFocus={() => formData.subject === "Urdu" && setUrduKeyboardFocus("topic")}
+                  onBlur={() => setUrduKeyboardFocus(null)}
+                  placeholder={formData.subject === "Urdu" ? "موضوع درج کریں" : "e.g., Linear Equations"}
                   className={`w-full px-2 sm:px-3 py-1.5 sm:py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-xs sm:text-sm ${errors.topic ? "border-red-500" : "border-gray-300"}`}
+                  dir={formData.subject === "Urdu" ? "rtl" : "ltr"}
                 />
                 {errors.topic && <p className="text-red-500 text-xs sm:text-sm mt-1">{errors.topic}</p>}
+                {formData.subject === "Urdu" && urduKeyboardFocus === "topic" && (
+                  <div className="mt-2">
+                    <UrduKeyboard
+                      isVisible={true}
+                      onInsert={(char) => {
+                        setFormData({ ...formData, topic: (formData.topic || "") + char });
+                      }}
+                    />
+                  </div>
+                )}
               </div>
             )}
 
@@ -369,10 +469,23 @@ export default function QuestionForm({
                   type="text"
                   value={formData.slo || ""}
                   onChange={(e) => setFormData({ ...formData, slo: e.target.value })}
-                  placeholder="Student Learning Outcome (Optional)"
+                  onFocus={() => formData.subject === "Urdu" && setUrduKeyboardFocus("slo")}
+                  onBlur={() => setUrduKeyboardFocus(null)}
+                  placeholder={formData.subject === "Urdu" ? "سیکھنے کے نتائج درج کریں" : "Student Learning Outcome (Optional)"}
                   className={`w-full px-2 sm:px-3 py-1.5 sm:py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-xs sm:text-sm ${errors.slo ? "border-red-500" : "border-gray-300"}`}
+                  dir={formData.subject === "Urdu" ? "rtl" : "ltr"}
                 />
                 {errors.slo && <p className="text-red-500 text-xs sm:text-sm mt-1">{errors.slo}</p>}
+                {formData.subject === "Urdu" && urduKeyboardFocus === "slo" && (
+                  <div className="mt-2">
+                    <UrduKeyboard
+                      isVisible={true}
+                      onInsert={(char) => {
+                        setFormData({ ...formData, slo: (formData.slo || "") + char });
+                      }}
+                    />
+                  </div>
+                )}
               </div>
             )}
 
@@ -503,20 +616,38 @@ export default function QuestionForm({
               {errors.options && <p className="text-red-500 text-xs sm:text-sm mt-2">{errors.options}</p>}
 
               <div className="mt-4 sm:mt-6">
-                <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1 sm:mb-2">Correct Answer *</label>
-                <select
-                  value={formData.correctAnswer}
-                  onChange={(e) => setFormData({ ...formData, correctAnswer: e.target.value })}
-                  className={`w-full px-2 sm:px-3 py-1.5 sm:py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-xs sm:text-sm ${errors.correctAnswer ? "border-red-500" : "border-gray-300"}`}
-                >
-                  <option value="">Select correct answer</option>
-                  {formData.options.map((option, i) => (
-                    <option key={i} value={option}>
-                      Option {optionLabels[i]}: {option}
-                    </option>
-                  ))}
-                </select>
-                {errors.correctAnswer && <p className="text-red-500 text-xs sm:text-sm mt-1">{errors.correctAnswer}</p>}
+                <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-2 sm:mb-3">Correct Answer(s) * (Select one or more)</label>
+                <div className="space-y-2 p-3 border rounded-lg border-gray-300">
+                  {formData.options.map((option, i) => {
+                    const isChecked = Array.isArray(formData.correctAnswer) && formData.correctAnswer.includes(option);
+                    return (
+                      <label key={i} className="flex items-center gap-2 text-xs sm:text-sm cursor-pointer hover:bg-gray-50 p-2 rounded">
+                        <input
+                          type="checkbox"
+                          checked={isChecked}
+                          onChange={(e) => {
+                            const newAnswers = Array.isArray(formData.correctAnswer) ? [...formData.correctAnswer] : [];
+                            if (e.target.checked) {
+                              if (!newAnswers.includes(option)) {
+                                newAnswers.push(option);
+                              }
+                            } else {
+                              const index = newAnswers.indexOf(option);
+                              if (index > -1) {
+                                newAnswers.splice(index, 1);
+                              }
+                            }
+                            setFormData({ ...formData, correctAnswer: newAnswers });
+                          }}
+                          className="w-4 h-4 text-blue-600 rounded focus:ring-2 focus:ring-blue-500"
+                        />
+                        <span className="font-medium text-gray-600 min-w-[20px]">Option {optionLabels[i]}:</span>
+                        <span className="text-gray-700 flex-1">{option || "(empty)"}</span>
+                      </label>
+                    );
+                  })}
+                </div>
+                {errors.correctAnswer && <p className="text-red-500 text-xs sm:text-sm mt-2">{errors.correctAnswer}</p>}
               </div>
             </div>
           )}
