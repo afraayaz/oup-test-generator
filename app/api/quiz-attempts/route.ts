@@ -176,7 +176,7 @@ export async function POST(request: NextRequest) {
     });
 
     // Calculate cognitive level breakdown
-    const cognitiveBreakdown: { [key: string]: { correct: number; total: number; percentage: number } } = {};
+    const cognitiveBreakdown: { [key: string]: { correct: number; total: number; percentage: number; questionIndices: number[] } } = {};
     questionResults.forEach((result: any, index: number) => {
       if (!cognitiveBreakdown[result.cognitiveLevel]) {
         cognitiveBreakdown[result.cognitiveLevel] = { correct: 0, total: 0, percentage: 0, questionIndices: [] };
