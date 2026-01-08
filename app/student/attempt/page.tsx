@@ -290,7 +290,7 @@ export default function QuizAttemptPage() {
           quizTitle: quiz.title,
           subject: quiz.subject,  // Include subject for dashboard display
           studentId: user?.uid || 'current_student',
-          studentName: user?.displayName || 'Unknown Student',  // Include student name
+          studentName: user?.name || 'Unknown Student',  // Include student name
           answers,
           score: finalScore,
           totalMarks: totalMarks,
