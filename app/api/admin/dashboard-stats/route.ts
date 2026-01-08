@@ -6,7 +6,7 @@ export async function GET() {
   try {
     // Fetch users (limited to 500)
     const usersSnapshot = await db.collection('users').limit(500).get();
-    const users = usersSnapshot.docs.map(doc => ({
+    const users = usersSnapshot.docs.map((doc: any) => ({
       id: doc.id,
       ...doc.data(),
     }));
@@ -22,7 +22,7 @@ export async function GET() {
 
     // Fetch schools (limited to 200)
     const schoolsSnapshot = await db.collection('schools').limit(200).get();
-    const schools = schoolsSnapshot.docs.map(doc => ({
+    const schools = schoolsSnapshot.docs.map((doc: any) => ({
       id: doc.id,
       ...doc.data(),
     }));
@@ -32,7 +32,7 @@ export async function GET() {
 
     // Fetch quizzes (limited to 500)
     const quizzesSnapshot = await db.collection('quizzes').limit(500).get();
-    const quizzes = quizzesSnapshot.docs.map(doc => ({
+    const quizzes = quizzesSnapshot.docs.map((doc: any) => ({
       id: doc.id,
       ...doc.data(),
     }));

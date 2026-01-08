@@ -26,7 +26,7 @@ export async function GET(request: NextRequest) {
     const questionsRef = collection(db, `questions/schools/${schoolId}`);
     const snapshot = await getDocs(questionsRef);
 
-    let questions = snapshot.docs.map(doc => ({
+    let questions = snapshot.docs.map((doc: any) => ({
       id: doc.id,
       source: 'school',
       ...doc.data()

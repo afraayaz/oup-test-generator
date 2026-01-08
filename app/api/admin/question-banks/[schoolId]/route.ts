@@ -31,7 +31,7 @@ export async function GET(
 
     const snapshot = await db.collection('questions').doc('schools').collection(schoolId).get();
 
-    let questions: any[] = snapshot.docs.map(doc => ({
+    let questions: any[] = snapshot.docs.map((doc: any) => ({
       id: doc.id,
       source: 'school',
       ...doc.data()

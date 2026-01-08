@@ -24,7 +24,7 @@ export async function GET(request: Request) {
     query = query.limit(500);
     
     const snapshot = await query.get();
-    const users = snapshot.docs.map(doc => ({
+    const users = snapshot.docs.map((doc: any) => ({
       id: doc.id,
       ...doc.data(),
     }));

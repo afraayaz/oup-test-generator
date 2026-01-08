@@ -25,7 +25,7 @@ export async function GET(request: NextRequest) {
     );
 
     const snapshot = await getDocs(q);
-    const students = snapshot.docs.map(doc => {
+    const students = snapshot.docs.map((doc: any) => {
       const docData = doc.data();
       // Use the uid field if available (Firebase Auth UID), otherwise use doc.id
       const studentId = docData.uid || doc.id;

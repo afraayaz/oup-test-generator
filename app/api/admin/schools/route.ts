@@ -4,7 +4,7 @@ import { db } from '@/lib/firebaseAdmin';
 export async function GET() {
   try {
     const snapshot = await db.collection('schools').get();
-    const schools = snapshot.docs.map(doc => ({
+    const schools = snapshot.docs.map((doc: any) => ({
       id: doc.id,
       ...doc.data(),
     }));
