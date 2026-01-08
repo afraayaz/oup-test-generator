@@ -76,7 +76,7 @@ export default function CreateQuizPage() {
             id: doc.id,
             source: 'oup' as const,
             ...doc.data()
-          }))
+          } as Question))
           .filter(q => {
             if (q.subject !== selectedSubject) return false;
             if (q.grade !== `Grade ${selectedGrade}`) return false;
@@ -98,7 +98,7 @@ export default function CreateQuizPage() {
             id: doc.id,
             source: 'school' as const,
             ...doc.data()
-          }))
+          } as Question))
           .filter(q => {
             if (q.subject !== selectedSubject) return false;
             if (q.grade !== `Grade ${selectedGrade}`) return false;
