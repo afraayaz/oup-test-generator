@@ -15,6 +15,7 @@ interface QuizItem {
   subject: string;
   difficulty: string;
   slo: string;
+  cognitiveLevel?: string;
   question: { text: string; format: string; isRTL?: boolean };
   options: { text: string; format: string }[];
   answer: { type: string; value: any };
