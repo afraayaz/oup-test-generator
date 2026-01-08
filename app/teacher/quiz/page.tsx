@@ -279,8 +279,10 @@ const QuizGeneration = () => {
   const [hasQuestionType, setHasQuestionType] = useState(false);
   const [randomSeed, setRandomSeed] = useState<string>(uuidv4());
   const [isGenerating, setIsGenerating] = useState(false);
+  const [isSavingChanges, setIsSavingChanges] = useState(false);
   const [availableChapters, setAvailableChapters] = useState<string[]>([]);
   const [availableSLOs, setAvailableSLOs] = useState<string[]>([]);
+  const [isLoadingChapters, setIsLoadingChapters] = useState(false);
   const [foundSubjectId, setFoundSubjectId] = useState(''); // Store the numeric subject ID found from API
   const [showReplaceModal, setShowReplaceModal] = useState(false);
   const [replaceQuestionIndex, setReplaceQuestionIndex] = useState<number | null>(null);
@@ -288,6 +290,9 @@ const QuizGeneration = () => {
   const [replaceLoading, setReplaceLoading] = useState<{ [key: number]: boolean }>({});
   const [answerLines, setAnswerLines] = useState<{ [key: number]: number }>({});
   const [defaultAnswerLines, setDefaultAnswerLines] = useState(4);
+  const [assignedStudents, setAssignedStudents] = useState<string[]>([]);
+  const [availableStudents, setAvailableStudents] = useState<any[]>([]);
+  const [showStudentSelection, setShowStudentSelection] = useState(false);
 
   // Dynamic data from user profile
   const grades = user?.assignedGrades || [];
@@ -424,6 +429,29 @@ const QuizGeneration = () => {
   const maxTimeLimit = 300;
   const optionLabels = (isRTL: boolean): string[] => isRTL ? ['ا', 'ب', 'ج', 'د', 'ھ', 'و'] : ['A', 'B', 'C', 'D', 'E', 'F'];
 
+  // Fetch students in the selected grade
+  useEffect(() => {
+    const fetchStudents = async () => {
+      if (!selectedGrade || !user?.schoolId) {
+        setAvailableStudents([]);
+        return;
+      }
+      
+      try {
+        const response = await fetch(`/api/teacher/students?schoolId=${user.schoolId}&grade=${encodeURIComponent(selectedGrade)}`);
+        if (response.ok) {
+          const data = await response.json();
+          setAvailableStudents(data.students || []);
+        }
+      } catch (error) {
+        console.error('Error fetching students:', error);
+        setAvailableStudents([]);
+      }
+    };
+    
+    fetchStudents();
+  }, [selectedGrade, user?.schoolId]);
+
   useEffect(() => {
     const fetchQuestions = async () => {
       try {
@@ -491,11 +519,13 @@ const QuizGeneration = () => {
       // Reset if missing subject/book (chapters need these)
       if (!selectedSubject || !selectedBook) {
         console.log('⚠️ Missing subject or book, resetting chapters');
+        setIsLoadingChapters(false);
         setAvailableChapters([]);
         setAvailableSLOs([]);
         return;
       }
 
+      setIsLoadingChapters(true);
       try {
         // Fetch chapters from API (consistent across all accounts) - doesn't require questions to be loaded
         const bookId = bookIdMap[selectedBook];
@@ -529,6 +559,7 @@ const QuizGeneration = () => {
         });
 
         setAvailableChapters(chapters);
+        setIsLoadingChapters(false);
         
         // Save the numeric subject ID that was found
         if (chaptersData.subjectId) {
@@ -586,6 +617,7 @@ const QuizGeneration = () => {
         setSelectedSLOs([]);
       } catch (error) {
         console.error('❌ Error fetching chapters and SLOs:', error);
+        setIsLoadingChapters(false);
         setAvailableChapters([]);
         setAvailableSLOs([]);
       }
@@ -1177,6 +1209,9 @@ const QuizGeneration = () => {
       schedule: null,
       totalQuestions: questions.length,
       questionIds: questions.map(q => q.id),
+      assignedStudents: assignedStudents,
+      assignedBy: user?.name || user?.email || 'teacher',
+      createdBy: user?.uid || 'current_user',
       items: questions.map(q => ({
         questionId: q.id,
         questionType: q.type,
@@ -1195,19 +1230,20 @@ const QuizGeneration = () => {
       randomization: { seed: newSeed, shuffledOrder: true, shuffleOptions: questions.some(q => q.type === 'multiple') },
       rendering: { respectRTL: selectedSubject === 'Urdu', renderMath: selectedSubject === 'Math' },
       status: 'draft',
-      createdBy: 'current_user',
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
       version: 1,
       notes: null,
     });
 
-      await addDoc(collection(db, 'quizzes'), quiz);
-      setGeneratedQuiz(quiz);
+      const quizDoc = await addDoc(collection(db, 'quizzes'), quiz);
+      const quizId = quizDoc.id;
+      
+      setGeneratedQuiz({ ...quiz, id: quizId });
       setEditedQuestions(questions);
       setShowEditor(true);
       setShowConfirmModal(false);
-      alert(`Quiz '${quizTitle}' created with ${questions.length} questions.`);
+      alert(`Quiz '${quizTitle}' created with ${questions.length} questions. Configure settings and assign to students if needed.`);
     } catch (error) {
       console.error('Error saving quiz:', error);
       const errorMsg = error instanceof Error ? error.message : String(error);
@@ -1231,11 +1267,15 @@ const QuizGeneration = () => {
     if (timeLimit < 1 || timeLimit > maxTimeLimit) {
       errors.push(`Time limit must be between 1 and ${maxTimeLimit} minutes`);
     }
-    if (!scheduledStart || new Date(scheduledStart) < new Date()) {
-      errors.push('Scheduled start must be in the future');
-    }
-    if (scheduledEnd && new Date(scheduledEnd) <= new Date(scheduledStart)) {
-      errors.push('Scheduled end must be after scheduled start');
+    
+    // Only validate schedule for Online quizzes
+    if (quizFormat === 'Online') {
+      if (!scheduledStart || new Date(scheduledStart) < new Date()) {
+        errors.push('Scheduled start must be in the future');
+      }
+      if (scheduledEnd && new Date(scheduledEnd) <= new Date(scheduledStart)) {
+        errors.push('Scheduled end must be after scheduled start');
+      }
     }
     
     if (errors.length > 0) {
@@ -1243,23 +1283,63 @@ const QuizGeneration = () => {
       return;
     }
     
+    setIsSavingChanges(true);
     try {
-      const sanitizedQuiz = {
-        ...generatedQuiz,
-        items: editedQuestions,
-        totalMarks: isMarked ? editedQuestions.reduce((sum, q) => sum + q.marks, 0) : null,
+      const quizId = generatedQuiz.id;
+      if (!quizId) {
+        alert('Error: Quiz ID not found');
+        return;
+      }
+      
+      // Update quiz in Firestore with timeLimit and schedule
+      const { doc, updateDoc } = await import('firebase/firestore');
+      const quizRef = doc(db, 'quizzes', quizId);
+      
+      const updateData: any = {
         timeLimitMinutes: timeLimit,
-        schedule: { 
-          startAt: Timestamp.fromDate(new Date(scheduledStart)), 
-          endAt: scheduledEnd ? Timestamp.fromDate(new Date(scheduledEnd)) : null 
-        },
         updatedAt: serverTimestamp(),
       };
-      setGeneratedQuiz(sanitizedQuiz);
-      alert('Quiz updated successfully!');
+      
+      // Only add schedule for Online quizzes
+      if (quizFormat === 'Online') {
+        updateData.schedule = {
+          startAt: scheduledStart ? Timestamp.fromDate(new Date(scheduledStart)) : null,
+          endAt: scheduledEnd ? Timestamp.fromDate(new Date(scheduledEnd)) : null,
+        };
+      }
+      
+      await updateDoc(quizRef, updateData);
+      
+      // If students are assigned, create assignment records
+      if (assignedStudents.length > 0) {
+        try {
+          await fetch('/api/teacher/assign-quiz', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              quizId,
+              studentIds: assignedStudents,
+              quizTitle: generatedQuiz.title,
+              quizData: { ...generatedQuiz, timeLimitMinutes: timeLimit, schedule: updateData.schedule },
+              isMarked: generatedQuiz.isMarked,
+              timeLimitMinutes: timeLimit,
+              schedule: updateData.schedule,
+            })
+          });
+        } catch (assignError) {
+          console.warn('Warning: Assignment failed:', assignError);
+          // Don't block the save if assignment fails
+        }
+      }
+      
+      const assignmentText = assignedStudents.length > 0 ? ` and assigned to ${assignedStudents.length} student(s)` : '';
+      alert(`Quiz saved successfully${assignmentText}!`);
+      setShowEditor(false);
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : String(error);
       alert('Error saving changes: ' + errorMsg);
+    } finally {
+      setIsSavingChanges(false);
     }
   };
 
@@ -2177,7 +2257,7 @@ const QuizGeneration = () => {
 
           {/* Step 0: Question Bank Selection */}
           {!selectedQB && (
-            <div className="bg-white rounded-xl shadow-sm border p-6 mb-6">
+            <div className="bg-white rounded-xl shadow-sm border-2 border-blue-900 p-6 mb-6">
               <h3 className="text-lg font-semibold text-gray-900 mb-4">Select Question Bank Source</h3>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <button
@@ -2398,6 +2478,14 @@ const QuizGeneration = () => {
                       </div>
                       <p className="text-xs text-gray-500 mt-3">{selectedChapters.length} chapter(s) selected</p>
                     </>
+                  ) : isLoadingChapters ? (
+                    <div className="text-center py-8 bg-gray-50 rounded-lg border-2 border-dashed border-gray-300">
+                      <div className="flex justify-center mb-3">
+                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600"></div>
+                      </div>
+                      <p className="text-sm font-medium text-gray-700">Loading chapters...</p>
+                      <p className="text-xs text-gray-600 mt-1">This may take a moment</p>
+                    </div>
                   ) : (
                     <div className="text-center py-8 bg-gray-50 rounded-lg border-2 border-dashed border-gray-300">
                       <svg className="mx-auto h-12 w-12 text-gray-400 mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -2771,6 +2859,7 @@ const QuizGeneration = () => {
                       </label>
                     </div>
                   </div>
+
                 </div>
                 <div className="mt-6 flex justify-end space-x-3">
                   <button
@@ -2815,7 +2904,8 @@ const QuizGeneration = () => {
                     <h4 className="text-lg font-semibold">Total Marks: {isMarked ? editedQuestions.reduce((sum, q) => sum + q.marks, 0) : 'N/A'}</h4>
                   </div>
                   
-                  {/* Quiz Settings Section */}
+                  {/* Quiz Settings Section - Only for Online Quizzes */}
+                  {quizFormat === 'Online' && (
                   <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
                     <h4 className="text-md font-semibold text-gray-900 mb-4 flex items-center">
                       <i className="ri-settings-3-line mr-2 text-blue-600"></i>
@@ -2862,6 +2952,84 @@ const QuizGeneration = () => {
                       </div>
                     </div>
                   </div>
+                  )}
+
+                  {/* Assign to Students Section - Only for Online Quizzes */}
+                  {quizFormat === 'Online' && (
+                  <div className="mb-6 p-4 bg-purple-50 border border-purple-200 rounded-lg">
+                    <h4 className="text-md font-semibold text-gray-900 mb-4 flex items-center">
+                      <i className="ri-team-line mr-2 text-purple-600"></i>
+                      Assign to Students (Optional)
+                    </h4>
+                    <div className="space-y-2">
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => {
+                            if (assignedStudents.length === availableStudents.length) {
+                              setAssignedStudents([]);
+                            } else {
+                              setAssignedStudents(availableStudents.map(s => s.id));
+                            }
+                          }}
+                          className="flex-1 px-3 py-2 border border-green-300 bg-green-50 text-green-700 rounded-lg text-sm hover:bg-green-100 transition font-medium"
+                        >
+                          {assignedStudents.length === availableStudents.length && availableStudents.length > 0
+                            ? '✓ Assign to All'
+                            : 'Assign to All'}
+                        </button>
+                        <button
+                          onClick={() => setShowStudentSelection(!showStudentSelection)}
+                          className="flex-1 px-3 py-2 border border-blue-300 bg-blue-50 text-blue-700 rounded-lg text-sm hover:bg-blue-100 transition font-medium"
+                        >
+                          {assignedStudents.length > 0 
+                            ? `${assignedStudents.length}/${availableStudents.length} Selected` 
+                            : 'Select Individually'}
+                        </button>
+                      </div>
+                      {showStudentSelection && (
+                        <div className="border rounded-lg p-3 bg-white max-h-64 overflow-y-auto">
+                          {availableStudents.length === 0 ? (
+                            <p className="text-sm text-gray-600">No students available in this class</p>
+                          ) : (
+                            <div className="space-y-2">
+                              <div className="flex items-center justify-between pb-2 border-b mb-2">
+                                <label className="text-xs font-semibold text-gray-700">Select Individual Students</label>
+                                <button
+                                  onClick={() => setAssignedStudents([])}
+                                  className="text-xs text-red-600 hover:text-red-700"
+                                >
+                                  Clear All
+                                </button>
+                              </div>
+                              {availableStudents.map(student => (
+                                <label key={student.id} className="flex items-center cursor-pointer p-2 hover:bg-gray-50 rounded">
+                                  <input
+                                    type="checkbox"
+                                    checked={assignedStudents.includes(student.id)}
+                                    onChange={e => {
+                                      if (e.target.checked) {
+                                        setAssignedStudents([...assignedStudents, student.id]);
+                                      } else {
+                                        setAssignedStudents(assignedStudents.filter(id => id !== student.id));
+                                      }
+                                    }}
+                                    className="mr-2 w-4 h-4"
+                                  />
+                                  <div>
+                                    <div className="text-sm font-medium text-gray-700">{student.name}</div>
+                                    <div className="text-xs text-gray-500">{student.email}</div>
+                                  </div>
+                                </label>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+
+
+                  </div>
+                  )}
 
                   {editedQuestions.map((q, index) => (
                     <div key={index} className="mb-4 p-4 border rounded-lg">
@@ -2988,9 +3156,21 @@ const QuizGeneration = () => {
                   <div className="flex space-x-4">
                     <button
                       onClick={handleSaveChanges}
-                      className="px-4 py-2 bg-blue-600 text-white rounded-lg"
+                      disabled={isSavingChanges}
+                      className={`px-4 py-2 text-white rounded-lg font-medium transition-all ${
+                        isSavingChanges 
+                          ? 'bg-blue-400 cursor-not-allowed opacity-75' 
+                          : 'bg-blue-600 hover:bg-blue-700'
+                      }`}
                     >
-                      Save Changes
+                      {isSavingChanges ? (
+                        <span className="flex items-center gap-2">
+                          <span className="inline-block animate-spin">⟳</span>
+                          Saving...
+                        </span>
+                      ) : (
+                        'Save Changes'
+                      )}
                     </button>
                     <button
                       onClick={downloadQuizPDF}

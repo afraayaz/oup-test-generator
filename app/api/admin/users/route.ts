@@ -20,6 +20,9 @@ export async function GET(request: Request) {
       query = query.where('role', '==', role);
     }
     
+    // Limit query to prevent excessive reads (max 500 users per call)
+    query = query.limit(500);
+    
     const snapshot = await query.get();
     const users = snapshot.docs.map(doc => ({
       id: doc.id,

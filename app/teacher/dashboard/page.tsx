@@ -63,7 +63,7 @@ const StatCard = ({
           </span>
         </div>
       ) : (
-        <div className="text-2xl sm:text-4xl opacity-80">{icon}</div>
+        <div className="text-2xl sm:text-4xl opacity-80 bg-white/20 rounded-lg p-2 sm:p-3 border-2 border-white/30">{icon}</div>
       )}
     </div>
     {progress && (
@@ -267,6 +267,40 @@ export default function TeacherDashboard() {
   const [expandedGroups, setExpandedGroups] = useState<{ [key: string]: boolean }>({});
   const [questionCounts, setQuestionCounts] = useState<{ [bookId: string]: { total: number; oup: number; school: number } }>({});
   const [loadingQuestions, setLoadingQuestions] = useState(false);
+  const [quizzesCreated, setQuizzesCreated] = useState(0);
+  const [assignedQuizzes, setAssignedQuizzes] = useState(0);
+  const [loadingQuizzes, setLoadingQuizzes] = useState(false);
+
+  // Fetch quiz data (created and assigned)
+  useEffect(() => {
+    if (!user?.id) return;
+
+    const fetchQuizData = async () => {
+      setLoadingQuizzes(true);
+      try {
+        const response = await fetch(`/api/teacher/quizzes`);
+        if (response.ok) {
+          const data = await response.json();
+          const quizzes = data.quizzes || [];
+          
+          // Count total quizzes created by this teacher
+          setQuizzesCreated(quizzes.length);
+          
+          // Count online quizzes that have been assigned (have assignments)
+          const onlineWithAssignments = quizzes.filter((q: any) => 
+            q.quizFormat === 'Online' && q.totalAssignments > 0
+          ).length;
+          setAssignedQuizzes(onlineWithAssignments);
+        }
+      } catch (error) {
+        console.error('Error fetching quiz data:', error);
+      } finally {
+        setLoadingQuizzes(false);
+      }
+    };
+
+    fetchQuizData();
+  }, [user?.id]);
 
   // Fetch question counts for all assigned books
   useEffect(() => {
@@ -290,15 +324,19 @@ export default function TeacherDashboard() {
       try {
         const counts: { [bookId: string]: { total: number; oup: number; school: number } } = {};
         
-        // Fetch OUP questions
-        const oupUrl = `https://firestore.googleapis.com/v1/projects/quiz-app-ff0ab/databases/(default)/documents/questions/oup/items`;
-        const oupResponse = await fetch(oupUrl);
+        // Fetch OUP questions with pageSize limit
+        const oupUrl = `https://firestore.googleapis.com/v1/projects/quiz-app-ff0ab/databases/(default)/documents/questions/oup/items?pageSize=1000`;
+        const oupResponse = await fetch(oupUrl, {
+          next: { revalidate: 600 } // Cache for 10 minutes
+        });
         const oupData = oupResponse.ok ? await oupResponse.json() : { documents: [] };
         console.log('📡 OUP Response OK:', oupResponse.ok, 'Documents:', oupData.documents?.length || 0);
         
-        // Fetch School questions
-        const schoolUrl = `https://firestore.googleapis.com/v1/projects/quiz-app-ff0ab/databases/(default)/documents/questions/schools/${user.schoolId}`;
-        const schoolResponse = await fetch(schoolUrl);
+        // Fetch School questions with pageSize limit
+        const schoolUrl = `https://firestore.googleapis.com/v1/projects/quiz-app-ff0ab/databases/(default)/documents/questions/schools/${user.schoolId}?pageSize=1000`;
+        const schoolResponse = await fetch(schoolUrl, {
+          next: { revalidate: 600 } // Cache for 10 minutes
+        });
         const schoolData = schoolResponse.ok ? await schoolResponse.json() : { documents: [] };
         console.log('📡 School Response OK:', schoolResponse.ok, 'Documents:', schoolData.documents?.length || 0);
         
@@ -535,16 +573,15 @@ export default function TeacherDashboard() {
           />
           <StatCard
             title="Quizzes Created"
-            value="28"
+            value={quizzesCreated.toString()}
             icon={<FaClipboardList />}
             color="bg-[#FF7A50]"
           />
           <StatCard
-            title="Chapters Done"
-            value="22"
-            icon={<FaTasks />}
+            title="Assigned Quizzes"
+            value={assignedQuizzes.toString()}
+            icon={<span className="text-xl sm:text-3xl"><FaTasks /></span>}
             color="bg-[#FF7A50]"
-            progress={73}
           />
         </section>
 

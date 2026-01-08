@@ -53,7 +53,8 @@ function parseDocument(doc: FirestoreDocument): { id: string; data: Record<strin
 
 export async function GET() {
   try {
-    const response = await fetch(FIRESTORE_URL);
+    // Add pageSize limit to reduce reads
+    const response = await fetch(`${FIRESTORE_URL}?pageSize=500`);
     
     if (!response.ok) {
       const errorText = await response.text();

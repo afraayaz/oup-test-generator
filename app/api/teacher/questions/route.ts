@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/firebase/firebase";
-import { collection, query, where, getDocs, doc, setDoc, updateDoc, deleteDoc, addDoc, serverTimestamp } from "firebase/firestore";
+import { collection, query, where, getDocs, doc, setDoc, updateDoc, deleteDoc, addDoc, serverTimestamp, limit } from "firebase/firestore";
 
 // GET - Fetch teacher questions with filters
 export async function GET(request: NextRequest) {
@@ -41,7 +41,8 @@ export async function GET(request: NextRequest) {
     if (qb === "school" || qb === "both") {
       if (schoolId) {
         const schoolQuestionsRef = collection(db, 'questions', 'schools', schoolId);
-        const schoolSnapshot = await getDocs(schoolQuestionsRef);
+        const schoolQuery = query(schoolQuestionsRef, limit(500));
+        const schoolSnapshot = await getDocs(schoolQuery);
         const schoolQuestions = schoolSnapshot.docs.map((doc) => ({
           id: doc.id,
           source: "school",
@@ -54,7 +55,8 @@ export async function GET(request: NextRequest) {
     // Fetch from OUP questions if qb is 'oup' or 'both'
     if (qb === "oup" || qb === "both") {
       const oupQuestionsRef = collection(db, 'questions', 'oup', 'items');
-      const oupSnapshot = await getDocs(oupQuestionsRef);
+      const oupQuery = query(oupQuestionsRef, limit(500));
+      const oupSnapshot = await getDocs(oupQuery);
       const oupQuestions = oupSnapshot.docs.map((doc) => ({
         id: doc.id,
         source: "oup",

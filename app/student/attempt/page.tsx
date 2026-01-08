@@ -1,11 +1,13 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import Sidebar from '@/components/Sidebar';
 import { DndContext, closestCenter, DragEndEvent } from '@dnd-kit/core';
 import { arrayMove, SortableContext, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
+import { useUserProfile } from '@/hooks/useUserProfile';
+import UrduKeyboard from '@/components/UrduKeyboard';
 
 interface QuizItem {
   questionId: string;
@@ -70,6 +72,12 @@ export default function QuizAttemptPage() {
   const [quizSubmitted, setQuizSubmitted] = useState(false);
   const [score, setScore] = useState(0);
   const [showResults, setShowResults] = useState(false);
+  const [resultsData, setResultsData] = useState<any>(null);
+  const [showBreakdownModal, setShowBreakdownModal] = useState(false);
+  const [showUrduKeyboard, setShowUrduKeyboard] = useState<{[key: number]: boolean}>({});
+  const textAreaRefs = useRef<{[key: number]: HTMLTextAreaElement | null}>({});
+  const blankInputRefs = useRef<{[key: string]: HTMLInputElement | null}>({});
+  const { user } = useUserProfile();
 
   useEffect(() => {
     const fetchQuiz = async () => {
@@ -86,6 +94,12 @@ export default function QuizAttemptPage() {
           // Allow quizzes without quizFormat (legacy) or with quizFormat === 'Online'
           // Only reject if explicitly set to 'Offline'
           if (quizData && quizData.quizFormat !== 'Offline') {
+            console.log('📋 Quiz loaded:', {
+              title: quizData.title,
+              totalItems: quizData.items?.length,
+              firstItemCognitiveLevel: quizData.items?.[0]?.cognitiveLevel,
+              firstItemFields: Object.keys(quizData.items?.[0] || {}),
+            });
             setQuiz(quizData);
             setTimeRemaining((quizData.timeLimitMinutes || 30) * 60);
           }
@@ -132,6 +146,12 @@ export default function QuizAttemptPage() {
 
     quiz.items.forEach((item, index) => {
       const userAnswer = answers[index];
+      
+      // Skip short and long answer questions (require manual grading)
+      if (['short', 'shortanswer', 'long', 'longanswer'].includes(item.questionType)) {
+        return;
+      }
+      
       if (!userAnswer) return;
 
       const isCorrect = checkAnswer(item, userAnswer);
@@ -158,12 +178,37 @@ export default function QuizAttemptPage() {
         return answer.value === userAnswer;
       case 'fill':
       case 'fillinblank':
-        if (Array.isArray(answer.value)) {
-          return answer.value.every((ans: string, i: number) =>
-            ans.toLowerCase().trim() === (userAnswer[i] || '').toLowerCase().trim()
-          );
+      case 'fillblanks':
+        // Handle empty or missing answer
+        if (!userAnswer) {
+          return false;
         }
-        return answer.value?.toLowerCase().trim() === userAnswer?.toLowerCase().trim();
+        
+        if (Array.isArray(answer.value)) {
+          // If answer is an array, compare each element
+          return answer.value.every((ans: string, i: number) => {
+            const userAns = typeof userAnswer === 'object' ? (userAnswer[i] || '') : '';
+            return ans.toLowerCase().trim() === userAns.toLowerCase().trim();
+          });
+        } else if (typeof answer.value === 'object' && answer.value !== null && !Array.isArray(answer.value)) {
+          // If answer is an object (key-value pairs)
+          return Object.keys(answer.value).every((key: string) => {
+            const correctAns = answer.value[key];
+            const userAns = userAnswer[key];
+            if (Array.isArray(correctAns)) {
+              return correctAns.some((ans: string) => ans.toLowerCase().trim() === (userAns || '').toLowerCase().trim());
+            }
+            return correctAns.toLowerCase().trim() === (userAns || '').toLowerCase().trim();
+          });
+        } else if (typeof userAnswer === 'string') {
+          // Simple string answer
+          return answer.value?.toLowerCase().trim() === userAnswer?.toLowerCase().trim();
+        } else if (typeof userAnswer === 'object') {
+          // userAnswer is object with indices - check if all blanks are filled
+          const values = Object.values(userAnswer) as string[];
+          return values.length > 0 && values.every(v => typeof v === 'string' && v.trim().length > 0);
+        }
+        return false;
       case 'short':
       case 'shortanswer':
       case 'long':
@@ -214,30 +259,58 @@ export default function QuizAttemptPage() {
     }
   };
 
+  const calculateTotalMarks = useCallback(() => {
+    if (!quiz) return 0;
+    let total = 0;
+
+    quiz.items.forEach((item) => {
+      // Include all questions (including short/long answer) in total marks
+      total += item.marks || 1;
+    });
+
+    return total || quiz.items.length;
+  }, [quiz]);
+
   const handleSubmitQuiz = async () => {
     if (!quiz || quizSubmitted) return;
 
     const finalScore = calculateScore();
+    const totalMarks = calculateTotalMarks();
     setScore(finalScore);
     setQuizSubmitted(true);
     setShowResults(true);
 
     try {
-      await fetch('/api/quiz-attempts', {
+      const response = await fetch('/api/quiz-attempts', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           quizId: quiz.id,
           quizTitle: quiz.title,
-          studentId: 'current_student',
+          subject: quiz.subject,  // Include subject for dashboard display
+          studentId: user?.uid || 'current_student',
+          studentName: user?.displayName || 'Unknown Student',  // Include student name
           answers,
           score: finalScore,
-          totalMarks: quiz.totalMarks || quiz.items.length,
-          percentage: Math.round((finalScore / (quiz.totalMarks || quiz.items.length)) * 100),
+          totalMarks: totalMarks,
+          percentage: Math.round((finalScore / totalMarks) * 100),
           timeSpent: (quiz.timeLimitMinutes || 30) * 60 - timeRemaining,
           submittedAt: new Date().toISOString(),
+          quizItems: quiz.items,
+          isMarked: quiz.isMarked || false,  // Pass the quiz's marked status
         })
       });
+      
+      if (response.ok) {
+        const data = await response.json();
+        console.log('✅ Quiz submission response:', data);
+        console.log('📊 Question Results:', data.questionResults);
+        console.log('📈 Cognitive Breakdown:', data.cognitiveBreakdown);
+        setResultsData(data);
+      } else {
+        const errorData = await response.json();
+        console.error('❌ Quiz submission error:', errorData);
+      }
     } catch (error) {
       console.error('Error saving quiz attempt:', error);
     }
@@ -303,58 +376,246 @@ export default function QuizAttemptPage() {
 
       case 'fill':
       case 'fillinblank':
-        const blanks = question.text.match(/\{blank\d+\}/g) || [];
-        return (
-          <div className="space-y-4">
-            {blanks.map((_, blankIndex) => (
-              <div key={blankIndex} className={`flex items-center gap-2 ${isRTL ? 'flex-row-reverse' : ''}`}>
-                <span className={`font-medium ${isRTL ? 'font-noto-nastaliq' : ''}`}>
-                  {isRTL ? `خالی جگہ ${blankIndex + 1}` : `Blank ${blankIndex + 1}`}:
-                </span>
-                <input
-                  type="text"
-                  value={answers[index]?.[blankIndex] || ''}
-                  onChange={(e) => {
-                    const newBlanks = { ...(answers[index] || {}) };
-                    newBlanks[blankIndex] = e.target.value;
-                    handleAnswerChange(index, newBlanks);
-                  }}
-                  className={`flex-1 px-4 py-2 border-2 border-gray-200 rounded-lg focus:border-purple-500 focus:ring-2 focus:ring-purple-200 ${
+      case 'fillblanks':
+        // Detect blanks with both {blank#} and ______ patterns
+        const blankPattern1 = question.text.match(/\{blank\d+\}/g) || [];
+        const blankPattern2 = question.text.match(/_{3,}/g) || []; // 3 or more underscores
+        const detectedBlanks = blankPattern1.length > 0 ? blankPattern1 : blankPattern2;
+        
+        if (detectedBlanks.length === 0) {
+          // If no blanks detected, show fallback text area
+          return (
+            <div className="space-y-4">
+              <div className={`p-4 bg-blue-50 border border-blue-200 rounded-lg ${isRTL ? 'text-right font-noto-nastaliq' : ''}`}>
+                <p className="text-sm font-medium text-blue-800 mb-3">
+                  {isRTL ? 'اپنا جواب یہاں درج کریں:' : 'Fill in the blanks:'}
+                </p>
+                {isRTL && (
+                  <button
+                    type="button"
+                    onClick={() => setShowUrduKeyboard(prev => ({ ...prev, [index]: !prev[index] }))}
+                    className="mb-2 px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-sm transition-colors"
+                  >
+                    <i className="ri-keyboard-line mr-1"></i>
+                    {showUrduKeyboard[index] ? 'Hide Urdu Keyboard' : 'Show Urdu Keyboard'}
+                  </button>
+                )}
+                {isRTL && showUrduKeyboard[index] && (
+                  <UrduKeyboard
+                    isVisible={true}
+                    onInsert={(char) => {
+                      const textarea = textAreaRefs.current[index];
+                      if (textarea) {
+                        const start = textarea.selectionStart;
+                        const end = textarea.selectionEnd;
+                        const currentValue = answers[index] || '';
+                        const newValue = currentValue.slice(0, start) + char + currentValue.slice(end);
+                        handleAnswerChange(index, newValue);
+                        setTimeout(() => {
+                          textarea.focus();
+                          textarea.setSelectionRange(start + char.length, start + char.length);
+                        }, 0);
+                      }
+                    }}
+                  />
+                )}
+                <textarea
+                  ref={(el) => { textAreaRefs.current[index] = el; }}
+                  value={answers[index] || ''}
+                  onChange={(e) => handleAnswerChange(index, e.target.value)}
+                  className={`w-full px-4 py-3 border-2 border-blue-300 rounded-lg focus:border-purple-500 focus:ring-2 focus:ring-purple-200 resize-none ${
                     isRTL ? 'text-right font-noto-nastaliq' : ''
                   }`}
-                  placeholder={isRTL ? 'اپنا جواب لکھیں' : 'Enter your answer'}
+                  rows={3}
+                  placeholder={isRTL ? 'اپنا جواب لکھیں' : 'Type your answer here...'}
                 />
               </div>
-            ))}
+            </div>
+          );
+        }
+        
+        // Split by either {blank#} or ______ pattern
+        const splitPattern = /(\{blank\d+\}|_{3,})/;
+        const parts = question.text.split(splitPattern);
+        let blankIdx = 0;
+        
+        return (
+          <div className="space-y-4">
+            {isRTL && (
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowUrduKeyboard(prev => ({ ...prev, [index]: !prev[index] }))}
+                  className="px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-sm transition-colors"
+                >
+                  <i className="ri-keyboard-line mr-1"></i>
+                  {showUrduKeyboard[index] ? 'Hide Urdu Keyboard' : 'Show Urdu Keyboard'}
+                </button>
+              </div>
+            )}
+            {isRTL && showUrduKeyboard[index] && (
+              <UrduKeyboard
+                isVisible={true}
+                onInsert={(char) => {
+                  // Find the currently focused blank input
+                  const focusedKey = Object.keys(blankInputRefs.current).find(key => {
+                    return blankInputRefs.current[key] === document.activeElement;
+                  });
+                  if (focusedKey) {
+                    const [qIndex, blankIndex] = focusedKey.split('-').map(Number);
+                    if (qIndex === index) {
+                      const input = blankInputRefs.current[focusedKey];
+                      if (input) {
+                        const start = input.selectionStart || 0;
+                        const end = input.selectionEnd || 0;
+                        const currentValue = answers[index]?.[blankIndex] || '';
+                        const newValue = currentValue.slice(0, start) + char + currentValue.slice(end);
+                        const newBlanks = { ...(answers[index] || {}) };
+                        newBlanks[blankIndex] = newValue;
+                        handleAnswerChange(index, newBlanks);
+                        setTimeout(() => {
+                          input.focus();
+                          input.setSelectionRange(start + char.length, start + char.length);
+                        }, 0);
+                      }
+                    }
+                  }
+                }}
+              />
+            )}
+            <div className={`p-4 bg-white border-2 border-gray-200 rounded-lg leading-relaxed ${isRTL ? 'text-right font-noto-nastaliq' : ''}`}>
+              <div className="inline-flex flex-wrap gap-1 items-baseline">
+                {parts.map((part, partIndex) => {
+                  // Check if this part is a blank placeholder
+                  if (part.match(/(\{blank\d+\}|_{3,})/)) {
+                    const currentBlankIndex = blankIdx++;
+                    const refKey = `${index}-${currentBlankIndex}`;
+                    return (
+                      <input
+                        key={`blank-${currentBlankIndex}`}
+                        ref={(el) => { blankInputRefs.current[refKey] = el; }}
+                        type="text"
+                        value={answers[index]?.[currentBlankIndex] || ''}
+                        onChange={(e) => {
+                          const newBlanks = { ...(answers[index] || {}) };
+                          newBlanks[currentBlankIndex] = e.target.value;
+                          handleAnswerChange(index, newBlanks);
+                        }}
+                        className={`px-2 py-1 border-b-2 border-purple-500 bg-purple-50 focus:bg-purple-100 focus:outline-none min-w-[80px] text-center font-medium text-sm focus:border-purple-700 transition-colors ${
+                          isRTL ? 'font-noto-nastaliq' : ''
+                        }`}
+                        placeholder="_"
+                        style={{ width: Math.max(80, (answers[index]?.[currentBlankIndex] || '').length * 8 + 30) + 'px' }}
+                      />
+                    );
+                  }
+                  
+                  // Regular text part
+                  if (part.trim()) {
+                    return (
+                      <span key={`text-${partIndex}`} className="inline">
+                        {part}
+                      </span>
+                    );
+                  }
+                  
+                  return null;
+                })}
+              </div>
+            </div>
           </div>
         );
 
       case 'short':
       case 'shortanswer':
         return (
-          <textarea
-            value={answers[index] || ''}
-            onChange={(e) => handleAnswerChange(index, e.target.value)}
-            className={`w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:border-purple-500 focus:ring-2 focus:ring-purple-200 resize-none ${
-              isRTL ? 'text-right font-noto-nastaliq' : ''
-            }`}
-            rows={3}
-            placeholder={isRTL ? 'مختصر جواب لکھیں' : 'Write a short answer...'}
-          />
+          <div className="space-y-2">
+            {isRTL && (
+              <button
+                type="button"
+                onClick={() => setShowUrduKeyboard(prev => ({ ...prev, [index]: !prev[index] }))}
+                className="px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-sm transition-colors"
+              >
+                <i className="ri-keyboard-line mr-1"></i>
+                {showUrduKeyboard[index] ? 'Hide Urdu Keyboard' : 'Show Urdu Keyboard'}
+              </button>
+            )}
+            {isRTL && showUrduKeyboard[index] && (
+              <UrduKeyboard
+                isVisible={true}
+                onInsert={(char) => {
+                  const textarea = textAreaRefs.current[index];
+                  if (textarea) {
+                    const start = textarea.selectionStart;
+                    const end = textarea.selectionEnd;
+                    const currentValue = answers[index] || '';
+                    const newValue = currentValue.slice(0, start) + char + currentValue.slice(end);
+                    handleAnswerChange(index, newValue);
+                    setTimeout(() => {
+                      textarea.focus();
+                      textarea.setSelectionRange(start + char.length, start + char.length);
+                    }, 0);
+                  }
+                }}
+              />
+            )}
+            <textarea
+              ref={(el) => { textAreaRefs.current[index] = el; }}
+              value={answers[index] || ''}
+              onChange={(e) => handleAnswerChange(index, e.target.value)}
+              className={`w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:border-purple-500 focus:ring-2 focus:ring-purple-200 resize-none ${
+                isRTL ? 'text-right font-noto-nastaliq' : ''
+              }`}
+              rows={3}
+              placeholder={isRTL ? 'مختصر جواب لکھیں' : 'Write a short answer...'}
+            />
+          </div>
         );
 
       case 'long':
       case 'longanswer':
         return (
-          <textarea
-            value={answers[index] || ''}
-            onChange={(e) => handleAnswerChange(index, e.target.value)}
-            className={`w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:border-purple-500 focus:ring-2 focus:ring-purple-200 resize-none ${
-              isRTL ? 'text-right font-noto-nastaliq' : ''
-            }`}
-            rows={8}
-            placeholder={isRTL ? 'تفصیلی جواب لکھیں' : 'Write a detailed answer...'}
-          />
+          <div className="space-y-2">
+            {isRTL && (
+              <button
+                type="button"
+                onClick={() => setShowUrduKeyboard(prev => ({ ...prev, [index]: !prev[index] }))}
+                className="px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-sm transition-colors"
+              >
+                <i className="ri-keyboard-line mr-1"></i>
+                {showUrduKeyboard[index] ? 'Hide Urdu Keyboard' : 'Show Urdu Keyboard'}
+              </button>
+            )}
+            {isRTL && showUrduKeyboard[index] && (
+              <UrduKeyboard
+                isVisible={true}
+                onInsert={(char) => {
+                  const textarea = textAreaRefs.current[index];
+                  if (textarea) {
+                    const start = textarea.selectionStart;
+                    const end = textarea.selectionEnd;
+                    const currentValue = answers[index] || '';
+                    const newValue = currentValue.slice(0, start) + char + currentValue.slice(end);
+                    handleAnswerChange(index, newValue);
+                    setTimeout(() => {
+                      textarea.focus();
+                      textarea.setSelectionRange(start + char.length, start + char.length);
+                    }, 0);
+                  }
+                }}
+              />
+            )}
+            <textarea
+              ref={(el) => { textAreaRefs.current[index] = el; }}
+              value={answers[index] || ''}
+              onChange={(e) => handleAnswerChange(index, e.target.value)}
+              className={`w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:border-purple-500 focus:ring-2 focus:ring-purple-200 resize-none ${
+                isRTL ? 'text-right font-noto-nastaliq' : ''
+              }`}
+              rows={8}
+              placeholder={isRTL ? 'تفصیلی جواب لکھیں' : 'Write a detailed answer...'}
+            />
+          </div>
         );
 
       default:
@@ -425,52 +686,324 @@ export default function QuizAttemptPage() {
   }
 
   if (showResults) {
-    const percentage = Math.round((score / (quiz.totalMarks || quiz.items.length)) * 100);
+    // Calculate total marks including ALL questions (auto-graded + manual-graded)
+    const totalMarksForResult = quiz.items.reduce((sum: number, item: any) => sum + (item.marks || 1), 0) || quiz.items.length;
+    const percentage = Math.round((score / totalMarksForResult) * 100);
+    const questionResults = resultsData?.questionResults || [];
+    const correctCount = questionResults.filter((q: any) => q.isCorrect).length;
+
     return (
       <div className="flex min-h-screen bg-gray-50">
         <Sidebar userRole="Student" currentPage="attempt" open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
         <main className="flex-1 lg:ml-64 p-4 lg:p-8">
-          <div className="max-w-2xl mx-auto">
-            <div className="bg-white rounded-2xl shadow-xl p-8 text-center">
-              <div className={`w-32 h-32 mx-auto mb-6 rounded-full flex items-center justify-center ${
-                percentage >= 80 ? 'bg-green-100' : percentage >= 50 ? 'bg-yellow-100' : 'bg-red-100'
-              }`}>
-                <span className={`text-4xl font-bold ${
-                  percentage >= 80 ? 'text-green-600' : percentage >= 50 ? 'text-yellow-600' : 'text-red-600'
-                }`}>
-                  {percentage}%
-                </span>
-              </div>
-
-              <h2 className="text-2xl font-bold text-gray-800 mb-2">Quiz Completed!</h2>
-              <p className="text-gray-600 mb-6">{quiz.title}</p>
-
-              <div className="grid grid-cols-2 gap-4 mb-8">
-                <div className="bg-purple-50 rounded-xl p-4">
-                  <p className="text-sm text-purple-600 font-medium">Score</p>
-                  <p className="text-2xl font-bold text-purple-700">{score} / {quiz.totalMarks || quiz.items.length}</p>
-                </div>
-                <div className="bg-blue-50 rounded-xl p-4">
-                  <p className="text-sm text-blue-600 font-medium">Questions</p>
-                  <p className="text-2xl font-bold text-blue-700">{quiz.items.length}</p>
-                </div>
-              </div>
-
-              <div className="flex gap-4 justify-center">
+          <div className="max-w-4xl mx-auto">
+            {/* Summary Card */}
+            <div className="bg-white rounded-2xl shadow-xl p-8 mb-6 relative">
+              {/* Top Action Buttons */}
+              <div className="absolute top-4 left-4 right-4 flex items-center justify-between">
+                <button
+                  onClick={() => {
+                    console.log('📂 Opening breakdown modal, questionResults:', questionResults);
+                    setShowBreakdownModal(true);
+                  }}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition font-medium flex items-center gap-2"
+                >
+                  <i className="ri-eye-line"></i>
+                  View Breakdown
+                </button>
                 <button
                   onClick={() => router.push('/student/dashboard')}
-                  className="px-6 py-3 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition font-medium"
+                  className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition font-medium flex items-center gap-2"
                 >
+                  <i className="ri-home-line"></i>
                   Back to Dashboard
                 </button>
-                <button
-                  onClick={() => router.push('/student/history')}
-                  className="px-6 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition font-medium"
-                >
-                  View History
-                </button>
+              </div>
+
+              <div className="text-center mb-8 pt-12">
+                <div className={`w-32 h-32 mx-auto mb-6 rounded-full flex items-center justify-center ${
+                  percentage >= 80 ? 'bg-green-100' : percentage >= 50 ? 'bg-yellow-100' : 'bg-red-100'
+                }`}>
+                  <span className={`text-4xl font-bold ${
+                    percentage >= 80 ? 'text-green-600' : percentage >= 50 ? 'text-yellow-600' : 'text-red-600'
+                  }`}>
+                    {percentage}%
+                  </span>
+                </div>
+
+                <h2 className="text-2xl font-bold text-gray-800 mb-2">Quiz Completed!</h2>
+                <p className="text-gray-600 mb-6">{quiz.title}</p>
+
+                <div className="grid grid-cols-3 gap-4 mb-8">
+                  <div className="bg-purple-50 rounded-xl p-4">
+                    <p className="text-sm text-purple-600 font-medium">Score</p>
+                    <p className="text-2xl font-bold text-purple-700">{score}/{totalMarksForResult}</p>
+                  </div>
+                  <div className="bg-green-50 rounded-xl p-4">
+                    <p className="text-sm text-green-600 font-medium">Correct (Auto-graded)</p>
+                    <p className="text-2xl font-bold text-green-700">{correctCount}</p>
+                  </div>
+                  <div className="bg-blue-50 rounded-xl p-4">
+                    <p className="text-sm text-blue-600 font-medium">Total Questions</p>
+                    <p className="text-2xl font-bold text-blue-700">{quiz.items.length}</p>
+                  </div>
+                </div>
               </div>
             </div>
+
+            {/* Cognitive Level Breakdown - HIDDEN, only shown in modal */}
+            {/* {resultsData?.cognitiveBreakdown && (
+              <div className="bg-white rounded-2xl shadow-lg p-6 mb-6">
+                <h3 className="text-xl font-bold text-gray-800 mb-4">Cognitive Level Performance</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {Object.entries(resultsData.cognitiveBreakdown).map(([level, data]: [string, any]) => {
+                    const performanceColor = 
+                      data.percentage >= 80 ? 'bg-green-50 border-green-300' :
+                      data.percentage >= 60 ? 'bg-yellow-50 border-yellow-300' :
+                      'bg-red-50 border-red-300';
+                    
+                    const textColor = 
+                      data.percentage >= 80 ? 'text-green-700' :
+                      data.percentage >= 60 ? 'text-yellow-700' :
+                      'text-red-700';
+
+                    return (
+                      <div key={level} className={`border-2 rounded-xl p-4 ${performanceColor}`}>
+                        <p className="text-sm font-semibold text-gray-700 mb-2">{level}</p>
+                        <div className="space-y-2">
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs text-gray-600">Score:</span>
+                            <span className={`text-lg font-bold ${textColor}`}>{data.percentage}%</span>
+                          </div>
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs text-gray-600">Correct:</span>
+                            <span className="text-sm font-semibold text-gray-700">{data.correct}/{data.total}</span>
+                          </div>
+                          <div className="w-full bg-gray-200 rounded-full h-2">
+                            <div
+                              className={`h-2 rounded-full transition-all ${
+                                data.percentage >= 80 ? 'bg-green-500' :
+                                data.percentage >= 60 ? 'bg-yellow-500' :
+                                'bg-red-500'
+                              }`}
+                              style={{ width: `${data.percentage}%` }}
+                            ></div>
+                          </div>
+                          {data.questionIndices && data.questionIndices.length > 0 && (
+                            <div className="pt-2 border-t border-gray-300">
+                              <p className="text-xs text-gray-600 font-medium mb-1">Questions:</p>
+                              <div className="flex flex-wrap gap-1">
+                                {data.questionIndices.map((idx: number) => (
+                                  <span key={idx} className="inline-flex items-center px-2 py-0.5 rounded-full text-xs bg-white border border-gray-300 text-gray-700 font-medium">
+                                    Q{idx + 1}
+                                  </span>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )} */}
+
+            {/* Cognitive Level Breakdown - Only in Modal Header */}
+
+            {/* Question Breakdown Modal */}
+            {showBreakdownModal && (
+              <>
+                {console.log('🎬 Modal is rendering, showBreakdownModal:', showBreakdownModal, 'questionResults:', questionResults)}
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 lg:ml-64">
+                <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[90vh] overflow-hidden flex flex-col">
+                  {/* Modal Header */}
+                  <div className="bg-gradient-to-r from-purple-600 to-purple-700 text-white p-3 sm:p-4">
+                    <div className="flex items-start justify-between mb-2">
+                      <div className="flex-1">
+                        <h2 className="text-lg sm:text-xl font-bold">Question Breakdown</h2>
+                        <p className="text-purple-100 mt-0.5 text-xs sm:text-sm">{questionResults.length} questions</p>
+                      </div>
+                      <button
+                        onClick={() => setShowBreakdownModal(false)}
+                        className="text-white hover:bg-white hover:bg-opacity-20 rounded-full p-2 transition flex-shrink-0 ml-2"
+                      >
+                        <i className="ri-close-line text-xl"></i>
+                      </button>
+                    </div>
+                    
+                    {/* Cognitive Level Performance in Modal */}
+                    {resultsData?.cognitiveBreakdown && (
+                      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-1.5 mt-2 pt-2.5 border-t border-purple-400">
+                        {Object.entries(resultsData.cognitiveBreakdown).map(([level, data]: [string, any]) => {
+                          const percentage = data.percentage;
+                          const performanceColor = percentage >= 80 ? 'text-green-300' : percentage >= 60 ? 'text-yellow-300' : 'text-red-300';
+                          return (
+                            <div key={level} className="text-xs">
+                              <p className="font-semibold text-purple-100 truncate">{level}</p>
+                              <p className={`text-base font-bold ${performanceColor}`}>{percentage}%</p>
+                              <p className="text-purple-100 text-2xs">{data.correct}/{data.total}</p>
+                              {data.questionIndices && data.questionIndices.length > 0 && (
+                                <p className="text-purple-100 text-2xs mt-0.5 truncate">Q: {data.questionIndices.map((idx: number) => idx + 1).join(',')}</p>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Modal Body - Scrollable */}
+                  <div className="overflow-y-auto flex-1 p-4 sm:p-6 space-y-3 sm:space-y-4">
+                    {questionResults.map((result: any, index: number) => (
+                      <div key={index} className={`rounded-xl p-3 sm:p-5 border-2 ${
+                        result.status === 'Not Attempted' ? 'border-gray-300 bg-gray-50' : 
+                        result.status === 'Attempted' ? 'border-yellow-300 bg-yellow-50' :
+                        result.isCorrect ? 'border-green-300 bg-green-50' : 'border-red-300 bg-red-50'
+                      }`}>
+                        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 sm:gap-3 mb-3">
+                          <div className="flex items-center gap-2 sm:gap-3 flex-1">
+                            <div className={`w-8 h-8 flex-shrink-0 rounded-full flex items-center justify-center font-bold text-white text-sm sm:text-base ${
+                              result.status === 'Not Attempted' ? 'bg-gray-400' :
+                              result.status === 'Attempted' ? 'bg-yellow-500' :
+                              result.isCorrect ? 'bg-green-500' : 'bg-red-500'
+                            }`}>
+                              {result.status === 'Not Attempted' ? '−' :
+                               result.status === 'Attempted' ? '✓' :
+                               result.isCorrect ? '✓' : '✗'}
+                            </div>
+                            <div className="flex-1">
+                              <span className="font-medium text-gray-700 text-sm sm:text-base">Question {index + 1}</span>
+                              <div className="flex flex-wrap gap-1 sm:gap-2 mt-1">
+                                {result.cognitiveLevel && result.cognitiveLevel !== 'Unknown' && (
+                                  <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-blue-100 text-blue-700">
+                                    {result.cognitiveLevel}
+                                  </span>
+                                )}
+                                {result.difficulty && (
+                                  <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-gray-200 text-gray-700 capitalize">
+                                    {result.difficulty}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                          <span className={`text-xs sm:text-sm font-semibold whitespace-nowrap flex-shrink-0 ${
+                            result.status === 'Not Attempted' ? 'text-gray-700' :
+                            result.status === 'Attempted' ? 'text-yellow-700' :
+                            result.isCorrect ? 'text-green-700' : 'text-red-700'
+                          }`}>
+                            {result.status}
+                          </span>
+                        </div>
+
+                        <div className="sm:ml-11 space-y-2 text-xs sm:text-sm">
+                          <div>
+                            <p className="font-medium text-gray-600">Question:</p>
+                            <p className="text-gray-800 mt-0.5 break-words">
+                              {typeof result.questionText === 'string'
+                                ? result.questionText
+                                : typeof result.questionText === 'object' && result.questionText?.text
+                                ? result.questionText.text
+                                : 'Question text unavailable'}
+                            </p>
+                          </div>
+
+                          {result.status !== 'Not Attempted' && (
+                            <div>
+                              <p className="font-medium text-gray-600">Your Answer:</p>
+                              <p className="text-gray-700 mt-0.5 p-1.5 sm:p-2 bg-white rounded border border-gray-200 break-words">
+                                {result.userAnswerText 
+                                  ? result.userAnswerText 
+                                  : typeof result.userAnswer === 'string' 
+                                  ? result.userAnswer 
+                                  : JSON.stringify(result.userAnswer)}
+                              </p>
+                            </div>
+                          )}
+
+                          {result.status === 'Correct' && (
+                            <>
+                              <div>
+                                <p className="font-medium text-green-700">Correct Answer:</p>
+                                <p className="text-green-800 mt-0.5 p-1.5 sm:p-2 bg-green-100 rounded border border-green-300 break-words">
+                                  {result.correctAnswerText
+                                    ? result.correctAnswerText
+                                    : typeof result.correctAnswer === 'string'
+                                    ? result.correctAnswer 
+                                    : JSON.stringify(result.correctAnswer)}
+                                </p>
+                              </div>
+
+                              {result.explanation && (
+                                <div>
+                                  <p className="font-medium text-blue-700">Explanation:</p>
+                                  <p className="text-blue-900 mt-0.5 p-1.5 sm:p-2 bg-blue-100 rounded border border-blue-300 break-words">
+                                    {typeof result.explanation === 'string'
+                                      ? result.explanation
+                                      : typeof result.explanation === 'object' && result.explanation?.text
+                                      ? result.explanation.text
+                                      : JSON.stringify(result.explanation)}
+                                  </p>
+                                </div>
+                              )}
+                            </>
+                          )}
+
+                          {result.status === 'Incorrect' && (
+                            <>
+                              <div>
+                                <p className="font-medium text-green-700">Correct Answer:</p>
+                                <p className="text-green-800 mt-0.5 p-1.5 sm:p-2 bg-green-100 rounded border border-green-300 break-words">
+                                  {result.correctAnswerText
+                                    ? result.correctAnswerText
+                                    : typeof result.correctAnswer === 'string'
+                                    ? result.correctAnswer 
+                                    : JSON.stringify(result.correctAnswer)}
+                                </p>
+                              </div>
+
+                              {result.explanation && (
+                                <div>
+                                  <p className="font-medium text-blue-700">Explanation:</p>
+                                  <p className="text-blue-900 mt-0.5 p-1.5 sm:p-2 bg-blue-100 rounded border border-blue-300 break-words">
+                                    {typeof result.explanation === 'string'
+                                      ? result.explanation
+                                      : typeof result.explanation === 'object' && result.explanation?.text
+                                      ? result.explanation.text
+                                      : JSON.stringify(result.explanation)}
+                                  </p>
+                                </div>
+                              )}
+                            </>
+                          )}
+
+                          {result.status === 'Attempted' && (
+                            <div>
+                              <p className="font-medium text-yellow-700">Note:</p>
+                              <p className="text-yellow-800 mt-0.5 p-1.5 sm:p-2 bg-yellow-100 rounded border border-yellow-300">
+                                This question requires manual grading by your teacher.
+                              </p>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Modal Footer */}
+                  <div className="bg-gray-100 p-3 sm:p-4 flex justify-end">
+                    <button
+                      onClick={() => setShowBreakdownModal(false)}
+                      className="px-4 sm:px-6 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition font-medium text-sm sm:text-base"
+                    >
+                      Close
+                    </button>
+                  </div>
+                </div>
+                </div>
+              </>
+            )}
           </div>
         </main>
       </div>
@@ -489,53 +1022,53 @@ export default function QuizAttemptPage() {
             <i className="ri-menu-line text-2xl"></i>
           </button>
 
-          <div className="max-w-2xl mx-auto">
-            <div className="bg-white rounded-2xl shadow-xl p-8">
-              <div className="text-center mb-8">
-                <div className="w-20 h-20 mx-auto mb-4 bg-purple-100 rounded-full flex items-center justify-center">
-                  <i className="ri-file-list-3-line text-3xl text-purple-600"></i>
+          <div className="max-w-2xl mx-auto h-auto">
+            <div className="bg-white rounded-2xl shadow-xl p-2 sm:p-3 lg:p-6">
+              <div className="text-center mb-1 sm:mb-2 lg:mb-4">
+                <div className="w-12 sm:w-14 lg:w-20 h-12 sm:h-14 lg:h-20 mx-auto mb-1 sm:mb-1.5 lg:mb-3 bg-purple-100 rounded-full flex items-center justify-center">
+                  <i className="ri-file-list-3-line text-sm sm:text-base lg:text-3xl text-purple-600"></i>
                 </div>
-                <h1 className="text-2xl font-bold text-gray-800 mb-2">{quiz.title}</h1>
-                <p className="text-gray-600">{quiz.subject} - Grade {quiz.class}</p>
+                <h1 className="text-base sm:text-lg lg:text-2xl font-bold text-gray-800 mb-0 lg:mb-1">{quiz.title}</h1>
+                <p className="text-2xs sm:text-xs lg:text-sm text-gray-600">{quiz.subject} - Grade {quiz.class}</p>
               </div>
 
-              <div className="grid grid-cols-2 gap-4 mb-8">
-                <div className="bg-gray-50 rounded-xl p-4 text-center">
-                  <i className="ri-question-line text-2xl text-purple-600 mb-2"></i>
-                  <p className="text-sm text-gray-600">Questions</p>
-                  <p className="text-xl font-bold text-gray-800">{quiz.items.length}</p>
+              <div className="grid grid-cols-2 gap-1 sm:gap-1.5 lg:gap-4 mb-1.5 sm:mb-2.5 lg:mb-4">
+                <div className="bg-gray-50 rounded-md sm:rounded-lg lg:rounded-xl p-1.5 sm:p-2 lg:p-3 text-center">
+                  <i className="ri-question-line text-xs sm:text-sm lg:text-2xl text-purple-600 mb-0 sm:mb-0.5 lg:mb-1"></i>
+                  <p className="text-2xs text-gray-600 lg:text-sm">Questions</p>
+                  <p className="text-xs sm:text-sm lg:text-xl font-bold text-gray-800">{quiz.items.length}</p>
                 </div>
-                <div className="bg-gray-50 rounded-xl p-4 text-center">
-                  <i className="ri-time-line text-2xl text-purple-600 mb-2"></i>
-                  <p className="text-sm text-gray-600">Time Limit</p>
-                  <p className="text-xl font-bold text-gray-800">{quiz.timeLimitMinutes || 30} mins</p>
+                <div className="bg-gray-50 rounded-md sm:rounded-lg lg:rounded-xl p-1.5 sm:p-2 lg:p-3 text-center">
+                  <i className="ri-time-line text-xs sm:text-sm lg:text-2xl text-purple-600 mb-0 sm:mb-0.5 lg:mb-1"></i>
+                  <p className="text-2xs text-gray-600 lg:text-sm">Time Limit</p>
+                  <p className="text-xs sm:text-sm lg:text-xl font-bold text-gray-800">{quiz.timeLimitMinutes || 30} mins</p>
                 </div>
                 {quiz.isMarked && (
                   <>
-                    <div className="bg-gray-50 rounded-xl p-4 text-center">
-                      <i className="ri-medal-line text-2xl text-purple-600 mb-2"></i>
-                      <p className="text-sm text-gray-600">Total Marks</p>
-                      <p className="text-xl font-bold text-gray-800">{quiz.totalMarks}</p>
+                    <div className="bg-gray-50 rounded-md sm:rounded-lg lg:rounded-xl p-1.5 sm:p-2 lg:p-3 text-center">
+                      <i className="ri-medal-line text-xs sm:text-sm lg:text-2xl text-purple-600 mb-0 sm:mb-0.5 lg:mb-1"></i>
+                      <p className="text-2xs text-gray-600 lg:text-sm">Total Marks</p>
+                      <p className="text-xs sm:text-sm lg:text-xl font-bold text-gray-800">{quiz.totalMarks}</p>
                     </div>
-                    <div className="bg-gray-50 rounded-xl p-4 text-center">
-                      <i className="ri-bar-chart-line text-2xl text-purple-600 mb-2"></i>
-                      <p className="text-sm text-gray-600">Quiz Type</p>
-                      <p className="text-xl font-bold text-gray-800">{quiz.quizType}</p>
+                    <div className="bg-gray-50 rounded-md sm:rounded-lg lg:rounded-xl p-1.5 sm:p-2 lg:p-3 text-center">
+                      <i className="ri-bar-chart-line text-xs sm:text-sm lg:text-2xl text-purple-600 mb-0 sm:mb-0.5 lg:mb-1"></i>
+                      <p className="text-2xs text-gray-600 lg:text-sm">Quiz Type</p>
+                      <p className="text-xs sm:text-sm lg:text-xl font-bold text-gray-800">{quiz.quizType}</p>
                     </div>
                   </>
                 )}
               </div>
 
-              <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4 mb-8">
+              {/* Instructions - Hidden on small screens, shown on lg and up */}
+              <div className="hidden lg:block bg-yellow-50 border border-yellow-200 rounded-xl p-4 mb-4">
                 <div className="flex items-start gap-3">
-                  <i className="ri-information-line text-xl text-yellow-600 mt-0.5"></i>
-                  <div>
-                    <p className="font-medium text-yellow-800">Instructions</p>
-                    <ul className="text-sm text-yellow-700 mt-2 space-y-1">
+                  <i className="ri-information-line text-lg text-yellow-600 mt-0.5 flex-shrink-0"></i>
+                  <div className="min-w-0">
+                    <p className="font-medium text-yellow-800 text-sm">Instructions</p>
+                    <ul className="text-xs text-yellow-700 mt-1 space-y-0.5">
                       <li>• Answer all questions before submitting</li>
-                      <li>• You cannot go back once the quiz is submitted</li>
-                      <li>• The quiz will auto-submit when time runs out</li>
-                      <li>• Make sure you have a stable internet connection</li>
+                      <li>• Cannot go back once submitted</li>
+                      <li>• Auto-submit when time runs out</li>
                     </ul>
                   </div>
                 </div>
@@ -543,7 +1076,7 @@ export default function QuizAttemptPage() {
 
               <button
                 onClick={() => setQuizStarted(true)}
-                className="w-full py-4 bg-purple-600 text-white text-lg font-semibold rounded-xl hover:bg-purple-700 transition shadow-lg"
+                className="w-full py-1.5 sm:py-2 lg:py-3 bg-purple-600 text-white text-xs sm:text-sm lg:text-base font-semibold rounded-lg lg:rounded-xl hover:bg-purple-700 transition shadow-lg"
               >
                 Start Quiz
               </button>
@@ -607,7 +1140,10 @@ export default function QuizAttemptPage() {
           <h2 className={`text-xl font-medium text-gray-800 mb-6 ${
             currentItem.question.isRTL ? 'text-right font-noto-nastaliq' : ''
           }`}>
-            {currentItem.question.text.replace(/\{blank\d+\}/g, '_____')}
+            {['fill', 'fillinblank', 'fillblanks'].includes(currentItem.questionType) 
+              ? '' 
+              : currentItem.question.text.replace(/\{blank\d+\}/g, '_____')
+            }
           </h2>
 
           {currentItem.isInteractive

@@ -141,7 +141,9 @@ export default function QuestionForm({
     fetchChapters();
   }, [formData.book, formData.subject, formData.grade, submittedBooks]);
 
-  const optionLabels = ["A", "B", "C", "D", "E", "F"];
+  const optionLabels = formData.subject === "Urdu" 
+    ? ["ا", "ب", "ج", "د", "ه", "و"]  // Urdu letters: Alif, Bay, Jeem, Dal, Hay, Waw
+    : ["A", "B", "C", "D", "E", "F"];
 
   const handleQuestionTypeChange = (type: QuestionFormData["type"]) => {
     setFormData((prev: QuestionFormData): QuestionFormData => ({
@@ -421,6 +423,7 @@ export default function QuestionForm({
                   onChange={(e) => setFormData({ ...formData, chapter: e.target.value })}
                   disabled={!formData.book}
                   className={`w-full px-2 sm:px-3 py-1.5 sm:py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100 text-xs sm:text-sm ${errors.chapter ? "border-red-500" : "border-gray-300"}`}
+                  dir={formData.subject === "Urdu" ? "rtl" : "ltr"}
                 >
                   <option value="">Select Chapter</option>
                   {getAvailableChapters().map((chapter) => (
@@ -581,15 +584,15 @@ export default function QuestionForm({
                         onInsert={insertLanguageCharacter}
                       />
                     )}
-                    <div className="flex gap-1 sm:gap-2 items-center">
-                      <span className="w-10 sm:w-12 text-xs sm:text-sm font-medium flex-shrink-0">Option {optionLabels[i]}</span>
+                    <div className="flex gap-1 sm:gap-2 items-center" dir={isUrduSubject ? "rtl" : "ltr"}>
+                      <span className="w-10 sm:w-12 text-xs sm:text-sm font-medium flex-shrink-0">{isUrduSubject ? optionLabels[i] : `Option ${optionLabels[i]}`}</span>
                       <input
                         type="text"
                         value={option}
                         onChange={(e) => handleOptionChange(i, e.target.value)}
                         onFocus={() => (isMathSubject || isUrduSubject) && handleMathFieldFocus("option", i)}
                         onBlur={() => (isMathSubject || isUrduSubject) && setFocusedMathField(null)}
-                        placeholder={`Option ${optionLabels[i]}`}
+                        placeholder={isUrduSubject ? optionLabels[i] : `Option ${optionLabels[i]}`}
                         dir={isUrduSubject ? "rtl" : "ltr"}
                         className="flex-1 px-2 sm:px-3 py-1.5 sm:py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-xs sm:text-sm"
                       />
@@ -621,7 +624,7 @@ export default function QuestionForm({
                   {formData.options.map((option, i) => {
                     const isChecked = Array.isArray(formData.correctAnswer) && formData.correctAnswer.includes(option);
                     return (
-                      <label key={i} className="flex items-center gap-2 text-xs sm:text-sm cursor-pointer hover:bg-gray-50 p-2 rounded">
+                      <label key={i} className="flex items-center gap-2 text-xs sm:text-sm cursor-pointer hover:bg-gray-50 p-2 rounded" dir={isUrduSubject ? "rtl" : "ltr"}>
                         <input
                           type="checkbox"
                           checked={isChecked}
@@ -641,8 +644,8 @@ export default function QuestionForm({
                           }}
                           className="w-4 h-4 text-blue-600 rounded focus:ring-2 focus:ring-blue-500"
                         />
-                        <span className="font-medium text-gray-600 min-w-[20px]">Option {optionLabels[i]}:</span>
-                        <span className="text-gray-700 flex-1">{option || "(empty)"}</span>
+                        <span className="font-medium text-gray-600 min-w-[20px]">{isUrduSubject ? `${optionLabels[i]}:` : `Option ${optionLabels[i]}:`}</span>
+                        <span className="text-gray-700 flex-1" dir={isUrduSubject ? "rtl" : "ltr"}>{option || "(empty)"}</span>
                       </label>
                     );
                   })}
@@ -656,7 +659,7 @@ export default function QuestionForm({
           {formData.type === "truefalse" && (
             <div className="mb-3 sm:mb-4 lg:mb-6">
               <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-2 sm:mb-3">Correct Answer *</label>
-              <div className="flex gap-3 sm:gap-4">
+              <div className="flex gap-3 sm:gap-4" dir={isUrduSubject ? "rtl" : "ltr"}>
                 <label className="flex items-center gap-2 text-xs sm:text-sm">
                   <input
                     type="radio"
@@ -665,7 +668,7 @@ export default function QuestionForm({
                     onChange={(e) => setFormData({ ...formData, correctAnswer: e.target.value })}
                     className="w-4 h-4"
                   />
-                  <span>True</span>
+                  <span>{isUrduSubject ? "صحیح" : "True"}</span>
                 </label>
                 <label className="flex items-center gap-2">
                   <input
@@ -675,7 +678,7 @@ export default function QuestionForm({
                     onChange={(e) => setFormData({ ...formData, correctAnswer: e.target.value })}
                     className="w-4 h-4"
                   />
-                  <span>False</span>
+                  <span>{isUrduSubject ? "غلط" : "False"}</span>
                 </label>
               </div>
               {errors.correctAnswer && <p className="text-red-500 text-sm mt-2">{errors.correctAnswer}</p>}

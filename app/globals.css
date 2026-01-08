@@ -1,8 +1,19 @@
 @import url('https://cdnjs.cloudflare.com/ajax/libs/remixicon/4.5.0/remixicon.min.css');
+@import url('https://fonts.googleapis.com/css2?family=Noto+Nastaliq+Urdu:wght@400;500;600;700&display=swap');
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 body {
   font-family: 'Jameel Noori Nastaleeq', serif;
+}
+
+@layer utilities {
+  .font-noto-nastaliq {
+    font-family: 'Noto Nastaliq Urdu', serif;
+  }
+  
+  .font-nastaleeq {
+    font-family: 'Jameel Noori Nastaleeq', 'Noto Nastaliq Urdu', serif;
+  }
 }

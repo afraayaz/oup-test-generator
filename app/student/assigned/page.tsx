@@ -2,7 +2,7 @@ import { Suspense } from 'react';
 import AssignedQuizzesClient from './AssignedQuizzesClient';
 
 const PROJECT_ID = 'quiz-app-ff0ab';
-const FIRESTORE_URL = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/(default)/documents/quizzes`;
+const FIRESTORE_URL = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/(default)/documents`;
 
 interface FirestoreValue {
   stringValue?: string;
@@ -36,50 +36,112 @@ function parseValue(val: FirestoreValue | undefined): any {
   return null;
 }
 
-async function getQuizzes() {
+// Get current student ID from session/context
+async function getStudentId() {
+  // This would normally come from your auth/session system
+  // For now, we'll pass it through the component
+  return null;
+}
+
+async function getAssignedQuizzes(studentId: string) {
   try {
-    const response = await fetch(FIRESTORE_URL, { cache: 'no-store' });
+    if (!studentId) {
+      return [];
+    }
+
+    // Get assignments for this student
+    const assignmentsUrl = `${FIRESTORE_URL}/quizAssignments?pageSize=100`;
+    const assignmentsResponse = await fetch(assignmentsUrl, { cache: 'no-store' });
     
-    if (!response.ok) {
-      console.error('Failed to fetch quizzes:', response.status);
+    if (!assignmentsResponse.ok) {
+      console.error('Failed to fetch assignments:', assignmentsResponse.status);
       return [];
     }
     
-    const data = await response.json();
+    const assignmentsData = await assignmentsResponse.json();
+    const assignmentDocs = assignmentsData.documents || [];
     
-    if (!data.documents) {
-      return [];
-    }
-    
-    return data.documents
-      .map((doc: any) => {
-        const pathParts = doc.name.split('/');
-        const id = pathParts[pathParts.length - 1];
+    // Filter assignments for this student
+    const studentAssignments = assignmentDocs
+      .filter((doc: any) => {
         const fields = doc.fields || {};
-        
-        const getData = (key: string) => parseValue(fields[key]);
-        
+        return parseValue(fields.studentId) === studentId;
+      })
+      .map((doc: any) => {
+        const fields = doc.fields || {};
         return {
-          id,
-          title: getData('title') || 'Untitled Quiz',
-          quizType: getData('quizType') || 'Quiz',
-          quizFormat: getData('quizFormat') || 'Online',
-          class: getData('class') || '',
-          subject: getData('subject') || '',
-          book: getData('book') || '',
-          chapters: getData('chapters') || [],
-          isMarked: getData('isMarked') || false,
-          timeLimitMinutes: getData('timeLimitMinutes') || 30,
-          schedule: getData('schedule') || { startAt: null, endAt: null },
-          totalQuestions: getData('totalQuestions') || 0,
-          totalMarks: getData('totalMarks') || 0,
-          status: getData('status') || 'draft',
-          createdAt: getData('createdAt'),
+          assignmentId: doc.name.split('/').pop(),
+          quizId: parseValue(fields.quizId),
+          quizTitle: parseValue(fields.quizTitle),
+          assignedAt: parseValue(fields.assignedAt),
+          status: parseValue(fields.status),
+          score: parseValue(fields.score),
+          timeLimitMinutes: parseValue(fields.timeLimitMinutes),
+          schedule: parseValue(fields.schedule),
+        };
+      });
+
+    if (studentAssignments.length === 0) {
+      return [];
+    }
+
+    // Fetch full quiz details for assigned quizzes
+    const quizzesUrl = `${FIRESTORE_URL}/quizzes?pageSize=500`;
+    const quizzesResponse = await fetch(quizzesUrl, { cache: 'no-store' });
+    
+    if (!quizzesResponse.ok) {
+      return studentAssignments;
+    }
+    
+    const quizzesData = await quizzesResponse.json();
+    const quizzesDocs = quizzesData.documents || [];
+    
+    return studentAssignments
+      .map((assignment: any) => {
+        const quizDoc = quizzesDocs.find((doc: any) => 
+          doc.name.split('/').pop() === assignment.quizId
+        );
+        
+        if (!quizDoc) {
+          return {
+            id: assignment.assignmentId,
+            quizId: assignment.quizId,
+            title: assignment.quizTitle,
+            status: assignment.status,
+            assignedAt: assignment.assignedAt,
+            score: assignment.score,
+            quizFormat: 'Online',
+            totalQuestions: 0,
+            totalMarks: 0,
+            timeLimitMinutes: assignment.timeLimitMinutes || 30,
+            schedule: assignment.schedule || null,
+          };
+        }
+
+        const fields = quizDoc.fields || {};
+        return {
+          id: assignment.assignmentId,
+          quizId: assignment.quizId,
+          title: parseValue(fields.title) || assignment.quizTitle,
+          quizType: parseValue(fields.quizType),
+          quizFormat: parseValue(fields.quizFormat) || 'Online',
+          class: parseValue(fields.class),
+          subject: parseValue(fields.subject),
+          book: parseValue(fields.book),
+          chapters: parseValue(fields.chapters) || [],
+          isMarked: parseValue(fields.isMarked),
+          timeLimitMinutes: assignment.timeLimitMinutes || parseValue(fields.timeLimitMinutes) || 30,
+          schedule: assignment.schedule || parseValue(fields.schedule) || null,
+          totalQuestions: parseValue(fields.totalQuestions) || 0,
+          totalMarks: parseValue(fields.totalMarks) || 0,
+          status: assignment.status,
+          assignedAt: assignment.assignedAt,
+          score: assignment.score,
         };
       })
       .filter((quiz: any) => quiz.quizFormat === 'Online');
   } catch (error) {
-    console.error('Error fetching quizzes:', error);
+    console.error('Error fetching assigned quizzes:', error);
     return [];
   }
 }
@@ -93,12 +155,12 @@ function LoadingFallback() {
   );
 }
 
-export default async function AssignedQuizzesPage() {
-  const quizzes = await getQuizzes();
-  
+import AssignedPage from './AssignedPage';
+
+export default function AssignedQuizzesPage() {
   return (
     <Suspense fallback={<LoadingFallback />}>
-      <AssignedQuizzesClient initialQuizzes={quizzes} />
+      <AssignedPage />
     </Suspense>
   );
 }

@@ -65,7 +65,8 @@ export default function QuestionBank({
 }: QuestionBankProps) {
   const [questions, setQuestions] = useState<Question[]>([]);
   const [loading, setLoading] = useState(true);
-  const [filters, setFilters] = useState({ subject: "", grade: "", book: "" });
+  const [filters, setFilters] = useState({ subject: "", grade: "", book: "", type: "" });
+  const [searchText, setSearchText] = useState("");
   const [editingQuestion, setEditingQuestion] = useState<Question | null>(null);
   const [editFormData, setEditFormData] = useState<Partial<Question>>({});
   const [isSaving, setIsSaving] = useState(false);
@@ -209,9 +210,11 @@ export default function QuestionBank({
       if (filters.subject && q.subject !== filters.subject) return false;
       if (filters.grade && q.grade !== filters.grade) return false;
       if (filters.book && q.book !== filters.book) return false;
+      if (filters.type && q.type !== filters.type) return false;
+      if (searchText && !q.questionText?.toLowerCase().includes(searchText.toLowerCase())) return false;
       return true;
     });
-  }, [questions, filters]);
+  }, [questions, filters, searchText]);
 
   const uniqueSubjects = useMemo(
     () => [...new Set(questions.map((q) => q.subject))].sort(),
@@ -225,6 +228,10 @@ export default function QuestionBank({
     () => [...new Set(questions.map((q) => q.book))].sort(),
     [questions]
   );
+  const uniqueTypes = useMemo(
+    () => [...new Set(questions.map((q) => q.type))].sort(),
+    [questions]
+  );
 
   if (loading) {
     return (
@@ -236,10 +243,35 @@ export default function QuestionBank({
 
   return (
     <div className="w-full px-3 sm:px-4 lg:px-6 py-4 sm:py-6 space-y-4 sm:space-y-5">
+      {/* Search Bar */}
+      <div className="bg-white rounded-xl shadow-sm p-3 sm:p-4 border border-gray-100">
+        <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-2">
+          Search Questions
+        </label>
+        <div className="relative">
+          <input
+            type="text"
+            value={searchText}
+            onChange={(e) => setSearchText(e.target.value)}
+            placeholder="Search by question text..."
+            className="w-full px-4 py-2.5 pl-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+          />
+          <i className="ri-search-line absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
+          {searchText && (
+            <button
+              onClick={() => setSearchText("")}
+              className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+            >
+              <i className="ri-close-line text-lg"></i>
+            </button>
+          )}
+        </div>
+      </div>
+
       {/* Filters */}
       <div className="bg-white rounded-xl shadow-sm p-3 sm:p-4 space-y-3 sm:space-y-4 border border-gray-100">
         <h3 className="font-semibold text-sm sm:text-base text-gray-900">Filters</h3>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 sm:gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3">
           <div>
             <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1.5">
               Subject
@@ -293,6 +325,24 @@ export default function QuestionBank({
               {uniqueBooks.map((book) => (
                 <option key={book} value={book}>
                   {book}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1.5">
+              Question Type
+            </label>
+            <select
+              value={filters.type}
+              onChange={(e) => setFilters({ ...filters, type: e.target.value })}
+              className="w-full px-2.5 sm:px-3 py-1.5 sm:py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-xs sm:text-sm bg-white hover:border-gray-400 transition-colors"
+            >
+              <option value="">All Types</option>
+              {uniqueTypes.map((type) => (
+                <option key={type} value={type}>
+                  {typeLabels[type] || type}
                 </option>
               ))}
             </select>

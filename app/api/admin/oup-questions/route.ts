@@ -6,8 +6,10 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const subject = searchParams.get('subject');
 
-    // Get all OUP questions
-    const snapshot = await db.collection('questions').doc('oup').collection('items').get();
+    // Get OUP questions with limit to reduce reads
+    let query = db.collection('questions').doc('oup').collection('items').limit(1000);
+    
+    const snapshot = await query.get();
     
     const questions = snapshot.docs.map(doc => ({
       id: doc.id,

@@ -38,7 +38,9 @@ async function fetchUserProfile() {
     // Try to fetch with a filter for student role using structured query
     // First, attempt to fetch all users with student role by checking documents
     const url = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/users?pageSize=100`;
-    const response = await fetch(url, { cache: 'no-store' });
+    const response = await fetch(url, { 
+      next: { revalidate: 300 } // Cache for 5 minutes
+    });
     
     if (!response.ok) {
       return { name: 'Student', email: '' };
@@ -78,7 +80,9 @@ async function fetchUserProfile() {
 async function fetchQuizAttempts() {
   try {
     const url = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/quizAttempts?pageSize=50`;
-    const response = await fetch(url, { cache: 'no-store' });
+    const response = await fetch(url, { 
+      next: { revalidate: 180 } // Cache for 3 minutes
+    });
     
     if (!response.ok) {
       return [];
@@ -100,6 +104,7 @@ async function fetchQuizAttempts() {
         score: parseFirestoreValue(fields.score || {}) || 0,
         totalMarks: parseFirestoreValue(fields.totalMarks || {}) || 0,
         percentage: parseFirestoreValue(fields.percentage || {}) || 0,
+        isMarked: parseFirestoreValue(fields.isMarked || {}) || false,
         completedAt: parseFirestoreValue(fields.completedAt || {}),
       };
     }).sort((a: any, b: any) => {
@@ -116,7 +121,9 @@ async function fetchQuizAttempts() {
 async function fetchQuizzes() {
   try {
     const url = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/quizzes?pageSize=100`;
-    const response = await fetch(url, { cache: 'no-store' });
+    const response = await fetch(url, { 
+      next: { revalidate: 120 } // Cache for 2 minutes
+    });
     
     if (!response.ok) {
       return [];

@@ -92,6 +92,12 @@ export default function Sidebar({
       href: "/teacher/quiz",
     },
     {
+      id: "quizzes",
+      label: "Quizzes",
+      icon: "ri-book-open-line",
+      href: "/teacher/quizzes",
+    },
+    {
       id: "interactiveQuiz",
       label: "Interactive Question",
       icon: "ri-file-list-3-line",

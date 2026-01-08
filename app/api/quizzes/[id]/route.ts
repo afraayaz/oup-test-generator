@@ -67,6 +67,37 @@ export async function GET(
       quiz[key] = parseFirestoreValue(value as FirestoreValue);
     }
     
+    // Enrich quiz items with cognitive levels from questions collection
+    if (quiz.items && Array.isArray(quiz.items)) {
+      for (let i = 0; i < quiz.items.length; i++) {
+        const item = quiz.items[i];
+        if (item && item.questionId) {
+          try {
+            // Fetch the question document to get cognitive level
+            const questionUrl = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/(default)/documents/questions/${item.questionId}`;
+            const questionResponse = await fetch(questionUrl);
+            
+            if (questionResponse.ok) {
+              const questionDoc = await questionResponse.json();
+              const questionData: Record<string, any> = {};
+              for (const [key, value] of Object.entries(questionDoc.fields || {})) {
+                questionData[key] = parseFirestoreValue(value as FirestoreValue);
+              }
+              
+              // Add cognitive level to the quiz item
+              if (questionData.cognitiveLevel) {
+                quiz.items[i].cognitiveLevel = questionData.cognitiveLevel;
+              }
+              
+              console.log(`[API] Enriched item ${i} (questionId: ${item.questionId}) with cognitiveLevel:`, questionData.cognitiveLevel);
+            }
+          } catch (error) {
+            console.log(`[API] Failed to fetch cognitive level for question ${item.questionId}:`, error);
+          }
+        }
+      }
+    }
+    
     return NextResponse.json({ quiz });
   } catch (error: any) {
     console.error('API route error:', error);

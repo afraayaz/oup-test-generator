@@ -51,39 +51,34 @@ export default function AdminDashboard() {
       try {
         setLoading(true);
         
-        // Fetch users count
-        const usersResponse = await fetch('/api/admin/users');
-        const usersData = await usersResponse.json();
-        const totalUsers = usersData.users?.length || 0;
+        // Use consolidated endpoint to reduce API calls
+        const response = await fetch('/api/admin/dashboard-stats', {
+          next: { revalidate: 300 } // Cache for 5 minutes
+        });
+        const data = await response.json();
         
-        // Count school users vs OUP users
-        const users = usersData.users || [];
-        const schoolUsers = users.filter((u: any) => u.schoolId || u.userType === 'school').length;
-        const oupUsers = users.filter((u: any) => !u.schoolId && u.userType !== 'school').length;
-
-        // Fetch schools count
-        const schoolsResponse = await fetch('/api/admin/schools');
-        const schoolsData = await schoolsResponse.json();
-        const totalSchools = schoolsData.schools?.length || 0;
-        const activeSchools = schoolsData.schools?.filter((s: any) => s.status === 'Active').length || 0;
-
-        // Fetch quizzes count
-        const quizzesResponse = await fetch('/api/quizzes');
-        const quizzesData = await quizzesResponse.json();
-        const totalQuizzes = quizzesData.quizzes?.length || 0;
-
-        // Update stats
-        setStats(prev => ({
-          ...prev,
-          totalUsers,
-          schoolUsers,
-          oupUsers,
-          totalUsersGrowth: 12,
-          totalQuizzes,
-          activeQuizzesGrowth: 8,
-          questionsPending: 23,
-          schoolsActive: activeSchools,
-        }));
+        if (data.stats) {
+          setStats(prev => ({
+            ...prev,
+            totalUsers: data.stats.totalUsers,
+            schoolUsers: data.stats.schoolUsers,
+            oupUsers: data.stats.oupUsers,
+            totalUsersGrowth: 12,
+            totalQuizzes: data.stats.totalQuizzes,
+            activeQuizzesGrowth: 8,
+            questionsPending: 23,
+            schoolsActive: data.stats.activeSchools,
+          }));
+        }
+        
+        // Update user roles data if needed
+        if (data.userRoles) {
+          setUserRolesData([
+            { name: 'Students', value: data.userRoles.students, color: '#8B5CF6' },
+            { name: 'Teachers', value: data.userRoles.teachers, color: '#F59E0B' },
+            { name: 'Admins', value: data.userRoles.admins, color: '#10B981' }
+          ]);
+        }
 
         setLoading(false);
       } catch (error) {
@@ -120,46 +115,20 @@ export default function AdminDashboard() {
     { name: 'Admins', value: 0, color: '#10B981' }
   ]);
 
-  // Fetch user distribution data
-  useEffect(() => {
-    const fetchUserDistribution = async () => {
-      try {
-        const usersResponse = await fetch('/api/admin/users');
-        const usersData = await usersResponse.json();
-        const users = usersData.users || [];
+  // Fetch user distribution data - now handled by consolidated endpoint above
+  // useEffect removed to prevent duplicate API calls
 
-        // Count users by role
-        const studentCount = users.filter((u: any) => u.role === 'student').length;
-        const teacherCount = users.filter((u: any) => u.role === 'teacher').length;
-        const adminCount = users.filter((u: any) => u.role === 'school_admin').length;
-
-        setUserRolesData([
-          { name: 'Students', value: studentCount, color: '#8B5CF6' },
-          { name: 'Teachers', value: teacherCount, color: '#F59E0B' },
-          { name: 'Admins', value: adminCount, color: '#10B981' }
-        ]);
-      } catch (error) {
-        console.error('Error fetching user distribution:', error);
-      }
-    };
-
-    if (isAuthorized) {
-      fetchUserDistribution();
-    }
-  }, [isAuthorized]);
-
-  // Fetch platform growth data
+  // Fetch platform growth data using consolidated endpoint
   useEffect(() => {
     const fetchPlatformGrowth = async () => {
       try {
-        const usersResponse = await fetch('/api/admin/users');
-        const quizzesResponse = await fetch('/api/quizzes');
+        const response = await fetch('/api/admin/dashboard-stats', {
+          next: { revalidate: 300 } // Cache for 5 minutes
+        });
+        const data = await response.json();
         
-        const usersData = await usersResponse.json();
-        const quizzesData = await quizzesResponse.json();
-        
-        const users = usersData.users || [];
-        const quizzes = quizzesData.quizzes || [];
+        const users = data.users || [];
+        const quizzes = data.quizzes || [];
 
         // Get current month and last 6 months
         const now = new Date();
@@ -264,18 +233,22 @@ export default function AdminDashboard() {
     }
   }, [isAuthorized]);
 
-  // Fetch recent activities
+  // Fetch recent activities using consolidated endpoint
   useEffect(() => {
     const fetchRecentActivities = async () => {
       try {
         const activities: any[] = [];
         const now = new Date();
 
-        // Fetch all users to find recent registrations
-        const usersResponse = await fetch('/api/admin/users');
-        const usersData = await usersResponse.json();
-        const users = usersData.users || [];
-
+        // Use consolidated endpoint to reduce API calls
+        const response = await fetch('/api/admin/dashboard-stats', {
+          next: { revalidate: 300 } // Cache for 5 minutes
+        });
+        const data = await response.json();
+        
+        const users = data.users || [];
+        const quizzes = data.quizzes || [];
+        
         // Check for recently created users (teachers)
         users.forEach((user: any) => {
           if (user.role === 'teacher' && user.createdAt) {
@@ -296,11 +269,7 @@ export default function AdminDashboard() {
           }
         });
 
-        // Fetch quizzes to find recently created quizzes
-        const quizzesResponse = await fetch('/api/quizzes');
-        const quizzesData = await quizzesResponse.json();
-        const quizzes = quizzesData.quizzes || [];
-
+        // Check for recently created quizzes (data already fetched from consolidated endpoint)
         quizzes.forEach((quiz: any) => {
           if (quiz.createdAt) {
             const createdDate = quiz.createdAt.toDate ? quiz.createdAt.toDate() : new Date(quiz.createdAt);
@@ -335,9 +304,7 @@ export default function AdminDashboard() {
 
     if (isAuthorized) {
       fetchRecentActivities();
-      // Refresh activities every 5 minutes
-      const interval = setInterval(fetchRecentActivities, 5 * 60 * 1000);
-      return () => clearInterval(interval);
+      // Auto-refresh removed to save Firestore reads - user can manually refresh page
     }
   }, [isAuthorized]);
 

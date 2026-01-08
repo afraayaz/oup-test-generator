@@ -20,6 +20,9 @@ interface Quiz {
   totalMarks: number;
   status: string;
   createdAt: any;
+  hasAttempted: boolean;
+  attemptCount: number;
+  assignedAt: any;
 }
 
 interface Props {
@@ -32,13 +35,23 @@ export default function AssignedQuizzesClient({ initialQuizzes }: Props) {
   const [filter, setFilter] = useState<'all' | 'upcoming' | 'completed'>('all');
 
   const getQuizStatus = (quiz: Quiz) => {
+    // If quiz has been attempted, it goes to "Completed"
+    if (quiz.hasAttempted) return 'completed';
+    
     const now = new Date();
     const startAt = quiz.schedule?.startAt ? new Date(quiz.schedule.startAt) : null;
     const endAt = quiz.schedule?.endAt ? new Date(quiz.schedule.endAt) : null;
 
+    // No schedule = available immediately
     if (!startAt) return 'available';
+    
+    // Check if scheduled date is in the future
     if (now < startAt) return 'upcoming';
+    
+    // Check if quiz has ended
     if (endAt && now > endAt) return 'expired';
+    
+    // Between start and end time = active
     return 'active';
   };
 
@@ -59,13 +72,20 @@ export default function AssignedQuizzesClient({ initialQuizzes }: Props) {
     }
   };
 
-  const filteredQuizzes = initialQuizzes.filter((quiz) => {
-    if (filter === 'all') return true;
-    const status = getQuizStatus(quiz);
-    if (filter === 'upcoming') return status === 'upcoming' || status === 'active' || status === 'available';
-    if (filter === 'completed') return status === 'expired';
-    return true;
-  });
+  const filteredQuizzes = initialQuizzes
+    .filter((quiz) => {
+      if (filter === 'all') return true;
+      const status = getQuizStatus(quiz);
+      if (filter === 'upcoming') return status === 'upcoming';
+      if (filter === 'completed') return status === 'completed';
+      return true;
+    })
+    // Sort by recently assigned (most recent first)
+    .sort((a, b) => {
+      const dateA = new Date(a.assignedAt || 0).getTime();
+      const dateB = new Date(b.assignedAt || 0).getTime();
+      return dateB - dateA; // Most recent first
+    });
 
   const handleStartQuiz = (quizId: string) => {
     router.push(`/student/attempt?id=${quizId}`);
@@ -73,10 +93,12 @@ export default function AssignedQuizzesClient({ initialQuizzes }: Props) {
 
   const getStatusBadge = (status: string) => {
     switch (status) {
+      case 'completed':
+        return <span className="px-2 py-1 text-xs font-medium bg-green-100 text-green-800 rounded-full">✓ Completed</span>;
       case 'active':
-        return <span className="px-2 py-1 text-xs font-medium bg-green-100 text-green-800 rounded-full">Active</span>;
+        return <span className="px-2 py-1 text-xs font-medium bg-blue-100 text-blue-800 rounded-full">Active</span>;
       case 'upcoming':
-        return <span className="px-2 py-1 text-xs font-medium bg-blue-100 text-blue-800 rounded-full">Upcoming</span>;
+        return <span className="px-2 py-1 text-xs font-medium bg-amber-100 text-amber-800 rounded-full">Upcoming</span>;
       case 'expired':
         return <span className="px-2 py-1 text-xs font-medium bg-gray-100 text-gray-800 rounded-full">Expired</span>;
       default:
@@ -186,14 +208,16 @@ export default function AssignedQuizzesClient({ initialQuizzes }: Props) {
 
                     <button
                       onClick={() => canAttempt && handleStartQuiz(quiz.id)}
-                      disabled={!canAttempt}
+                      disabled={!canAttempt && status !== 'completed'}
                       className={`w-full py-2.5 rounded-lg font-medium transition-colors ${
                         canAttempt
                           ? 'bg-purple-600 text-white hover:bg-purple-700'
+                          : status === 'completed'
+                          ? 'bg-green-100 text-green-700'
                           : 'bg-gray-100 text-gray-400 cursor-not-allowed'
                       }`}
                     >
-                      {status === 'upcoming' ? 'Not Yet Available' : status === 'expired' ? 'Quiz Ended' : 'Start Quiz'}
+                      {status === 'completed' ? '✓ Completed' : status === 'upcoming' ? 'Not Yet Available' : status === 'expired' ? 'Quiz Ended' : 'Start Quiz'}
                     </button>
                   </div>
                 );
