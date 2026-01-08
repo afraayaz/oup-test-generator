@@ -8,7 +8,7 @@ export async function GET(request: Request) {
     const campusId = searchParams.get('campusId');
     const role = searchParams.get('role');
     
-    let query = db.collection('users');
+    let query: any = db.collection('users');
     
     if (schoolId) {
       query = query.where('schoolId', '==', schoolId);

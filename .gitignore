@@ -14,4 +14,5 @@ build/
 *.swo
 *~
 .cache/
-"quiz-app-ff0ab-firebase-adminsdk-fbsvc-e0fea7198d.json" 
+quiz-app-ff0ab-firebase-adminsdk-fbsvc-e0fea7198d.json
+*-firebase-adminsdk-*.json 
