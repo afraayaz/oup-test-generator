@@ -8,6 +8,14 @@ export async function GET(
   { params }: { params: Promise<{ schoolId: string }> }
 ) {
   try {
+    // Check if Firebase is properly initialized
+    if (!process.env.FIREBASE_PRIVATE_KEY || !process.env.FIREBASE_CLIENT_EMAIL) {
+      return NextResponse.json(
+        { error: 'Firebase not configured' },
+        { status: 503 }
+      );
+    }
+
     const { schoolId } = await params;
     const userRole = request.headers.get('x-user-role');
     const userSchoolId = request.headers.get('x-school-id');

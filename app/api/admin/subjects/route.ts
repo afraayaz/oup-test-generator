@@ -5,6 +5,14 @@ export const dynamic = 'force-dynamic';
 
 export async function GET() {
   try {
+    // Check if Firebase is properly initialized
+    if (!process.env.FIREBASE_PRIVATE_KEY || !process.env.FIREBASE_CLIENT_EMAIL) {
+      return NextResponse.json(
+        { error: 'Firebase not configured' },
+        { status: 503 }
+      );
+    }
+
     const subjectsSnapshot = await db.collection('subjects').get();
     
     const subjects = await Promise.all(

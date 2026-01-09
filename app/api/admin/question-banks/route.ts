@@ -6,6 +6,14 @@ export const dynamic = 'force-dynamic';
 // GET - Get all school QBs (OUP admin only)
 export async function GET(request: NextRequest) {
   try {
+    // Check if Firebase is properly initialized
+    if (!process.env.FIREBASE_PRIVATE_KEY || !process.env.FIREBASE_CLIENT_EMAIL) {
+      return NextResponse.json(
+        { error: 'Firebase not configured' },
+        { status: 503 }
+      );
+    }
+
     const userRole = request.headers.get('x-user-role');
 
     if (userRole !== 'oup-admin') {
