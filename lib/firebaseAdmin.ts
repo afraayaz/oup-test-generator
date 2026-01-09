@@ -19,36 +19,45 @@
 
 import admin from 'firebase-admin';
 
-// Initialize Firebase Admin SDK
-if (!admin.apps.length) {
-  const projectId = process.env.FIREBASE_PROJECT_ID || 'quiz-app-ff0ab';
-  const privateKey = process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n');
-  const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
+let isInitialized = false;
 
-  if (!privateKey || !clientEmail) {
-    console.warn('⚠️ Firebase Admin SDK credentials not found in environment variables');
-  } else {
-    try {
-      admin.initializeApp({
-        credential: admin.credential.cert({
-          projectId,
-          privateKey,
-          clientEmail,
-        } as admin.ServiceAccount),
-      });
-      console.log('✅ Firebase Admin SDK initialized');
-    } catch (error: any) {
-      console.error('❌ Error initializing Firebase Admin SDK:', error.message);
+// Initialize Firebase Admin SDK
+try {
+  if (!admin.apps.length) {
+    const projectId = process.env.FIREBASE_PROJECT_ID || 'quiz-app-ff0ab';
+    const privateKey = process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n');
+    const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
+
+    if (!privateKey || !clientEmail) {
+      console.warn('⚠️ Firebase Admin SDK credentials not found in environment variables');
+    } else {
+      try {
+        admin.initializeApp({
+          credential: admin.credential.cert({
+            projectId,
+            privateKey,
+            clientEmail,
+          } as admin.ServiceAccount),
+        });
+        isInitialized = true;
+        console.log('✅ Firebase Admin SDK initialized');
+      } catch (error: any) {
+        console.error('❌ Error initializing Firebase Admin SDK:', error.message);
+      }
     }
   }
+} catch (error: any) {
+  console.warn('⚠️ Firebase Admin SDK initialization skipped:', error.message);
 }
 
-export const db = admin.firestore();
-export const auth = admin.auth();
+// Lazy getters that will throw only when actually used
+export const db = isInitialized ? admin.firestore() : (null as any);
+export const auth = isInitialized ? admin.auth() : (null as any);
 
 // Delete Firebase Auth user
 export async function deleteFirebaseUser(uid: string): Promise<boolean> {
   try {
+    if (!auth) throw new Error('Firebase Admin SDK not initialized');
     await auth.deleteUser(uid);
     console.log(`✅ Successfully deleted Firebase Auth user: ${uid}`);
     return true;
@@ -61,6 +70,7 @@ export async function deleteFirebaseUser(uid: string): Promise<boolean> {
 // Create custom claims for user
 export async function setUserClaims(uid: string, claims: Record<string, any>): Promise<boolean> {
   try {
+    if (!auth) throw new Error('Firebase Admin SDK not initialized');
     await auth.setCustomUserClaims(uid, claims);
     console.log(`✅ Custom claims set for user ${uid}`);
     return true;
@@ -73,6 +83,7 @@ export async function setUserClaims(uid: string, claims: Record<string, any>): P
 // Get user by email
 export async function getUserByEmail(email: string) {
   try {
+    if (!auth) throw new Error('Firebase Admin SDK not initialized');
     const user = await auth.getUserByEmail(email);
     return user;
   } catch (error: any) {
