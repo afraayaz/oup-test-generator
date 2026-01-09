@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import Sidebar from '@/components/Sidebar';
 import { DndContext, closestCenter, DragEndEvent } from '@dnd-kit/core';
@@ -58,7 +59,7 @@ function SortableItem({ id, children }: { id: string; children: React.ReactNode 
   );
 }
 
-export default function QuizAttemptPage() {
+function QuizAttemptPageContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const quizId = searchParams.get('id');
@@ -1201,6 +1202,14 @@ export default function QuizAttemptPage() {
         </div>
       </main>
     </div>
+  );
+}
+
+export default function QuizAttemptPage() {
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <QuizAttemptPageContent />
+    </Suspense>
   );
 }
 

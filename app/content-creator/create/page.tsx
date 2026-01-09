@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import { Suspense } from "react";
 import Sidebar from "@/components/Sidebar";
 import { useUserProfile } from "@/hooks/useUserProfile";
 import { useSearchParams } from "next/navigation";
@@ -10,7 +11,7 @@ import dynamic from "next/dynamic";
 
 const CreateInteractiveQuiz = dynamic(() => import("../interactiveQuiz/page"), { ssr: false });
 
-export default function ContentCreatorCreateQuestionPage() {
+function ContentCreatorCreateQuestionPageContent() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [mode, setMode] = useState<'create' | 'bank' | 'interactive'>('create');
   const { user } = useUserProfile();
@@ -131,5 +132,13 @@ export default function ContentCreatorCreateQuestionPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function ContentCreatorCreateQuestionPage() {
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <ContentCreatorCreateQuestionPageContent />
+    </Suspense>
   );
 }

@@ -1,12 +1,13 @@
 "use client";
 
 import { useState, useMemo } from "react";
+import { Suspense } from "react";
 import Sidebar from "@/components/Sidebar";
 import { useUserProfile } from "@/hooks/useUserProfile";
 import { useRouter, useSearchParams } from "next/navigation";
 import QuestionForm, { QuestionFormData } from "@/components/QuestionForm";
 
-export default function TeacherCreateIndividualQuestionPage() {
+function TeacherCreateIndividualQuestionPageContent() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [successMessage, setSuccessMessage] = useState("");
@@ -159,5 +160,13 @@ export default function TeacherCreateIndividualQuestionPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function TeacherCreateIndividualQuestionPage() {
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <TeacherCreateIndividualQuestionPageContent />
+    </Suspense>
   );
 }

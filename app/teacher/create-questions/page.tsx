@@ -1,13 +1,14 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import { Suspense } from "react";
 import Sidebar from "@/components/Sidebar";
 import { useUserProfile } from "@/hooks/useUserProfile";
 import { useSearchParams } from "next/navigation";
 import QuestionCreationModePage from "@/components/QuestionCreationModePage";
 import QuestionBank from "@/components/QuestionBank";
 
-export default function TeacherCreateQuestionPage() {
+function TeacherCreateQuestionPageContent() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [mode, setMode] = useState<'create' | 'bank'>('create');
   const { user } = useUserProfile();
@@ -118,5 +119,13 @@ export default function TeacherCreateQuestionPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function TeacherCreateQuestionPage() {
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <TeacherCreateQuestionPageContent />
+    </Suspense>
   );
 }
