@@ -356,7 +356,7 @@ const DiagramLabelingBuilder = ({ question, onUpdate }: { question: DragDropQues
 // All builders are now implemented
 
 const builderComponents: {
-  [K in Exclude<QuizType, "" | "fill-blanks">]: React.FC<{
+  [K in Exclude<QuizType, "">]: React.FC<{
     question: QuestionMap[K];
     onUpdate: (updated: QuestionMap[K]) => void;
   }>;
@@ -366,6 +366,7 @@ const builderComponents: {
   matching: MatchingBuilder,
   categorization: CategorizationBuilder,
   ordering: OrderingBuilder,
+  "fill-blanks": FillBlanksBuilder,
 };
 
 const getQuizTypeIcon = (type: QuizType) => {
