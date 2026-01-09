@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/firebaseAdmin';
 
+export const dynamic = 'force-dynamic';
+
 // Consolidated endpoint to fetch all dashboard stats in one call
 export async function GET() {
   try {
