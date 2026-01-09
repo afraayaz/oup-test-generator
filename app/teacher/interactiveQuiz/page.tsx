@@ -42,7 +42,7 @@ const DiagramLabelingBuilder = ({ question, onUpdate }: { question: DragDropQues
     question.dragItems?.map((item, idx) => ({
       id: item.id,
       number: idx + 1,
-      answer: item.text,
+      answer: item.label,
       x: (item as any).x,
       y: (item as any).y
     })) || []
