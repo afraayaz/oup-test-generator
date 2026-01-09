@@ -58,7 +58,7 @@ const DiagramLabelingBuilder = ({ question, onUpdate }: { question: DragDropQues
     onUpdate({
       ...question,
       layoutMode: "image",
-      dragItems: labels.map(label => ({ id: label.id, text: label.answer })),
+      dragItems: labels.map(label => ({ id: label.id, label: label.answer, type: "text" })),
       backgroundImage,
     });
   }, [labels, backgroundImage]);
