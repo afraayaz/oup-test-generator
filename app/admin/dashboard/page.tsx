@@ -258,7 +258,7 @@ export default function AdminDashboard() {
             
             if (diffMins <= 1440) { // Last 24 hours
               activities.push({
-                id: `teacher-${user.id}`,
+                id: `teacher-${user?.id}`,
                 type: 'teacher',
                 title: 'New teacher registered',
                 description: `${user.name} joined ${user.schoolName || 'a school'}`,

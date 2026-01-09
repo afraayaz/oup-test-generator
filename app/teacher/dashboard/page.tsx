@@ -273,7 +273,7 @@ export default function TeacherDashboard() {
 
   // Fetch quiz data (created and assigned)
   useEffect(() => {
-    if (!user?.id) return;
+    if (!user?.uid) return;
 
     const fetchQuizData = async () => {
       setLoadingQuizzes(true);
@@ -300,7 +300,7 @@ export default function TeacherDashboard() {
     };
 
     fetchQuizData();
-  }, [user?.id]);
+  }, [user?.uid]);
 
   // Fetch question counts for all assigned books
   useEffect(() => {
