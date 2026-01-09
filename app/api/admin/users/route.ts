@@ -1,8 +1,18 @@
 import { NextResponse } from 'next/server';
 import { db, auth, deleteFirebaseUser } from '@/lib/firebaseAdmin';
 
+export const dynamic = 'force-dynamic';
+
 export async function GET(request: Request) {
   try {
+    // Check if Firebase is properly initialized
+    if (!process.env.FIREBASE_PRIVATE_KEY || !process.env.FIREBASE_CLIENT_EMAIL) {
+      return NextResponse.json(
+        { error: 'Firebase not configured' },
+        { status: 503 }
+      );
+    }
+
     const { searchParams } = new URL(request.url);
     const schoolId = searchParams.get('schoolId');
     const campusId = searchParams.get('campusId');
@@ -41,6 +51,14 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
+    // Check if Firebase is properly initialized
+    if (!process.env.FIREBASE_PRIVATE_KEY || !process.env.FIREBASE_CLIENT_EMAIL) {
+      return NextResponse.json(
+        { error: 'Firebase not configured' },
+        { status: 503 }
+      );
+    }
+
     const body = await request.json();
     const { 
       name, 
@@ -170,6 +188,14 @@ export async function POST(request: Request) {
 
 export async function PUT(request: Request) {
   try {
+    // Check if Firebase is properly initialized
+    if (!process.env.FIREBASE_PRIVATE_KEY || !process.env.FIREBASE_CLIENT_EMAIL) {
+      return NextResponse.json(
+        { error: 'Firebase not configured' },
+        { status: 503 }
+      );
+    }
+
     const body = await request.json();
     const { id, ...updateData } = body;
     
@@ -201,6 +227,14 @@ export async function PUT(request: Request) {
 
 export async function DELETE(request: Request) {
   try {
+    // Check if Firebase is properly initialized
+    if (!process.env.FIREBASE_PRIVATE_KEY || !process.env.FIREBASE_CLIENT_EMAIL) {
+      return NextResponse.json(
+        { error: 'Firebase not configured' },
+        { status: 503 }
+      );
+    }
+
     const { searchParams } = new URL(request.url);
     const id = searchParams.get('id');
     
