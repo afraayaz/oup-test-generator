@@ -20,22 +20,46 @@ export function useUserProfile() {
   const [user, setUser] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [lastFetchTime, setLastFetchTime] = useState<number>(0);
+  const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes cache
 
   // Function to fetch and update user profile from Firestore
-  const refreshUserProfile = async (authUser: any) => {
+  const refreshUserProfile = async (authUser: any, forceRefresh = false) => {
     try {
+      // Check cache first - only refresh if > 5 minutes old or forced
+      const now = Date.now();
+      if (!forceRefresh && (now - lastFetchTime) < CACHE_DURATION && user) {
+        console.log('✅ Using cached user profile (age:', Math.round((now - lastFetchTime) / 1000), 'seconds)');
+        return true;
+      }
+      
       console.log('🔄 Refreshing user profile for:', authUser.email);
       
+      // Query by email field instead of fetching all users - this is MUCH more efficient
       const usersResponse = await fetch(
-        `https://firestore.googleapis.com/v1/projects/quiz-app-ff0ab/databases/(default)/documents/users`
+        `https://firestore.googleapis.com/v1/projects/quiz-app-ff0ab/databases/(default)/documents:runQuery`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            structuredQuery: {
+              from: [{ collectionId: 'users' }],
+              where: {
+                fieldFilter: {
+                  field: { fieldPath: 'email' },
+                  op: 'EQUAL',
+                  value: { stringValue: authUser.email }
+                }
+              },
+              limit: 1
+            }
+          })
+        }
       );
       
       if (usersResponse.ok) {
         const usersData = await usersResponse.json();
-        
-        const userDoc = (usersData.documents || []).find((doc: any) =>
-          doc.fields?.email?.stringValue === authUser.email
-        );
+        const userDoc = usersData[0]?.document;
 
         if (userDoc) {
           console.log('✅ Updated user doc found, parsing...');
@@ -178,6 +202,7 @@ export function useUserProfile() {
           console.log('🔥 About to call setUser with:', userProfile);
           setUser(userProfile);
           saveTabSession(userProfile);
+          setLastFetchTime(Date.now());
           return true;
         }
       }
@@ -250,19 +275,10 @@ export function useUserProfile() {
       }
     });
 
-    // Set up periodic refresh every 30 seconds when user is active
-    const refreshInterval = setInterval(async () => {
-      if (auth.currentUser && document.visibilityState === 'visible') {
-        console.log('⏱️ Periodic refresh - checking for updates...');
-        await refreshUserProfile(auth.currentUser);
-      }
-    }, 30000); // Refresh every 30 seconds
-
     return () => {
       unsubscribe();
       window.removeEventListener('storage', handleStorageChange);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
-      clearInterval(refreshInterval);
     };
   }, []);
 

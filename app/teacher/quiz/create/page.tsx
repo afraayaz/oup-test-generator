@@ -35,6 +35,7 @@ export default function CreateQuizPage() {
   const [selectedGrade, setSelectedGrade] = useState<string>('');
   const [selectedBook, setSelectedBook] = useState<string>('');
   const [selectedChapter, setSelectedChapter] = useState<string>('');
+  const [chapters, setChapters] = useState<string[]>([]);
 
   // Step 3: Question Selection
   const [allQuestions, setAllQuestions] = useState<Question[]>([]);
@@ -61,6 +62,66 @@ export default function CreateQuizPage() {
       fetchQuestions();
     }
   }, [step, selectedQB, selectedSubject, selectedGrade, selectedBook, selectedChapter, filters]);
+
+  // Fetch chapters when book changes
+  useEffect(() => {
+    if (!selectedBook || !selectedQB || !selectedSubject || !selectedGrade) {
+      setChapters([]);
+      return;
+    }
+
+    const loadChapters = async () => {
+      try {
+        const gradeFormatted = selectedGrade.startsWith('Grade') ? selectedGrade : `Grade ${selectedGrade}`;
+        const chaptersSet = new Set<string>();
+
+        // Fetch from OUP
+        if (selectedQB === 'oup' || selectedQB === 'both') {
+          try {
+            const oupRef = collection(db, 'questions/oup');
+            const oupSnapshot = await getDocs(oupRef);
+            oupSnapshot.docs.forEach(doc => {
+              const data = doc.data();
+              if (data.book === selectedBook && data.subject === selectedSubject && data.grade === gradeFormatted && data.chapter) {
+                chaptersSet.add(data.chapter);
+              }
+            });
+          } catch (err) {
+            console.log('Note: Could not fetch OUP questions');
+          }
+        }
+
+        // Fetch from School
+        if (selectedQB === 'school' || selectedQB === 'both') {
+          try {
+            const schoolRef = collection(db, `questions/schools/${user?.schoolId}`);
+            const schoolSnapshot = await getDocs(schoolRef);
+            schoolSnapshot.docs.forEach(doc => {
+              const data = doc.data();
+              if (data.book === selectedBook && data.subject === selectedSubject && data.grade === gradeFormatted && data.chapter) {
+                chaptersSet.add(data.chapter);
+              }
+            });
+          } catch (err) {
+            console.log('Note: Could not fetch school questions');
+          }
+        }
+
+        const chaptersList = Array.from(chaptersSet).sort((a, b) => {
+          const numA = parseInt(a.replace(/\D/g, '')) || 0;
+          const numB = parseInt(b.replace(/\D/g, '')) || 0;
+          return numA - numB;
+        });
+
+        setChapters(chaptersList);
+      } catch (error) {
+        console.error('Error loading chapters:', error);
+        setChapters([]);
+      }
+    };
+
+    loadChapters();
+  }, [selectedBook, selectedSubject, selectedGrade, selectedQB, user?.schoolId]);
 
   const fetchQuestions = async () => {
     setLoading(true);
@@ -402,7 +463,6 @@ export default function CreateQuizPage() {
     const availableGrades = getAvailableGrades();
     const availableSubjects = getAvailableSubjects();
     const availableBooks = getAvailableBooks();
-    const chapters = getChaptersForBook();
 
     return (
       <div className="flex min-h-screen bg-gray-50">

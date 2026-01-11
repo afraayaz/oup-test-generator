@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { db } from '@/lib/firebaseAdmin';
+import { db, getDb, switchToSecondaryFirebase, resetToPrimaryFirebase } from '@/lib/firebaseAdmin';
 
 export const dynamic = 'force-dynamic';
 
@@ -13,11 +13,12 @@ export async function GET() {
       );
     }
 
-    const subjectsSnapshot = await db.collection('subjects').get();
+    const currentDb = await getDb();
+    const subjectsSnapshot = await currentDb.collection('subjects').get();
     
     const subjects = await Promise.all(
       subjectsSnapshot.docs.map(async (doc) => {
-        const booksSnapshot = await db.collection('subjects').doc(doc.id).collection('books').get();
+        const booksSnapshot = await currentDb.collection('subjects').doc(doc.id).collection('books').get();
         const books = booksSnapshot.docs.map(bookDoc => ({
           id: bookDoc.id,
           ...bookDoc.data(),
@@ -31,9 +32,50 @@ export async function GET() {
       })
     );
 
+    // Reset to primary if it was switched
+    resetToPrimaryFirebase();
+
     return NextResponse.json({ subjects });
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error fetching subjects:', error);
+    
+    // Check for quota error
+    if (error.message?.includes('quota') || error.code === 'RESOURCE_EXHAUSTED' || error.message?.includes('quota')) {
+      console.warn('⚠️ Primary Firebase quota exceeded, switching to secondary');
+      switchToSecondaryFirebase();
+      
+      try {
+        // Retry with secondary Firebase
+        const backupDb = await getDb();
+        const subjectsSnapshot = await backupDb.collection('subjects').get();
+        
+        const subjects = await Promise.all(
+          subjectsSnapshot.docs.map(async (doc) => {
+            const booksSnapshot = await backupDb.collection('subjects').doc(doc.id).collection('books').get();
+            const books = booksSnapshot.docs.map(bookDoc => ({
+              id: bookDoc.id,
+              ...bookDoc.data(),
+            }));
+
+            return {
+              id: doc.id,
+              ...doc.data(),
+              books,
+            };
+          })
+        );
+
+        console.log('✅ Successfully fetched from secondary Firebase');
+        return NextResponse.json({ subjects });
+      } catch (retryError) {
+        console.error('❌ Secondary Firebase also failed:', retryError);
+        return NextResponse.json(
+          { error: 'Firebase quota exceeded and backup unavailable' },
+          { status: 503 }
+        );
+      }
+    }
+
     return NextResponse.json(
       { error: 'Failed to fetch subjects' },
       { status: 500 }

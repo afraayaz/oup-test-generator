@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { db } from '@/lib/firebaseAdmin';
+import { db, getDb, switchToSecondaryFirebase, resetToPrimaryFirebase } from '@/lib/firebaseAdmin';
 
 export const dynamic = 'force-dynamic';
 
@@ -13,6 +13,7 @@ export async function GET(request: NextRequest) {
       );
     }
 
+    const currentDb = await getDb();
     const { searchParams } = new URL(request.url);
     const subject = searchParams.get('subject');
     const book = searchParams.get('book');
@@ -32,11 +33,11 @@ export async function GET(request: NextRequest) {
     if (bookId && !subjectId) {
       console.log(`🔍 Finding subject that contains book ID "${bookId}"...`);
       try {
-        const subjectsSnapshot = await db.collection('subjects').get();
+        const subjectsSnapshot = await currentDb.collection('subjects').get();
         
         for (const subjectDoc of subjectsSnapshot.docs) {
           try {
-            const booksSnapshot = await db
+            const booksSnapshot = await currentDb
               .collection('subjects')
               .doc(subjectDoc.id)
               .collection('books')
@@ -64,7 +65,7 @@ export async function GET(request: NextRequest) {
     if (subjectId && bookId) {
       console.log(`📖 Fetching chapters directly from subjects/${subjectId}/books/${bookId}/chapters...`);
       try {
-        const chaptersSnapshot = await db
+        const chaptersSnapshot = await currentDb
           .collection('subjects')
           .doc(subjectId)
           .collection('books')
@@ -99,7 +100,7 @@ export async function GET(request: NextRequest) {
         console.log(`🔍 Trying numeric IDs: subjectId="${subjectId}", bookId="${bookId}"`);
         
         try {
-          const oupQuestionsRef = db.collection('questions').doc('oup').collection('items');
+          const oupQuestionsRef = currentDb.collection('questions').doc('oup').collection('items');
           const oupSnapshot = await oupQuestionsRef
             .where('subject', '==', subjectId)
             .where('book', '==', bookId)
@@ -114,7 +115,7 @@ export async function GET(request: NextRequest) {
 
         // Get School questions using numeric IDs
         try {
-          const schoolQuestionsRef = db.collection('questions').doc('schools');
+          const schoolQuestionsRef = currentDb.collection('questions').doc('schools');
           const schoolsSnapshot = await schoolQuestionsRef.listCollections();
           
           for (const schoolCollection of schoolsSnapshot) {
@@ -143,7 +144,7 @@ export async function GET(request: NextRequest) {
         console.log(`⚠️ No results with numeric IDs, trying display names...`);
         
         try {
-          const oupQuestionsRef = db.collection('questions').doc('oup').collection('items');
+          const oupQuestionsRef = currentDb.collection('questions').doc('oup').collection('items');
           const oupSnapshot = await oupQuestionsRef
             .where('subject', '==', subject)
             .where('book', '==', book)
@@ -158,7 +159,7 @@ export async function GET(request: NextRequest) {
 
         // Get School questions with display names
         try {
-          const schoolQuestionsRef = db.collection('questions').doc('schools');
+          const schoolQuestionsRef = currentDb.collection('questions').doc('schools');
           const schoolsSnapshot = await schoolQuestionsRef.listCollections();
           
           for (const schoolCollection of schoolsSnapshot) {
@@ -209,6 +210,7 @@ export async function GET(request: NextRequest) {
       console.log(`⚠️ No chapters found for subject="${subject}", book="${book}"`);
     }
 
+    resetToPrimaryFirebase();
     return NextResponse.json({
       chapters: chaptersList,
       total: chaptersList.length,
@@ -218,6 +220,55 @@ export async function GET(request: NextRequest) {
     });
   } catch (error: any) {
     console.error('❌ Error fetching chapters:', error);
+    
+    // Check for quota error
+    if (error.message?.includes('quota') || error.code === 'RESOURCE_EXHAUSTED') {
+      console.warn('⚠️ Primary Firebase quota exceeded, switching to secondary');
+      switchToSecondaryFirebase();
+      
+      try {
+        // Retry with secondary Firebase
+        const backupDb = await getDb();
+        const fallbackParams = new URL('http://localhost?' + new URL(request.url).searchParams).searchParams;
+        const fallbackSubject = fallbackParams.get('subject') || subject;
+        const fallbackBook = fallbackParams.get('book') || book;
+        const fallbackBookId = fallbackParams.get('bookId') || bookId;
+        let fallbackSubjectId = fallbackParams.get('subjectId') || '';
+        
+        // Simplified fallback - just try to get chapters
+        const fallbackChapters = new Set<string>();
+        
+        if (fallbackSubjectId && fallbackBookId) {
+          const fallbackSnapshot = await backupDb
+            .collection('subjects')
+            .doc(fallbackSubjectId)
+            .collection('books')
+            .doc(fallbackBookId)
+            .collection('chapters')
+            .get();
+          
+          fallbackSnapshot.docs.forEach(doc => {
+            fallbackChapters.add(doc.data().chapterName || doc.id);
+          });
+        }
+        
+        console.log('✅ Successfully fetched from secondary Firebase');
+        return NextResponse.json({
+          chapters: Array.from(fallbackChapters).sort(),
+          total: fallbackChapters.size,
+          source: 'secondary',
+          subjectId: fallbackSubjectId,
+          bookId: fallbackBookId
+        });
+      } catch (retryError) {
+        console.error('❌ Secondary Firebase also failed:', retryError);
+        return NextResponse.json(
+          { error: 'Firebase quota exceeded and backup unavailable' },
+          { status: 503 }
+        );
+      }
+    }
+    
     return NextResponse.json(
       { error: 'Failed to fetch chapters', details: error.message },
       { status: 500 }

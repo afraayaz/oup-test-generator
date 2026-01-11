@@ -145,15 +145,21 @@ export default function LoginPage() {
             
             // Handle specific Firebase auth errors that aren't network-related
             if (error.code === 'auth/user-not-found') {
-              userMessage = 'User not found. Please check your email.';
+              userMessage = '❌ User not found. Please check your email address.';
             } else if (error.code === 'auth/wrong-password') {
-              userMessage = 'Incorrect password. Please try again.';
+              userMessage = '❌ Incorrect password. Please try again.';
             } else if (error.code === 'auth/invalid-email') {
-              userMessage = 'Invalid email format.';
+              userMessage = '❌ Invalid email format. Please check your email.';
             } else if (error.code === 'auth/user-disabled') {
-              userMessage = 'This account has been disabled. Contact support.';
+              userMessage = '❌ This account has been disabled. Contact support.';
+            } else if (error.code === 'auth/too-many-requests') {
+              userMessage = '❌ Too many failed login attempts. Please try again later.';
+            } else if (error.code === 'auth/invalid-credential') {
+              userMessage = '❌ Invalid email or password. Please try again.';
             } else if (error.message === 'No internet connection. Please check your network and try again.') {
               userMessage = error.message;
+            } else if (error.message?.includes('quota')) {
+              userMessage = '⚠️ Primary service temporarily unavailable. Using backup service...';
             }
             
             setError(userMessage);
@@ -240,7 +246,20 @@ export default function LoginPage() {
                         </div>
 
                         {error && (
-                            <div className="text-red-500 text-sm text-center mb-4">{error}</div>
+                            <div className="bg-red-50 border border-red-300 rounded-lg p-4 mb-4">
+                                <div className="flex items-start">
+                                    <i className="ri-error-warning-line text-red-600 mr-3 mt-0.5"></i>
+                                    <div>
+                                        <p className="text-red-700 text-sm font-medium">{error}</p>
+                                        {error.includes('too many requests') && (
+                                            <p className="text-red-600 text-xs mt-1">Please wait a few minutes before trying again.</p>
+                                        )}
+                                        {(error.includes('not found') || error.includes('Incorrect')) && (
+                                            <p className="text-red-600 text-xs mt-1">Check your email and password are correct.</p>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
                         )}
 
                         <form onSubmit={handleLogin} className="space-y-6">

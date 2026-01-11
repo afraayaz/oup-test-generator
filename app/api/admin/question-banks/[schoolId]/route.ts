@@ -1,4 +1,4 @@
-import { db } from '@/lib/firebaseAdmin';
+import { db, withQuotaFallback, isQuotaError } from '@/lib/firebaseAdmin';
 import { NextRequest, NextResponse } from 'next/server';
 
 export const dynamic = 'force-dynamic';

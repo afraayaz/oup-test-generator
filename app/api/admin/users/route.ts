@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { db, auth, deleteFirebaseUser } from '@/lib/firebaseAdmin';
+import { db, auth, deleteFirebaseUser, getDb, switchToSecondaryFirebase, resetToPrimaryFirebase } from '@/lib/firebaseAdmin';
 
 export const dynamic = 'force-dynamic';
 

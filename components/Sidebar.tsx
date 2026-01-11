@@ -87,7 +87,7 @@ export default function Sidebar({
     },
     {
       id: "quiz",
-      label: "Quiz Generator",
+      label: "Create Quiz",
       icon: "ri-file-list-3-line",
       href: "/teacher/quiz",
     },
