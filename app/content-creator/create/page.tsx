@@ -90,7 +90,7 @@ function ContentCreatorCreateQuestionPageContent() {
                     : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
                 }`}
               >
-                <span className="hidden sm:inline">Interactive</span>
+                {/* <span className="hidden sm:inline">Interactive</span> */}
                 <span className="sm:hidden">⚡</span>
               </button>
               <button
