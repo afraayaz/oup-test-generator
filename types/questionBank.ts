@@ -18,6 +18,7 @@ export interface BaseQuestion {
   createdBy: string;
   updatedAt?: any;
   updatedBy?: string;
+  imageUrl?: string; // Optional image URL
 }
 
 export interface OUPQuestion extends BaseQuestion {

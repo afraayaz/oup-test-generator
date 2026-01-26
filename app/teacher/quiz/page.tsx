@@ -693,6 +693,9 @@ const QuizGeneration = () => {
     
     console.log('📌 Using IDs:', { numericSubjectId, numericBookId, selectedSubject, selectedBook, foundSubjectId });
     
+    let matchedCount = 0;
+    let failedGrade = 0, failedSubject = 0, failedBook = 0, failedChapter = 0, failedNoSLO = 0;
+    
     questions.forEach(q => {
       const qGradeNormalized = (q.grade || q.class || '').toString().replace(/^(Grade|Class)\s+/i, '').trim().toLowerCase();
       const qSubject = (q.subject || '').toString().toLowerCase();
@@ -708,16 +711,56 @@ const QuizGeneration = () => {
       }
       
       // Check if this question matches our selected grade/subject/book
-      // Try both numeric IDs and display names
+      // Try both numeric IDs and display names (convert both to lowercase and string for comparison)
       const gradeMatch = qGradeNormalized === selectedGradeNormalized;
-      const subjectMatch = qSubject === selectedSubjectLower || qSubject === numericSubjectId.toLowerCase();
-      const bookMatch = qBook === selectedBookLower || qBook === numericBookId.toLowerCase();
+      const subjectMatch = qSubject === selectedSubjectLower || 
+                          qSubject === String(numericSubjectId).toLowerCase() ||
+                          qSubject === numericSubjectId;
+      const bookMatch = qBook === selectedBookLower || 
+                       qBook === String(numericBookId).toLowerCase() ||
+                       qBook === numericBookId;
       const chapterMatch = selectedChapters.includes(qChapter);
       
-      if (gradeMatch && subjectMatch && bookMatch && chapterMatch && qSLO) {
-        console.log('✅ SLO Match found:', { qChapter, qSLO, qSubject, numericSubjectId });
-        slos.add(qSLO);
+      // Debug: Log first 5 questions that match grade/subject/book but fail overall
+      if (gradeMatch && subjectMatch && bookMatch) {
+        if (!chapterMatch) {
+          if (failedChapter < 3) {
+            console.log('❌ SLO Search - Chapter mismatch:', { 
+              qChapter, 
+              selectedChapters: selectedChapters.slice(0, 3),
+              qSLO,
+              hasChapter: !!qChapter,
+              hasSLO: !!qSLO
+            });
+          }
+          failedChapter++;
+        } else if (!qSLO) {
+          if (failedNoSLO < 3) {
+            console.log('⚠️ SLO Search - Question has no SLO:', { qChapter, qSubject, qBook, qGrade: qGradeNormalized });
+          }
+          failedNoSLO++;
+        }
       }
+      
+      if (!gradeMatch) failedGrade++;
+      if (!subjectMatch) failedSubject++;
+      if (!bookMatch) failedBook++;
+      
+      if (gradeMatch && subjectMatch && bookMatch && chapterMatch && qSLO) {
+        console.log('✅ SLO Match found:', { qChapter, qSLO, qSubject, qBook, numericSubjectId, numericBookId });
+        slos.add(qSLO);
+        matchedCount++;
+      }
+    });
+    
+    console.log('📊 SLO Search Summary:', {
+      totalQuestions: questions.length,
+      matched: matchedCount,
+      failedGrade,
+      failedSubject,
+      failedBook,
+      failedChapter,
+      failedNoSLO
     });
     
     const sloArray = Array.from(slos).sort();
@@ -1131,6 +1174,7 @@ const QuizGeneration = () => {
           explanation: { text: q.explanation || '', format: 'text', isRTL: false },
           isInteractive: isInteractiveType && q.isInteractive,
           interactiveData: interactiveData,
+          imageUrl: q.imageUrl || null,
         });
       });
     });
@@ -1614,6 +1658,7 @@ const QuizGeneration = () => {
                   ${isMarked ? `<div class="${q.question.isRTL ? 'question-number-marks-urdu' : 'question-number-marks'}">(${q.marks} marks)</div>` : ''}
                 </div>
                 <div class="question-text ${q.question.isRTL ? 'urdu' : ''}">${extractLatexFromFormulas(q.question.text)}</div>
+                ${(q as any).imageUrl ? `<div style="margin-top: 10px; margin-bottom: 10px;"><img src="${(q as any).imageUrl}" alt="Question image" style="max-width: 100%; height: auto; max-height: 300px; border: 1px solid #ddd; border-radius: 4px;" /></div>` : ''}
                 ${
                   q.type === 'multiple' && q.options?.length
                     ? `<div class="options ${q.question.isRTL ? 'urdu' : ''}">${q.options
@@ -1813,7 +1858,30 @@ const QuizGeneration = () => {
     if (!generatedQuiz) return;
     try {
       const docxModule = await import('docx');
-      const { Document, Packer, Paragraph, TextRun, Header, Footer, AlignmentType, Table, TableRow, TableCell, WidthType, BorderStyle } = docxModule;
+      const { Document, Packer, Paragraph, TextRun, Header, Footer, AlignmentType, Table, TableRow, TableCell, WidthType, BorderStyle, ImageRun } = docxModule;
+      
+      // Helper function to fetch image and convert to buffer
+      const fetchImageAsBuffer = async (url: string): Promise<Uint8Array | null> => {
+        try {
+          const response = await fetch(url);
+          if (!response.ok) return null;
+          const blob = await response.blob();
+          const arrayBuffer = await blob.arrayBuffer();
+          return new Uint8Array(arrayBuffer);
+        } catch (error) {
+          console.error('Error fetching image:', error);
+          return null;
+        }
+      };
+      
+      // Pre-fetch all images
+      const imageBuffers: { [key: number]: Uint8Array | null } = {};
+      for (let i = 0; i < editedQuestions.length; i++) {
+        const q = editedQuestions[i];
+        if ((q as any).imageUrl) {
+          imageBuffers[i] = await fetchImageAsBuffer((q as any).imageUrl);
+        }
+      }
       
       // Alternative download function if file-saver doesn't work
       const downloadBlob = (blob: Blob, filename: string) => {
@@ -2071,8 +2139,25 @@ const QuizGeneration = () => {
                   color: '2c3e50'
                 })],
                 alignment: q.question.isRTL ? AlignmentType.RIGHT : AlignmentType.LEFT,
-                spacing: { after: 100 },
+                spacing: { after: (q as any).imageUrl ? 50 : 100 },
               }),
+              ...((q as any).imageUrl && imageBuffers[i] ? [new Paragraph({
+                children: [
+                  new ImageRun({
+                    data: imageBuffers[i]!,
+                    transformation: {
+                      width: 400,
+                      height: 300,
+                    },
+                  })
+                ],
+                alignment: AlignmentType.LEFT,
+                spacing: { after: 100 },
+              })] : (q as any).imageUrl ? [new Paragraph({
+                children: [new TextRun({ text: `[Image: ${(q as any).imageUrl}]`, size: 20, font: 'Calibri', color: '999999', italics: true })],
+                alignment: AlignmentType.LEFT,
+                spacing: { after: 100 },
+              })] : []),
               ...(q.type === 'multiple' && q.options?.length
                 ? q.options.map((opt: any, j: number) => {
                     const optionLabel = q.question.isRTL ? optionLabels(true)[j] : String.fromCharCode(65 + j);
@@ -2574,6 +2659,26 @@ const QuizGeneration = () => {
                 </div>
               )}
 
+              {/* Info message when no SLOs available */}
+              {quizFormat && selectedChapters.length > 0 && getAvailableSLOs().length === 0 && (
+                <div className="bg-yellow-50 rounded-xl border border-yellow-200 p-4">
+                  <div className="flex items-start">
+                    <svg className="h-5 w-5 text-yellow-600 mt-0.5 mr-3 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <div>
+                      <h4 className="text-sm font-semibold text-yellow-900 mb-1">No SLOs Available</h4>
+                      <p className="text-xs text-yellow-800">
+                        The selected questions don't have Student Learning Outcomes (SLOs) assigned. You can still proceed to create a quiz without SLO filtering.
+                      </p>
+                      <p className="text-xs text-yellow-700 mt-2">
+                        💡 <strong>Tip:</strong> Add SLO values to your questions when creating them to enable SLO-based filtering.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {/* Step 4: Question Configuration by Type */}
               {quizFormat && selectedBook && (selectedChapters.length > 0 || selectedSLOs.length > 0) && (
                 <div className="bg-white rounded-xl shadow-sm border p-6">
@@ -3072,6 +3177,16 @@ const QuizGeneration = () => {
                           className={`w-full p-2 border rounded mt-2 ${q.question.isRTL ? 'text-right font-noto-nastaliq' : ''}`}
                           dir={q.question.isRTL ? 'rtl' : 'ltr'}
                         />
+                        {(q as any).imageUrl && (
+                          <div className="mt-3 mb-3">
+                            <img 
+                              src={(q as any).imageUrl} 
+                              alt="Question image" 
+                              className="max-w-full h-auto rounded border"
+                              style={{ maxHeight: '300px' }}
+                            />
+                          </div>
+                        )}
                         {q.type === 'multiple' && q.options?.length > 0 ? (
                           <div className="mt-2">
                             <label className="block text-sm font-medium text-gray-700 mb-2">Options:</label>

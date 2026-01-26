@@ -56,15 +56,16 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
 
     console.log("[OUP-Creator] Received request body:", {
+      questionText: body.questionText,
+      question: body.question,
       type: body.type,
       hasOptions: !!body.options,
       optionsLength: (body.options || []).length,
       optionsContent: body.options,
+      allFields: Object.keys(body),
       keys: Object.keys(body)
     });
 
-    const questionsRef = collection(db, 'questions', 'oup', 'items');
-    
     // Normalize grade to always have "Grade " prefix for consistent matching
     let normalizedGrade = body.grade || "";
     if (normalizedGrade && !normalizedGrade.toLowerCase().startsWith('grade ') && !normalizedGrade.toLowerCase().startsWith('class ')) {
@@ -111,29 +112,50 @@ export async function POST(request: NextRequest) {
     };
     normalizedType = typeMap[normalizedType] || normalizedType;
 
-    const newQuestion = {
-      ...body,
-      type: normalizedType, // Store with normalized type
-      grade: normalizedGrade, // Store with normalized format
-      difficulty: normalizedDifficulty, // Store with normalized format
-      // Explicitly handle options array for MCQ and multiple choice questions
-      options: (normalizedType === "multiple") ? body.options || [] : [],
-      createdBy: userId,
-      createdByName: userName,
+    // All questions go directly to question bank (approval queue removed)
+    const targetCollection = collection(db, 'questions', 'oup', 'items');
+    const questionData = {
+      questionText: body.questionText || body.question || "",
+      type: normalizedType,
+      subject: body.subject || "",
+      grade: normalizedGrade,
+      book: body.book || "",
+      chapter: body.chapter || "",
+      topic: body.topic || "",
+      slo: body.slo || "",
+      difficulty: normalizedDifficulty,
+      explanation: body.explanation || "",
+      options: normalizedType === "multiple" ? (Array.isArray(body.options) ? body.options : []) : [],
+      correctAnswer: body.correctAnswer || "",
+      blanks: normalizedType === "fillblanks" ? (body.blanks || {}) : {},
+      cognitiveLevel: body.cognitiveLevel || {
+        knowledge: false,
+        understanding: false,
+        application: false
+      },
+      createdBy: userId || "",
+      createdByName: userName || "Unknown User",
       createdAt: new Date(),
+      updatedBy: userId || "",
       updatedAt: new Date(),
-      updatedBy: userId
+      ...(body.imageUrl && { imageUrl: body.imageUrl }),
+      ...(body.isInteractiveQuestion && body.interactiveData && { 
+        isInteractive: true,
+        interactiveData: body.interactiveData 
+      })
     };
 
-    const docRef = await addDoc(questionsRef, newQuestion);
+    const docRef = await addDoc(targetCollection, questionData);
 
     // Log for debugging
     console.log(`[OUP-Creator] Question stored:`, {
       id: docRef.id,
       type: normalizedType,
-      hasOptions: normalizedType === "multiple" && (newQuestion.options || []).length > 0,
-      optionsLength: (newQuestion.options || []).length,
-      optionsContent: newQuestion.options
+      questionText: questionData.question,
+      questionField: !!questionData.question,
+      hasOptions: normalizedType === "multiple" && (questionData.options || []).length > 0,
+      optionsLength: (questionData.options || []).length,
+      storedFields: Object.keys(questionData)
     });
 
     // Update OUP stats
@@ -142,7 +164,8 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       success: true,
       questionId: docRef.id,
-      message: 'OUP question added successfully'
+      message: 'Question added successfully',
+      needsApproval: false
     });
   } catch (error) {
     console.error('Error adding OUP question:', error);

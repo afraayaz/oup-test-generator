@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import InlineMathToolbar from "./InlineMathToolbar";
 import UrduKeyboard from "./UrduKeyboard";
+import { uploadQuestionImage, validateImageFile } from "@/lib/uploadImage";
 
 interface QuestionFormProps {
   onSubmit: (questionData: QuestionFormData) => Promise<void>;
@@ -17,6 +18,7 @@ interface QuestionFormProps {
   showTopicField?: boolean;
   showSloField?: boolean;
   apiEndpoint?: string;
+  userId?: string; // Optional user ID for image uploads
 }
 
 export interface QuestionFormData {
@@ -33,6 +35,7 @@ export interface QuestionFormData {
   correctAnswer: string | string[]; // Support both single and multiple answers
   explanation: string;
   blanks: { [key: string]: string[] };
+  imageUrl?: string; // Optional image URL
 }
 
 const initialFormData: QuestionFormData = {
@@ -47,6 +50,7 @@ const initialFormData: QuestionFormData = {
   correctAnswer: [], // Initialize as empty array for multiple answers
   explanation: "",
   blanks: {},
+  imageUrl: "", // Initialize imageUrl field
 };
 
 export default function QuestionForm({
@@ -61,6 +65,7 @@ export default function QuestionForm({
   defaultBook,
   showTopicField = false,
   showSloField = false,
+  userId,
 }: QuestionFormProps) {
   const [currentStep, setCurrentStep] = useState(1);
   const [formData, setFormData] = useState<QuestionFormData>(initialFormData);
@@ -72,6 +77,11 @@ export default function QuestionForm({
   const [chaptersLoading, setChaptersLoading] = useState(false); // Loading state for chapters
   const [activeBlankId, setActiveBlankId] = useState<string | null>(null);
   const [urduKeyboardFocus, setUrduKeyboardFocus] = useState<"topic" | "slo" | null>(null); // Track which field needs Urdu keyboard
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string>("");
+  const [imageUploading, setImageUploading] = useState(false);
+  const [imageError, setImageError] = useState<string>("");
+  const [uploadProgress, setUploadProgress] = useState<number>(0);
 
   // Initialize with defaults
   useEffect(() => {
@@ -249,6 +259,36 @@ export default function QuestionForm({
   const isMathSubject = formData.subject.toLowerCase().includes("math") || formData.subject.toLowerCase().includes("mathematics");
   const isUrduSubject = formData.subject.toLowerCase().includes("urdu");
 
+  // Image handling functions
+  const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Validate the image file
+    const validation = validateImageFile(file);
+    if (!validation.valid) {
+      setImageError(validation.error || "Invalid file");
+      return;
+    }
+
+    setImageError("");
+    setImageFile(file);
+
+    // Create preview
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setImagePreview(reader.result as string);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const removeImage = () => {
+    setImageFile(null);
+    setImagePreview("");
+    setImageError("");
+    setFormData((prev) => ({ ...prev, imageUrl: "" }));
+  };
+
   const validateForm = (): boolean => {
     const newErrors: { [key: string]: string } = {};
 
@@ -306,7 +346,32 @@ export default function QuestionForm({
     }
 
     try {
+      // Upload image if one is selected
+      if (imageFile && userId) {
+        setImageUploading(true);
+        setUploadProgress(0);
+        try {
+          const imageUrl = await uploadQuestionImage(imageFile, userId, (progress) => {
+            setUploadProgress(progress);
+          });
+          formData.imageUrl = imageUrl;
+        } catch (error) {
+          setImageUploading(false);
+          setUploadProgress(0);
+          setToast({ type: "error", message: "Failed to upload image. Please try again." });
+          return;
+        }
+        setImageUploading(false);
+        setUploadProgress(0);
+      }
+
       await onSubmit(formData);
+      
+      // Reset image states after successful submission
+      setImageFile(null);
+      setImagePreview("");
+      setImageError("");
+      
       setToast(null);
     } catch (error) {
       console.error("Error in form submission:", error);
@@ -563,6 +628,101 @@ export default function QuestionForm({
               className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm ${errors.questionText ? "border-red-500" : "border-gray-300"}`}
             />
             {errors.questionText && <p className="text-red-500 text-sm mt-1">{errors.questionText}</p>}
+          </div>
+
+          {/* Image Upload */}
+          <div className="mb-3 sm:mb-4 lg:mb-6">
+            <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1 sm:mb-2">
+              Attach Image (Optional)
+            </label>
+            <div className="flex flex-col gap-3">
+              {!imagePreview ? (
+                <div>
+                  <label
+                    htmlFor="question-image"
+                    className="flex items-center justify-center px-4 py-3 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:border-blue-500 hover:bg-blue-50 transition-colors"
+                  >
+                    <div className="text-center">
+                      <svg
+                        className="mx-auto h-12 w-12 text-gray-400"
+                        stroke="currentColor"
+                        fill="none"
+                        viewBox="0 0 48 48"
+                        aria-hidden="true"
+                      >
+                        <path
+                          d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02"
+                          strokeWidth={2}
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        />
+                      </svg>
+                      <p className="mt-2 text-sm text-gray-600">
+                        Click to upload or drag and drop
+                      </p>
+                      <p className="text-xs text-gray-500 mt-1">
+                        PNG, JPG, GIF, WebP up to 5MB
+                      </p>
+                    </div>
+                  </label>
+                  <input
+                    id="question-image"
+                    type="file"
+                    accept="image/*"
+                    onChange={handleImageSelect}
+                    className="hidden"
+                  />
+                </div>
+              ) : (
+                <div className="relative border-2 border-gray-300 rounded-lg p-3">
+                  <button
+                    type="button"
+                    onClick={removeImage}
+                    className="absolute top-2 right-2 bg-red-500 text-white rounded-full p-1.5 hover:bg-red-600 transition-colors z-10"
+                    title="Remove image"
+                  >
+                    <svg
+                      className="w-4 h-4"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M6 18L18 6M6 6l12 12"
+                      />
+                    </svg>
+                  </button>
+                  <img
+                    src={imagePreview}
+                    alt="Question preview"
+                    className="max-w-full h-auto max-h-64 rounded mx-auto"
+                  />
+                  <p className="text-xs text-gray-500 text-center mt-2">
+                    {imageFile?.name}
+                  </p>
+                </div>
+              )}
+              {imageError && (
+                <p className="text-red-500 text-sm">{imageError}</p>
+              )}
+              {imageUploading && (
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-blue-600 font-medium">Uploading image...</span>
+                    <span className="text-blue-600 font-semibold">{uploadProgress}%</span>
+                  </div>
+                  <div className="w-full bg-gray-200 rounded-full h-2.5 overflow-hidden">
+                    <div
+                      className="bg-blue-600 h-2.5 rounded-full transition-all duration-300 ease-out"
+                      style={{ width: `${uploadProgress}%` }}
+                    ></div>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
 
           {/* MCQ Options */}
