@@ -82,7 +82,7 @@ function ContentCreatorCreateQuestionPageContent() {
                 <span className="hidden sm:inline">Create</span>
                 <span className="sm:hidden">+</span>
               </button>
-              <button
+              {/* <button
                 onClick={() => setMode('interactive')}
                 className={`px-3 sm:px-4 py-2 rounded-lg font-medium transition-colors ${
                   mode === 'interactive'
@@ -90,9 +90,9 @@ function ContentCreatorCreateQuestionPageContent() {
                     : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
                 }`}
               >
-                <span className="hidden sm:inline">Interactive</span>
+               <span className="hidden sm:inline">Interactive</span>
                 <span className="sm:hidden">⚡</span>
-              </button>
+              </button> */}
               <button
                 onClick={() => setMode('bank')}
                 className={`px-3 sm:px-4 py-2 rounded-lg font-medium transition-colors ${

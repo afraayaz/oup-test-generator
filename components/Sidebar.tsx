@@ -211,12 +211,12 @@ export default function Sidebar({
       icon: "ri-file-add-line",
       href: "/content-creator/create",
     },
-    {
-      id: "interactiveQuiz",
-      label: "Interactive Question",
-      icon: "ri-file-list-3-line",
-      href: "/content-creator/interactiveQuiz",
-    },
+    // {
+    //   id: "interactiveQuiz",
+    //   label: "Interactive Question",
+    //   icon: "ri-file-list-3-line",
+    //   href: "/content-creator/interactiveQuiz",
+    // },
     {
       id: "bank",
       label: "My Question Bank",
