@@ -14,11 +14,25 @@ export async function GET(request: NextRequest) {
     const questionsRef = collection(db, 'questions', 'oup', 'items');
     const snapshot = await getDocs(questionsRef);
 
-    let questions: any[] = snapshot.docs.map((doc: any) => ({
-      id: doc.id,
-      source: 'oup',
-      ...doc.data()
-    }));
+    let questions: any[] = snapshot.docs.map((doc: any) => {
+      const data = doc.data();
+      return {
+        id: doc.id,
+        source: 'oup',
+        ...data,
+        // Ensure imageUrl is explicitly included
+        imageUrl: data.imageUrl || undefined
+      };
+    });
+    
+    // Log sample question with image for debugging
+    const questionsWithImages = questions.filter(q => q.imageUrl);
+    if (questionsWithImages.length > 0) {
+      console.log('[OUP-API] Questions with images:', questionsWithImages.length, 'Sample:', {
+        id: questionsWithImages[0].id,
+        imageUrl: questionsWithImages[0].imageUrl
+      });
+    }
 
     // Apply filters
     if (subject) questions = questions.filter(q => q.subject === subject);

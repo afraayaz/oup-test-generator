@@ -14,6 +14,13 @@ export interface Question {
   createdAt?: string;
   createdByName?: string;
   createdBy?: string;
+  status?: string;
+  feedback?: string;
+  isFromApprovalQueue?: boolean;
+  submittedAt?: string;
+  imageUrl?: string; // Add imageUrl to Question interface
+  rejectedBy?: string;
+  rejectedAt?: string;
 }
 
 interface QuestionBankProps {
@@ -70,10 +77,37 @@ export default function QuestionBank({
   const [editingQuestion, setEditingQuestion] = useState<Question | null>(null);
   const [editFormData, setEditFormData] = useState<Partial<Question>>({});
   const [isSaving, setIsSaving] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   useEffect(() => {
     fetchQuestions();
   }, [userId]);
+
+  // Helper function to get question text from various possible field names
+  const getQuestionText = (question: any): string => {
+    // Try all possible field names for question text
+    const possibleFields = [
+      'question', 
+      'questionText', 
+      'text', 
+      'content', 
+      'prompt', 
+      'description',
+      'questionContent',
+      'questionDescription',
+      'questionPrompt',
+      'query',
+      'statement'
+    ];
+    
+    for (const field of possibleFields) {
+      if (question[field] && typeof question[field] === 'string' && question[field].trim()) {
+        return question[field];
+      }
+    }
+    
+    return "No text provided";
+  };
 
   const fetchQuestions = async () => {
     if (!userId) return;
@@ -90,21 +124,47 @@ export default function QuestionBank({
       if (schoolName) {
         headers["x-school-name"] = schoolName;
       }
+
+      // Fetch questions from main question bank
       const response = await fetch(apiEndpoint, {
         method: "GET",
         headers,
       });
 
       const data = await response.json();
+      let allUserQuestions: any[] = [];
+      
       if (data.success || Array.isArray(data)) {
-        // Handle both formats: {success: true, questions: [...]} or direct array
-        const allQuestions = Array.isArray(data) ? data : data.questions || [];
-        // Filter to show only questions created by this user
-        const userQuestions = allQuestions.filter(
-          (q: any) => q.createdBy === userId
-        );
-        setQuestions(userQuestions);
+        const questions = Array.isArray(data) ? data : data.questions || [];
+        const userQuestions = questions.filter((q: any) => q.createdBy === userId || q.createdById === userId);
+        allUserQuestions = userQuestions;
       }
+
+      setQuestions(allUserQuestions);
+      
+      // Debug logging
+      console.log('[QuestionBank] Fetched questions:', {
+        total: allUserQuestions.length,
+        withImages: allUserQuestions.filter(q => q.imageUrl).length,
+        sampleQuestion: allUserQuestions[0] ? {
+          id: allUserQuestions[0].id,
+          allFields: Object.keys(allUserQuestions[0]),
+          imageUrl: allUserQuestions[0].imageUrl,
+          question: allUserQuestions[0].question,
+          questionText: allUserQuestions[0].questionText,
+          text: allUserQuestions[0].text,
+          content: allUserQuestions[0].content,
+          subject: allUserQuestions[0].subject,
+          isFromApprovalQueue: allUserQuestions[0].isFromApprovalQueue
+        } : null,
+        allQuestionFields: allUserQuestions.slice(0, 3).map(q => ({
+          id: q.id,
+          fields: Object.keys(q),
+          imageUrl: q.imageUrl,
+          questionField: q.question,
+          questionTextField: q.questionText
+        }))
+      });
     } catch (error) {
       console.error("Error fetching questions:", error);
     } finally {
@@ -115,9 +175,12 @@ export default function QuestionBank({
   const handleEdit = (question: Question) => {
     setEditingQuestion(question);
     setEditFormData({
-      questionText: question.questionText,
+      questionText: question.question || question.questionText,
       difficulty: question.difficulty,
       chapter: question.chapter,
+      explanation: question.explanation || "",
+      correctAnswer: question.correctAnswer || "",
+      options: question.options || [],
     });
     onEdit?.(question);
   };
@@ -143,7 +206,10 @@ export default function QuestionBank({
         {
           method: "PUT",
           headers,
-          body: JSON.stringify(editFormData),
+          body: JSON.stringify({
+            ...editFormData,
+            question: editFormData.questionText, // Map questionText to question field
+          }),
         }
       );
 
@@ -154,7 +220,7 @@ export default function QuestionBank({
         setQuestions((prev) =>
           prev.map((q) =>
             q.id === editingQuestion.id
-              ? { ...q, ...editFormData }
+              ? { ...q, ...editFormData, question: editFormData.questionText }
               : q
           )
         );
@@ -205,6 +271,128 @@ export default function QuestionBank({
     }
   };
 
+  // Delete all filtered questions functionality
+  const handleDeleteAll = async () => {
+    if (filteredQuestions.length === 0) return;
+    
+    const confirmMessage = `Are you sure you want to delete all ${filteredQuestions.length} question(s) shown? This action cannot be undone.`;
+    if (!confirm(confirmMessage)) return;
+
+    setIsDeleting(true);
+    const deletePromises = filteredQuestions.map(async (question) => {
+      try {
+        const headers: Record<string, string> = {
+          "x-user-id": userId || "",
+          "x-user-role": userRole,
+        };
+        if (schoolId) {
+          headers["x-school-id"] = schoolId;
+        }
+        if (schoolName) {
+          headers["x-school-name"] = schoolName;
+        }
+        const response = await fetch(`${apiEndpoint}/${question.id}`, {
+          method: "DELETE",
+          headers,
+        });
+        return { questionId: question.id, success: response.ok };
+      } catch (error) {
+        return { questionId: question.id, success: false, error };
+      }
+    });
+
+    try {
+      const results = await Promise.all(deletePromises);
+      const successful = results.filter(r => r.success);
+      const failed = results.filter(r => !r.success);
+      
+      // Update questions list by removing successful deletions
+      setQuestions(prev => prev.filter(q => !successful.find(s => s.questionId === q.id)));
+      
+      if (failed.length > 0) {
+        alert(`${successful.length} questions deleted successfully. ${failed.length} failed to delete.`);
+      } else {
+        alert(`All ${successful.length} questions deleted successfully!`);
+      }
+    } catch (error) {
+      console.error("Error in delete all:", error);
+      alert("Failed to delete questions. Please try again.");
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+
+  // Bulk delete functionality (old - should be removed)
+  const handleSelectAll = (checked: boolean) => {
+    if (checked) {
+      setSelectedQuestions(new Set(filteredQuestions.map(q => q.id)));
+    } else {
+      setSelectedQuestions(new Set());
+    }
+  };
+
+  const handleSelectQuestion = (questionId: string, checked: boolean) => {
+    const newSelected = new Set(selectedQuestions);
+    if (checked) {
+      newSelected.add(questionId);
+    } else {
+      newSelected.delete(questionId);
+    }
+    setSelectedQuestions(newSelected);
+  };
+
+  const handleBulkDelete = async () => {
+    if (selectedQuestions.size === 0) return;
+    
+    const confirmMessage = `Are you sure you want to delete ${selectedQuestions.size} question(s)? This action cannot be undone.`;
+    if (!confirm(confirmMessage)) return;
+
+    setIsDeleting(true);
+    const deletePromises = Array.from(selectedQuestions).map(async (questionId) => {
+      try {
+        const headers: Record<string, string> = {
+          "x-user-id": userId || "",
+          "x-user-role": userRole,
+        };
+        if (schoolId) {
+          headers["x-school-id"] = schoolId;
+        }
+        if (schoolName) {
+          headers["x-school-name"] = schoolName;
+        }
+        const response = await fetch(`${apiEndpoint}/${questionId}`, {
+          method: "DELETE",
+          headers,
+        });
+        return { questionId, success: response.ok };
+      } catch (error) {
+        return { questionId, success: false, error };
+      }
+    });
+
+    try {
+      const results = await Promise.all(deletePromises);
+      const successful = results.filter(r => r.success);
+      const failed = results.filter(r => !r.success);
+      
+      // Update questions list by removing successful deletions
+      setQuestions(prev => prev.filter(q => !successful.find(s => s.questionId === q.id)));
+      setSelectedQuestions(new Set());
+      
+      if (failed.length > 0) {
+        alert(`${successful.length} questions deleted successfully. ${failed.length} failed to delete.`);
+      } else {
+        alert(`All ${successful.length} questions deleted successfully!`);
+      }
+    } catch (error) {
+      console.error("Error in bulk delete:", error);
+      alert("Failed to delete questions. Please try again.");
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
   const filteredQuestions = useMemo(() => {
     return questions.filter((q) => {
       if (filters.subject && q.subject !== filters.subject) return false;
@@ -212,9 +400,10 @@ export default function QuestionBank({
       if (filters.book && q.book !== filters.book) return false;
       if (filters.type && q.type !== filters.type) return false;
       if (searchText && !q.questionText?.toLowerCase().includes(searchText.toLowerCase())) return false;
+      
       return true;
     });
-  }, [questions, filters, searchText]);
+  }, [questions, filters, searchText, userRole]);
 
   const uniqueSubjects = useMemo(
     () => [...new Set(questions.map((q) => q.subject))].sort(),
@@ -270,7 +459,29 @@ export default function QuestionBank({
 
       {/* Filters */}
       <div className="bg-white rounded-xl shadow-sm p-3 sm:p-4 space-y-3 sm:space-y-4 border border-gray-100">
-        <h3 className="font-semibold text-sm sm:text-base text-gray-900">Filters</h3>
+        <div className="flex items-center justify-between">
+          <h3 className="font-semibold text-sm sm:text-base text-gray-900">Filters</h3>
+          {/* Delete All Button */}
+          {allowDelete && filteredQuestions.length > 0 && (
+            <button
+              onClick={handleDeleteAll}
+              disabled={isDeleting}
+              className="px-4 py-2 bg-red-600 text-white text-sm font-medium rounded-lg hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
+            >
+              {isDeleting ? (
+                <>
+                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                  Deleting...
+                </>
+              ) : (
+                <>
+                  <i className="ri-delete-bin-line"></i>
+                  Delete All ({filteredQuestions.length})
+                </>
+              )}
+            </button>
+          )}
+        </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3">
           <div>
             <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1.5">
@@ -399,14 +610,38 @@ export default function QuestionBank({
             >
               {/* Card Header with Type Badge */}
               <div className="bg-gradient-to-r from-gray-50 to-gray-100 px-3 sm:px-4 py-2.5 sm:py-3 flex items-center justify-between border-b border-gray-200">
-                <span
-                  className={`inline-block px-2 py-0.5 rounded-full text-xs font-semibold ${
-                    typeColors[question.type] ||
-                    "bg-gray-100 text-gray-800"
-                  }`}
-                >
-                  {typeLabels[question.type] || question.type}
-                </span>
+                <div className="flex items-center gap-2">
+                  <span
+                    className={`inline-block px-2 py-0.5 rounded-full text-xs font-semibold ${
+                      typeColors[question.type] ||
+                      "bg-gray-100 text-gray-800"
+                    }`}
+                  >
+                    {typeLabels[question.type] || question.type}
+                  </span>
+                  {/* Status badge for content creators */}
+                  {userRole === "content_creator" && question.isFromApprovalQueue && (
+                    <span
+                      className={`inline-block px-2 py-0.5 rounded-full text-xs font-semibold ${
+                        question.status === 'approved' 
+                          ? 'bg-green-100 text-green-600'
+                          : question.status === 'rejected'
+                          ? 'bg-red-100 text-red-600'
+                          : 'bg-yellow-100 text-yellow-600'
+                      }`}
+                    >
+                      {question.status === 'approved' ? '✓ Approved' : 
+                       question.status === 'rejected' ? '✗ Rejected' : 
+                       '⏳ Pending'}
+                    </span>
+                  )}
+                  {/* Approved badge for questions from main bank */}
+                  {userRole === "content_creator" && !question.isFromApprovalQueue && (
+                    <span className="inline-block px-2 py-0.5 rounded-full text-xs font-semibold bg-green-100 text-green-600">
+                      ✓ Approved
+                    </span>
+                  )}
+                </div>
                 <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-yellow-100 text-yellow-800">
                   {question.difficulty}
                 </span>
@@ -416,8 +651,19 @@ export default function QuestionBank({
               <div className="flex-1 px-3 sm:px-4 py-2.5 sm:py-3 space-y-2">
                 {/* Question Text Preview */}
                 <p className="text-xs sm:text-sm text-gray-800 leading-relaxed line-clamp-3 font-medium">
-                  {question.questionText || "No text provided"}
+                  {getQuestionText(question)}
                 </p>
+
+                {/* Image Preview if available */}
+                {question.imageUrl && (
+                  <div className="mt-2">
+                    <img
+                      src={question.imageUrl}
+                      alt="Question"
+                      className="max-w-full h-auto max-h-32 rounded border border-gray-200"
+                    />
+                  </div>
+                )}
 
                 {/* Metadata */}
                 <div className="text-xs text-gray-600 space-y-1 bg-gray-50 -mx-3 sm:-mx-4 -mb-2.5 sm:-mb-3 px-3 sm:px-4 py-2 sm:py-2.5 rounded-b-lg">
@@ -467,13 +713,13 @@ export default function QuestionBank({
       {/* Edit Modal */}
       {editingQuestion && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-2xl p-5 sm:p-6 max-w-md w-full border border-gray-200">
+          <div className="bg-white rounded-xl shadow-2xl p-5 sm:p-6 max-w-lg w-full border border-gray-200 max-h-[90vh] overflow-y-auto">
             <h3 className="text-base sm:text-lg font-bold text-gray-900 mb-4 sm:mb-5 flex items-center">
               <i className="ri-edit-2-line mr-2 text-blue-600"></i>
               Edit Question
             </h3>
 
-            <div className="space-y-3 sm:space-y-4 max-h-[60vh] overflow-y-auto pr-2">
+            <div className="space-y-3 sm:space-y-4 max-h-[70vh] overflow-y-auto pr-2">
               {/* Subject (Read-only) */}
               <div>
                 <label className="block text-xs sm:text-sm font-semibold text-gray-700 mb-1.5">
@@ -544,6 +790,22 @@ export default function QuestionBank({
                 />
               </div>
 
+              {/* Image Display (Read-only for now) */}
+              {editingQuestion.imageUrl && (
+                <div>
+                  <label className="block text-xs sm:text-sm font-semibold text-gray-700 mb-1.5">
+                    Attached Image
+                  </label>
+                  <div className="border border-gray-200 rounded-lg p-2">
+                    <img
+                      src={editingQuestion.imageUrl}
+                      alt="Question"
+                      className="max-w-full h-auto max-h-48 rounded mx-auto"
+                    />
+                  </div>
+                </div>
+              )}
+
               {/* Chapter (Editable) */}
               <div>
                 <label className="block text-xs sm:text-sm font-semibold text-gray-700 mb-1.5">
@@ -579,6 +841,108 @@ export default function QuestionBank({
                   <option value="Medium">Medium</option>
                   <option value="Hard">Hard</option>
                 </select>
+              </div>
+
+              {/* Options for Multiple Choice Questions */}
+              {editingQuestion.type === 'multiple' && (
+                <div>
+                  <label className="block text-xs sm:text-sm font-semibold text-gray-700 mb-1.5">
+                    Options *
+                  </label>
+                  <div className="space-y-2">
+                    {['A', 'B', 'C', 'D'].map((letter, index) => (
+                      <div key={letter} className="flex items-center gap-2">
+                        <span className="text-xs font-semibold text-gray-600 w-4">{letter}:</span>
+                        <input
+                          type="text"
+                          value={editFormData.options?.[index] || ""}
+                          onChange={(e) => {
+                            const newOptions = [...(editFormData.options || ['', '', '', ''])];
+                            newOptions[index] = e.target.value;
+                            setEditFormData({
+                              ...editFormData,
+                              options: newOptions,
+                            });
+                          }}
+                          className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-xs sm:text-sm"
+                          placeholder={`Option ${letter}`}
+                        />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Correct Answer */}
+              <div>
+                <label className="block text-xs sm:text-sm font-semibold text-gray-700 mb-1.5">
+                  Correct Answer *
+                </label>
+                {editingQuestion.type === 'multiple' ? (
+                  <select
+                    value={editFormData.correctAnswer || ""}
+                    onChange={(e) =>
+                      setEditFormData({
+                        ...editFormData,
+                        correctAnswer: e.target.value,
+                      })
+                    }
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-xs sm:text-sm bg-white"
+                  >
+                    <option value="">Select correct option</option>
+                    <option value="A">A</option>
+                    <option value="B">B</option>
+                    <option value="C">C</option>
+                    <option value="D">D</option>
+                  </select>
+                ) : editingQuestion.type === 'truefalse' ? (
+                  <select
+                    value={editFormData.correctAnswer?.toString() || ""}
+                    onChange={(e) =>
+                      setEditFormData({
+                        ...editFormData,
+                        correctAnswer: e.target.value,
+                      })
+                    }
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-xs sm:text-sm bg-white"
+                  >
+                    <option value="">Select answer</option>
+                    <option value="true">True</option>
+                    <option value="false">False</option>
+                  </select>
+                ) : (
+                  <input
+                    type="text"
+                    value={editFormData.correctAnswer || ""}
+                    onChange={(e) =>
+                      setEditFormData({
+                        ...editFormData,
+                        correctAnswer: e.target.value,
+                      })
+                    }
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-xs sm:text-sm"
+                    placeholder="Enter correct answer"
+                  />
+                )}
+              </div>
+
+              {/* Explanation */}
+              <div>
+                <label className="block text-xs sm:text-sm font-semibold text-gray-700 mb-1.5">
+                  Explanation (Optional)
+                </label>
+                <textarea
+                  value={editFormData.explanation || ""}
+                  onChange={(e) =>
+                    setEditFormData({
+                      ...editFormData,
+                      explanation: e.target.value,
+                    })
+                  }
+                  rows={3}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-xs sm:text-sm resize-none"
+                  placeholder="Explain why this is the correct answer"
+                />
               </div>
             </div>
 
