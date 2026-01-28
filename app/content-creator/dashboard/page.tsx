@@ -4,46 +4,208 @@ import { useState, useEffect } from 'react';
 import Sidebar from '@/components/Sidebar';
 import { useUserProfile } from '@/hooks/useUserProfile';
 import { AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { db } from '@/firebase/firebase';
+import { collection, query, where, getDocs, Timestamp } from 'firebase/firestore';
 
 export default function ContentCreatorDashboard() {
   const { user } = useUserProfile();
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [stats] = useState({
-    questionsCreated: 156,
-    questionsApproved: 98,
-    pendingReview: 34,
-    rejectedQuestions: 24,
-    thisWeek: 18,
-    approvalRate: 78
+  const [loading, setLoading] = useState(true);
+  const [stats, setStats] = useState({
+    questionsCreated: 0,
+    questionsApproved: 0,
+    pendingReview: 0,
+    rejectedQuestions: 0,
+    thisWeek: 0,
+    approvalRate: 0
   });
 
-  const [creationTrendData] = useState([
-    { week: 'Week 1', created: 22, approved: 18, rejected: 4 },
-    { week: 'Week 2', created: 28, approved: 21, rejected: 7 },
-    { week: 'Week 3', created: 35, approved: 28, rejected: 7 },
-    { week: 'Week 4', created: 31, approved: 25, rejected: 6 }
-  ]);
+  const [creationTrendData, setCreationTrendData] = useState<any[]>([]);
+  const [subjectDistribution, setSubjectDistribution] = useState<any[]>([]);
+  const [difficultyBreakdown, setDifficultyBreakdown] = useState<any[]>([]);
+  const [recentQuestions, setRecentQuestions] = useState<any[]>([]);
 
-  const [subjectDistribution] = useState([
-    { subject: 'Mathematics', count: 45, color: '#3B82F6' },
-    { subject: 'Science', count: 38, color: '#10B981' },
-    { subject: 'English', count: 32, color: '#F59E0B' },
-    { subject: 'History', count: 25, color: '#8B5CF6' },
-    { subject: 'Others', count: 16, color: '#EF4444' }
-  ]);
+  useEffect(() => {
+    if (user?.uid) {
+      fetchDashboardData();
+    }
+  }, [user?.uid]);
 
-  const [difficultyBreakdown] = useState([
-    { level: 'Easy', count: 62, target: 50 },
-    { level: 'Medium', count: 58, target: 60 },
-    { level: 'Hard', count: 36, target: 40 }
-  ]);
+  // Refetch data when window gains focus (user comes back to dashboard)
+  useEffect(() => {
+    const handleFocus = () => {
+      if (user?.uid) {
+        fetchDashboardData();
+      }
+    };
 
-  const [recentQuestions] = useState([
-    { id: 1, text: 'Explain the Pythagorean theorem with examples', subject: 'Mathematics', grade: 'Grade 9', difficulty: 'Medium', status: 'approved', time: '2 hours ago' },
-    { id: 2, text: 'What is photosynthesis? Describe the process', subject: 'Science', grade: 'Grade 7', difficulty: 'Easy', status: 'pending', time: '5 hours ago' },
-    { id: 3, text: 'Analyze the themes in "To Kill a Mockingbird"', subject: 'English', grade: 'Grade 11', difficulty: 'Hard', status: 'pending', time: '1 day ago' },
-    { id: 4, text: 'What were the causes of World War I?', subject: 'History', grade: 'Grade 10', difficulty: 'Medium', status: 'rejected', time: '2 days ago' }
-  ]);
+    window.addEventListener('focus', handleFocus);
+    
+    // Also refetch every 30 seconds while on the page
+    const interval = setInterval(() => {
+      if (user?.uid && document.visibilityState === 'visible') {
+        fetchDashboardData();
+      }
+    }, 30000);
+
+    return () => {
+      window.removeEventListener('focus', handleFocus);
+      clearInterval(interval);
+    };
+  }, [user?.uid]);
+
+  const fetchDashboardData = async () => {
+    if (!user?.uid) return;
+    
+    try {
+      setLoading(true);
+      
+      console.log('🔍 Fetching dashboard data for user:', user.uid);
+      
+      // Fetch all questions created by this content creator
+      const questionsRef = collection(db, 'questions', 'oup', 'items');
+      const q = query(questionsRef, where('createdById', '==', user.uid));
+      const snapshot = await getDocs(q);
+      
+      console.log('📊 Found questions:', snapshot.size);
+      
+      const questions = snapshot.docs.map(doc => {
+        const data = doc.data();
+        console.log('Question data:', {
+          id: doc.id,
+          createdById: data.createdById,
+          createdBy: data.createdBy,
+          subject: data.subject,
+          questionText: data.questionText?.substring(0, 50)
+        });
+        return {
+          id: doc.id,
+          ...data
+        };
+      });
+
+      // Calculate stats
+      const totalQuestions = questions.length;
+      
+      // Calculate this week's questions
+      const oneWeekAgo = new Date();
+      oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
+      const thisWeekQuestions = questions.filter(q => {
+        const createdAt = q.createdAt?.toDate ? q.createdAt.toDate() : new Date(q.createdAt);
+        return createdAt >= oneWeekAgo;
+      }).length;
+
+      // Calculate week-wise data for last 4 weeks
+      const weekData = [];
+      for (let i = 3; i >= 0; i--) {
+        const weekStart = new Date();
+        weekStart.setDate(weekStart.getDate() - (i + 1) * 7);
+        const weekEnd = new Date();
+        weekEnd.setDate(weekEnd.getDate() - i * 7);
+        
+        const weekQuestions = questions.filter(q => {
+          const createdAt = q.createdAt?.toDate ? q.createdAt.toDate() : new Date(q.createdAt);
+          return createdAt >= weekStart && createdAt < weekEnd;
+        });
+        
+        weekData.push({
+          week: `Week ${4 - i}`,
+          created: weekQuestions.length,
+          approved: 0,
+          rejected: 0
+        });
+      }
+      setCreationTrendData(weekData);
+
+      // Calculate subject distribution
+      const subjectCounts: { [key: string]: number } = {};
+      questions.forEach(q => {
+        const subject = q.subject || 'Others';
+        subjectCounts[subject] = (subjectCounts[subject] || 0) + 1;
+      });
+      
+      const colors = ['#3B82F6', '#10B981', '#F59E0B', '#8B5CF6', '#EF4444', '#06B6D4', '#EC4899'];
+      const subjectData = Object.entries(subjectCounts).map(([subject, count], index) => ({
+        subject,
+        count,
+        color: colors[index % colors.length]
+      }));
+      setSubjectDistribution(subjectData);
+
+      // Calculate difficulty breakdown
+      const difficultyCounts: { [key: string]: number } = { Easy: 0, Medium: 0, Hard: 0 };
+      questions.forEach(q => {
+        const difficulty = q.difficulty || 'Medium';
+        if (difficultyCounts[difficulty] !== undefined) {
+          difficultyCounts[difficulty]++;
+        }
+      });
+      
+      const difficultyData = [
+        { level: 'Easy', count: difficultyCounts.Easy, target: Math.ceil(totalQuestions * 0.3) },
+        { level: 'Medium', count: difficultyCounts.Medium, target: Math.ceil(totalQuestions * 0.5) },
+        { level: 'Hard', count: difficultyCounts.Hard, target: Math.ceil(totalQuestions * 0.2) }
+      ];
+      setDifficultyBreakdown(difficultyData);
+
+      // Get recent questions (last 4)
+      const sortedQuestions = questions
+        .sort((a, b) => {
+          const aTime = a.createdAt?.toDate ? a.createdAt.toDate() : new Date(a.createdAt);
+          const bTime = b.createdAt?.toDate ? b.createdAt.toDate() : new Date(b.createdAt);
+          return bTime.getTime() - aTime.getTime();
+        })
+        .slice(0, 4)
+        .map(q => {
+          const createdAt = q.createdAt?.toDate ? q.createdAt.toDate() : new Date(q.createdAt);
+          const timeDiff = Date.now() - createdAt.getTime();
+          const hours = Math.floor(timeDiff / (1000 * 60 * 60));
+          const days = Math.floor(hours / 24);
+          const timeAgo = days > 0 ? `${days} day${days > 1 ? 's' : ''} ago` : 
+                         hours > 0 ? `${hours} hour${hours > 1 ? 's' : ''} ago` : 
+                         'Just now';
+          
+          return {
+            id: q.id,
+            text: q.questionText || q.question || 'No question text',
+            subject: q.subject || 'N/A',
+            grade: q.grade || 'N/A',
+            difficulty: q.difficulty || 'Medium',
+            status: 'approved', // Since approval queue is removed, all are approved
+            time: timeAgo
+          };
+        });
+      setRecentQuestions(sortedQuestions);
+
+      setStats({
+        questionsCreated: totalQuestions,
+        questionsApproved: totalQuestions, // Since approval is removed
+        pendingReview: 0, // No approval queue
+        rejectedQuestions: 0, // No rejection
+        thisWeek: thisWeekQuestions,
+        approvalRate: 100 // All approved since no approval workflow
+      });
+
+    } catch (error) {
+      console.error('Error fetching dashboard data:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex min-h-screen bg-gray-50">
+        <Sidebar userRole="Content Creator" currentPage="dashboard" open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
+        <div className="flex-1 lg:ml-[256px] flex items-center justify-center">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-violet-600 mx-auto mb-4"></div>
+            <p className="text-gray-600">Loading dashboard...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex min-h-screen bg-gray-50">
