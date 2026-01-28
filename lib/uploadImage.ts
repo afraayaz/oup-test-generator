@@ -21,10 +21,9 @@ export async function uploadQuestionImage(
       throw new Error('ImgBB API key is not configured. Please add NEXT_PUBLIC_IMGBB_API_KEY to your .env.local file.');
     }
 
-    // Create form data
+    // Create form data - DO NOT include the key here
     const formData = new FormData();
     formData.append('image', file);
-    formData.append('key', apiKey);
     formData.append('name', `question_${userId}_${Date.now()}`);
 
     // Create XMLHttpRequest for progress tracking
@@ -49,12 +48,15 @@ export async function uploadQuestionImage(
               console.log('✅ Image uploaded successfully to ImgBB:', response.data.url);
               resolve(response.data.url);
             } else {
+              console.error('❌ ImgBB response:', xhr.responseText);
               reject(new Error('Invalid response from ImgBB'));
             }
           } catch (error) {
+            console.error('❌ Failed to parse response:', xhr.responseText);
             reject(new Error('Failed to parse ImgBB response'));
           }
         } else {
+          console.error('❌ Upload failed with status:', xhr.status, 'Response:', xhr.responseText);
           reject(new Error(`Upload failed with status: ${xhr.status}`));
         }
       });
@@ -68,8 +70,8 @@ export async function uploadQuestionImage(
         reject(new Error('Upload was cancelled'));
       });
       
-      // Send request
-      xhr.open('POST', 'https://api.imgbb.com/1/upload');
+      // Send request - API key goes in the URL as a query parameter
+      xhr.open('POST', `https://api.imgbb.com/1/upload?key=${apiKey}`);
       xhr.send(formData);
     });
   } catch (error) {
