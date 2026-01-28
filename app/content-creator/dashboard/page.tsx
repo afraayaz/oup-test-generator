@@ -63,8 +63,9 @@ export default function ContentCreatorDashboard() {
       console.log('🔍 Fetching dashboard data for user:', user.uid);
       
       // Fetch all questions created by this content creator
+      // Note: API stores as 'createdBy', not 'createdById'
       const questionsRef = collection(db, 'questions', 'oup', 'items');
-      const q = query(questionsRef, where('createdById', '==', user.uid));
+      const q = query(questionsRef, where('createdBy', '==', user.uid));
       const snapshot = await getDocs(q);
       
       console.log('📊 Found questions:', snapshot.size);
