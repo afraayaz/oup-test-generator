@@ -48,8 +48,20 @@ function CreateIndividualQuestionPageContent() {
   }, [user?.assignedBooks]);
 
   const handleQuestionSubmit = async (questionData: QuestionFormData) => {
+    console.log('🎯 Submit called with userId:', user?.uid, 'User object:', user);
+    
+    if (!user || !user.uid) {
+      alert("Please wait for user profile to load");
+      return;
+    }
     setLoading(true);
     try {
+      console.log('[CreateQuestion] Submitting question data:', {
+        questionText: questionData.questionText,
+        allFields: Object.keys(questionData),
+        fullData: questionData
+      });
+
       const response = await fetch("/api/oup-creator/questions", {
         method: "POST",
         headers: {
@@ -67,8 +79,11 @@ function CreateIndividualQuestionPageContent() {
 
       if (!response.ok) throw new Error("Failed to create question");
 
+      const result = await response.json();
+      
       setSuccessMessage("✅ Question created successfully! It's now in your Question Bank.");
-      setTimeout(() => setSuccessMessage(""), 2000);
+      
+      setTimeout(() => setSuccessMessage(""), 5000); // Show message for 5 seconds
       window.scrollTo(0, 0);
     } catch (error) {
       console.error("Error creating question:", error);
@@ -128,19 +143,26 @@ function CreateIndividualQuestionPageContent() {
               </div>
             )}
 
-            <QuestionForm
-              onSubmit={handleQuestionSubmit}
-              onSwitchToBank={handleSwitchToBank}
-              loading={loading}
-              submittedBooks={submittedBooks}
-              subjects={availableSubjects}
-              grades={availableGrades}
-              defaultSubject={defaultSubject}
-              defaultGrade={defaultGrade}
-              defaultBook={defaultBook}
-              showTopicField={true}
-              showSloField={true}
-            />
+            {!user ? (
+              <div className="text-center py-8">
+                <p className="text-gray-600">Loading user profile...</p>
+              </div>
+            ) : (
+              <QuestionForm
+                onSubmit={handleQuestionSubmit}
+                onSwitchToBank={handleSwitchToBank}
+                loading={loading}
+                submittedBooks={submittedBooks}
+                subjects={availableSubjects}
+                grades={availableGrades}
+                defaultSubject={defaultSubject}
+                defaultGrade={defaultGrade}
+                defaultBook={defaultBook}
+                showTopicField={true}
+                showSloField={true}
+                userId={user?.uid}
+              />
+            )}
           </div>
         </div>
       </div>
