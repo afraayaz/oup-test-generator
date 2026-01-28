@@ -596,9 +596,20 @@ export default function QuestionForm({
 
           <button
             onClick={() => setCurrentStep(2)}
-            className="w-full px-3 sm:px-4 lg:px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium text-xs sm:text-sm lg:text-base mt-4 sm:mt-6 lg:mt-8"
+            disabled={loading}
+            className="w-full px-3 sm:px-4 lg:px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium text-xs sm:text-sm lg:text-base mt-4 sm:mt-6 lg:mt-8 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
           >
-            Next: Question Content
+            {loading ? (
+              <>
+                <svg className="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                Proceeding...
+              </>
+            ) : (
+              "Next: Question Content"
+            )}
           </button>
         </div>
       )}
@@ -855,11 +866,20 @@ export default function QuestionForm({
           {(formData.type === "short" || formData.type === "long") && (
             <div className="mb-4 sm:mb-6">
               <label className="block text-sm font-medium text-gray-700 mb-2">Correct Answer *</label>
+              {isUrduSubject && focusedMathField === "correctAnswer" && (
+                <UrduKeyboard
+                  isVisible={true}
+                  onInsert={insertLanguageCharacter}
+                />
+              )}
               <textarea
                 value={formData.correctAnswer}
                 onChange={(e) => setFormData({ ...formData, correctAnswer: e.target.value })}
+                onFocus={() => isUrduSubject && handleMathFieldFocus("correctAnswer" as any)}
+                onBlur={() => isUrduSubject && setFocusedMathField(null)}
                 placeholder="Enter the correct answer"
                 rows={formData.type === "long" ? 6 : 3}
+                dir={isUrduSubject ? "rtl" : "ltr"}
                 className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm ${errors.correctAnswer ? "border-red-500" : "border-gray-300"}`}
               />
               {errors.correctAnswer && <p className="text-red-500 text-sm mt-1">{errors.correctAnswer}</p>}
@@ -875,12 +895,31 @@ export default function QuestionForm({
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Answers for {blankId} (separate with |) *
                   </label>
+                  {isUrduSubject && focusedMathField === "blank" && activeBlankId === blankId && (
+                    <UrduKeyboard
+                      isVisible={true}
+                      onInsert={insertLanguageCharacter}
+                    />
+                  )}
                   <div className="flex gap-2">
                     <input
                       type="text"
                       value={formData.blanks[blankId].join("|")}
                       onChange={(e) => handleBlankChange(blankId, e.target.value)}
+                      onFocus={() => {
+                        if (isUrduSubject) {
+                          setActiveBlankId(blankId);
+                          handleMathFieldFocus("blank");
+                        }
+                      }}
+                      onBlur={() => {
+                        if (isUrduSubject) {
+                          setActiveBlankId(null);
+                          setFocusedMathField(null);
+                        }
+                      }}
                       placeholder="answer1|answer2|answer3"
+                      dir={isUrduSubject ? "rtl" : "ltr"}
                       className={`flex-1 px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${errors[blankId] ? "border-red-500" : "border-gray-300"}`}
                     />
                     <button
@@ -948,10 +987,28 @@ export default function QuestionForm({
             )}
             <button
               onClick={handleFormSubmit}
-              disabled={loading}
-              className="flex-1 px-4 sm:px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-medium disabled:opacity-50 text-sm sm:text-base"
+              disabled={loading || imageUploading}
+              className="flex-1 px-4 sm:px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed text-sm sm:text-base flex items-center justify-center gap-2"
             >
-              {loading ? "Creating..." : "Create Question"}
+              {loading ? (
+                <>
+                  <svg className="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  Creating...
+                </>
+              ) : imageUploading ? (
+                <>
+                  <svg className="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  Uploading Image...
+                </>
+              ) : (
+                "Create Question"
+              )}
             </button>
           </div>
         </div>

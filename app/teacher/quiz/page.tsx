@@ -1154,8 +1154,14 @@ const QuizGeneration = () => {
             interactiveData = q.interactiveData;
             answer = { value: 'interactive', text: 'See interactive data' };
           } else {
-            // For regular fillblanks, use correctAnswer directly
-            answer = { value: q.correctAnswer || '', text: q.correctAnswer || '' };
+            // For regular fillblanks, check both blanks object and correctAnswer field
+            if (q.blanks && typeof q.blanks === 'object' && Object.keys(q.blanks).length > 0) {
+              // Question has blanks object (from individual creation)
+              answer = { value: q.blanks, text: JSON.stringify(q.blanks) };
+            } else {
+              // Fallback to correctAnswer field
+              answer = { value: q.correctAnswer || '', text: q.correctAnswer || '' };
+            }
           }
         } else {
           answer = { value: q.correctAnswer || '', text: q.correctAnswer || '' };
