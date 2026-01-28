@@ -34,7 +34,8 @@ export default function TeacherQuestionBankPage() {
     grade: '',
     subject: '',
     book: '',
-    chapter: ''
+    chapter: '',
+    type: ''
   });
 
   useEffect(() => {
@@ -87,6 +88,11 @@ export default function TeacherQuestionBankPage() {
     // Filter by chapter
     if (filters.chapter) {
       filtered = filtered.filter(q => q.chapter === filters.chapter);
+    }
+
+    // Filter by type
+    if (filters.type) {
+      filtered = filtered.filter(q => q.type === filters.type);
     }
 
     setFilteredQuestions(filtered);
@@ -147,7 +153,8 @@ export default function TeacherQuestionBankPage() {
       grade: '',
       subject: '',
       book: '',
-      chapter: ''
+      chapter: '',
+      type: ''
     });
   };
 
@@ -265,9 +272,25 @@ export default function TeacherQuestionBankPage() {
                   ))}
                 </select>
               </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Question Type</label>
+                <select
+                  value={filters.type}
+                  onChange={(e) => setFilters({ ...filters, type: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="">All Types</option>
+                  <option value="multiple">MCQ</option>
+                  <option value="truefalse">True/False</option>
+                  <option value="short">Short Answer</option>
+                  <option value="long">Long Answer</option>
+                  <option value="fillblanks">Fill Blanks</option>
+                </select>
+              </div>
             </div>
 
-            {(filters.grade || filters.subject || filters.book || filters.chapter) && (
+            {(filters.grade || filters.subject || filters.book || filters.chapter || filters.type) && (
               <button
                 onClick={handleResetFilters}
                 className="mt-4 px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300"

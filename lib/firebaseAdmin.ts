@@ -98,20 +98,25 @@ export async function initializeSecondaryFirebase() {
   try {
     if (process.env.FIREBASE_PROJECT_ID_2 && process.env.FIREBASE_PRIVATE_KEY_2 && process.env.FIREBASE_CLIENT_EMAIL_2) {
       console.log('🔍 Initializing secondary Firebase Admin SDK...');
-      
       const secondaryServiceAccount = {
         projectId: process.env.FIREBASE_PROJECT_ID_2,
         privateKey: process.env.FIREBASE_PRIVATE_KEY_2.replace(/\\n/g, '\n'),
         clientEmail: process.env.FIREBASE_CLIENT_EMAIL_2,
       } as admin.ServiceAccount;
 
-      const secondaryApp = admin.initializeApp({
-        credential: admin.credential.cert(secondaryServiceAccount),
-      }, 'secondary');
+      let secondaryApp;
+      try {
+        secondaryApp = admin.app('secondary');
+        console.log('ℹ️ Secondary Firebase app already exists, reusing it.');
+      } catch (e) {
+        secondaryApp = admin.initializeApp({
+          credential: admin.credential.cert(secondaryServiceAccount),
+        }, 'secondary');
+        console.log('✅ Secondary Firebase Admin SDK initialized');
+      }
 
       secondaryDb = secondaryApp.firestore();
       secondaryAuth = secondaryApp.auth();
-      console.log('✅ Secondary Firebase Admin SDK initialized');
       return true;
     }
   } catch (error: any) {
@@ -123,8 +128,10 @@ export async function initializeSecondaryFirebase() {
 // Wrapper to automatically fallback if primary quota is exceeded
 export async function getDb() {
   if (useSecondaryDb && secondaryDb) {
+    console.log('🔄 [FIREBASE] Using SECONDARY Firestore instance');
     return secondaryDb;
   }
+  console.log('🔄 [FIREBASE] Using PRIMARY Firestore instance');
   return db;
 }
 
@@ -301,14 +308,15 @@ export async function safeRead<T>(
 ): Promise<T> {
   try {
     const currentDb = await getDb();
+    console.log('🔍 [FIREBASE] Performing safeRead operation');
     return await operation(currentDb);
   } catch (error: any) {
     if (isQuotaError(error) && !useSecondaryDb && secondaryDb) {
       console.warn('⚠️ Primary quota exceeded! Switching to secondary Firebase for reads...');
       switchToSecondaryFirebase();
-      
       try {
         const backupDb = await getDb();
+        console.log('🔍 [FIREBASE] Retrying safeRead operation on SECONDARY');
         return await operation(backupDb);
       } catch (retryError: any) {
         console.error('❌ Read failed on secondary too:', retryError.message);

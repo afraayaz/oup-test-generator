@@ -18,6 +18,7 @@ interface CSVQuestion {
     optionD?: string;
     correctAnswer?: string;
     explanation?: string;
+    slo?: string;
   };
   errors: string[];
   index: number;
@@ -228,6 +229,7 @@ export default function BulkUploadPage({
               optionD: row.optiond,
               correctAnswer: row.correctanswer,
               explanation: row.explanation,
+              slo: row.slo || "",
             },
             errors, 
             index: index + 1 
@@ -257,11 +259,11 @@ export default function BulkUploadPage({
     }
 
     const data = [
-      [`# Grade: ${formData.grade}, Subject: ${formData.subject}, Book: ${formData.book}`, "", "", "", "", "", ""],
-      ["", "", "", "", "", "", ""],
-      ["chapter", "difficulty", "questionType", "question", "optionA", "optionB", "correctAnswer"],
-      ["Chapter 1", "MEDIUM", "MCQ", "What is 5 + 3?", "7", "8", "B"],
-      ["Chapter 1", "EASY", "TRUE_FALSE", "10 - 4 = 6", "", "", "TRUE"],
+      [`# Grade: ${formData.grade}, Subject: ${formData.subject}, Book: ${formData.book}`, "", "", "", "", "", "", ""],
+      ["", "", "", "", "", "", "", ""],
+      ["chapter", "difficulty", "questionType", "question", "optionA", "optionB", "correctAnswer", "slo"],
+      ["Chapter 1", "MEDIUM", "MCQ", "What is 5 + 3?", "7", "8", "B", "SLO 1.1"],
+      ["Chapter 1", "EASY", "TRUE_FALSE", "10 - 4 = 6", "", "", "TRUE", "SLO 1.2"],
     ];
 
     const worksheet = XLSX.utils.aoa_to_sheet(data);
@@ -356,6 +358,7 @@ export default function BulkUploadPage({
           options,
           correctAnswer,
           explanation: row.explanation || "",
+          slo: row.slo || "",
         };
 
         // Log what we're sending

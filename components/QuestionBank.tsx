@@ -417,9 +417,11 @@ export default function QuestionBank({
     () => [...new Set(questions.map((q) => q.book))].sort(),
     [questions]
   );
+  
+  // Always show all available question types in filter, not just existing ones
   const uniqueTypes = useMemo(
-    () => [...new Set(questions.map((q) => q.type))].sort(),
-    [questions]
+    () => ['multiple', 'truefalse', 'short', 'long', 'fillblanks'], // 'matching', 'ordering', 'categorization' - commented out for now
+    []
   );
 
   if (loading) {

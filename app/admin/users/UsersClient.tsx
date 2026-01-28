@@ -218,9 +218,9 @@ export default function UsersClient({ initialUsers, schools, campuses }: Props) 
       return;
     }
 
-    // Validation: content creators must have at least one subject assigned
-    if (userForm.role === 'content_creator' && userForm.assignedBooks.length === 0) {
-      alert('Please assign at least one subject for the content creator');
+    // Validation: content creators and content managers must have at least one subject assigned
+    if ((userForm.role === 'content_creator' || userForm.role === 'content_manager') && userForm.assignedBooks.length === 0) {
+      alert(`Please assign at least one subject for the ${userForm.role.replace('_', ' ')}`);
       return;
     }
 
@@ -248,8 +248,8 @@ export default function UsersClient({ initialUsers, schools, campuses }: Props) 
         for (const pair of userForm.subjectGradePairs) {
           finalBooks = [...finalBooks, ...pair.assignedBooks];
         }
-      } else if (userForm.role === 'content_creator') {
-        // For content creators: use assignedBooks directly
+      } else if (userForm.role === 'content_creator' || userForm.role === 'content_manager') {
+        // For content creators and content managers: use assignedBooks directly
         finalBooks = userForm.assignedBooks;
       }
 
@@ -1095,7 +1095,7 @@ export default function UsersClient({ initialUsers, schools, campuses }: Props) 
                 )}
               </div>
 
-              {userForm.role === 'content_creator' && (
+              {(userForm.role === 'content_creator' || userForm.role === 'content_manager') && (
                 <div className="space-y-4 border-t pt-4 mt-4">
                   <div className="flex items-center justify-between mb-4">
                     <h5 className="text-sm font-semibold text-gray-900">Subject Assignments</h5>
@@ -1204,8 +1204,8 @@ export default function UsersClient({ initialUsers, schools, campuses }: Props) 
               <div className="flex space-x-3 mt-6">
                 <button
                   type="submit"
-                  disabled={isLoading || !userForm.name || !userForm.email || (userForm.role === 'teacher' && userForm.subjectGradePairs.length === 0) || (userForm.role === 'content_creator' && userForm.assignedBooks.length === 0)}
-                  title={(userForm.role === 'teacher' && userForm.subjectGradePairs.length === 0) ? 'Please add at least one subject-grade assignment' : (userForm.role === 'content_creator' && userForm.assignedBooks.length === 0) ? 'Please assign at least one subject' : ''}
+                  disabled={isLoading || !userForm.name || !userForm.email || (userForm.role === 'teacher' && userForm.subjectGradePairs.length === 0) || ((userForm.role === 'content_creator' || userForm.role === 'content_manager') && userForm.assignedBooks.length === 0)}
+                  title={(userForm.role === 'teacher' && userForm.subjectGradePairs.length === 0) ? 'Please add at least one subject-grade assignment' : ((userForm.role === 'content_creator' || userForm.role === 'content_manager') && userForm.assignedBooks.length === 0) ? 'Please assign at least one subject' : ''}
                   className="flex-1 min-h-[44px] bg-emerald-600 hover:bg-emerald-700 disabled:bg-emerald-400 disabled:cursor-not-allowed text-white font-medium py-2 px-4 rounded-lg cursor-pointer"
                 >
                   {isLoading ? 'Creating...' : 'Create User'}

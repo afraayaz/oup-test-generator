@@ -702,7 +702,13 @@ export default function QuestionCreationModePage({
             if (uploadErrors.length > 0) {
               message = `✅ Partial Success!\n\nSuccessfully uploaded: ${successCount}/${questions.length} questions\nFailed: ${uploadErrors.length}\n\nErrors:\n${uploadErrors.slice(0, 3).join("\n")}`;
             } else {
-              message = `🎉 Success!\n\n✅ Successfully uploaded all ${questions.length} questions to ${formData.book} (Grade ${formData.grade}, ${formData.subject})!`;
+              // Check if content creator (questions go for approval) or direct upload
+              const isContentCreator = userRole === 'Content Creator';
+              if (isContentCreator) {
+                message = `🎉 Success!\n\n✅ All ${questions.length} questions have been submitted for approval!\n\nThey will be reviewed by the content manager for ${formData.subject} subject. You can track their status in the 'Question Status' section.`;
+              } else {
+                message = `🎉 Success!\n\n✅ Successfully uploaded all ${questions.length} questions to ${formData.book} (Grade ${formData.grade}, ${formData.subject})!`;
+              }
             }
             setUploadMessage(message);
             if (successCount === questions.length) {

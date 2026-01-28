@@ -258,11 +258,12 @@ const QuizGeneration = () => {
     { key: 'short', label: 'Short Answer', icon: 'ri-text', isInteractive: false },
     { key: 'long', label: 'Long Answer', icon: 'ri-file-text-line', isInteractive: false },
     { key: 'fillblanks', label: 'Fill in the Blanks', icon: 'ri-input-cursor-move', isInteractive: false },
-    { key: 'dragdrop', label: 'Drag & Drop', icon: 'ri-drag-move-line', isInteractive: true },
-    { key: 'diagramlabeling', label: 'Diagram Labeling', icon: 'ri-image-edit-line', isInteractive: true },
-    { key: 'matching', label: 'Textual Matching', icon: 'ri-links-line', isInteractive: true },
-    { key: 'categorization', label: 'Column Sorting', icon: 'ri-layout-column-line', isInteractive: true },
-    { key: 'ordering', label: 'Sequence Ordering', icon: 'ri-list-ordered', isInteractive: true }
+    // Commented out for now - interactive question types
+    // { key: 'dragdrop', label: 'Drag & Drop', icon: 'ri-drag-move-line', isInteractive: true },
+    // { key: 'diagramlabeling', label: 'Diagram Labeling', icon: 'ri-image-edit-line', isInteractive: true },
+    // { key: 'matching', label: 'Textual Matching', icon: 'ri-links-line', isInteractive: true },
+    // { key: 'categorization', label: 'Column Sorting', icon: 'ri-layout-column-line', isInteractive: true },
+    // { key: 'ordering', label: 'Sequence Ordering', icon: 'ri-list-ordered', isInteractive: true }
   ];
   const [totalQuestions, setTotalQuestions] = useState(20);
   const [timeLimit, setTimeLimit] = useState(30);

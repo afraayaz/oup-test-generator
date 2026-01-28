@@ -118,22 +118,7 @@ export default function ContentCreatorDashboard() {
       }
       setCreationTrendData(weekData);
 
-      // Calculate subject distribution
-      const subjectCounts: { [key: string]: number } = {};
-      questions.forEach(q => {
-        const subject = q.subject || 'Others';
-        subjectCounts[subject] = (subjectCounts[subject] || 0) + 1;
-      });
-      
-      const colors = ['#3B82F6', '#10B981', '#F59E0B', '#8B5CF6', '#EF4444', '#06B6D4', '#EC4899'];
-      const subjectData = Object.entries(subjectCounts).map(([subject, count], index) => ({
-        subject,
-        count,
-        color: colors[index % colors.length]
-      }));
-      setSubjectDistribution(subjectData);
-
-      // Calculate difficulty breakdown
+      // Calculate difficulty distribution for pie chart
       const difficultyCounts: { [key: string]: number } = { Easy: 0, Medium: 0, Hard: 0 };
       questions.forEach(q => {
         const difficulty = q.difficulty || 'Medium';
@@ -142,12 +127,43 @@ export default function ContentCreatorDashboard() {
         }
       });
       
-      const difficultyData = [
-        { level: 'Easy', count: difficultyCounts.Easy, target: Math.ceil(totalQuestions * 0.3) },
-        { level: 'Medium', count: difficultyCounts.Medium, target: Math.ceil(totalQuestions * 0.5) },
-        { level: 'Hard', count: difficultyCounts.Hard, target: Math.ceil(totalQuestions * 0.2) }
-      ];
-      setDifficultyBreakdown(difficultyData);
+      // Create pie chart data for difficulty
+      const difficultyColors = { Easy: '#10B981', Medium: '#F59E0B', Hard: '#EF4444' };
+      const difficultyPieData = Object.entries(difficultyCounts).map(([level, count]) => ({
+        subject: level, // Keep 'subject' key for compatibility with PieChart component
+        count,
+        color: difficultyColors[level as keyof typeof difficultyColors]
+      }));
+      setSubjectDistribution(difficultyPieData);
+
+      // Calculate question type distribution for bar chart
+      const typeLabels: { [key: string]: string } = {
+        multiple: "MCQ",
+        truefalse: "True/False",
+        short: "Short Answer",
+        long: "Long Answer",
+        fillblanks: "Fill Blanks",
+        matching: "Matching",
+        ordering: "Ordering",
+        categorization: "Categorization",
+        "drag-drop": "Drag & Drop"
+      };
+      
+      const typeCounts: { [key: string]: number } = {};
+      questions.forEach(q => {
+        const type = q.type || 'multiple';
+        const label = typeLabels[type] || type;
+        typeCounts[label] = (typeCounts[label] || 0) + 1;
+      });
+      
+      const typeData = Object.entries(typeCounts)
+        .map(([type, count]) => ({
+          level: type,
+          count: count
+        }))
+        .sort((a, b) => b.count - a.count);
+      
+      setDifficultyBreakdown(typeData);
 
       // Get recent questions (last 4)
       const sortedQuestions = questions
@@ -320,9 +336,9 @@ export default function ContentCreatorDashboard() {
               </div>
             </div>
 
-            {/* Subject Distribution */}
+            {/* Difficulty Distribution Pie Chart */}
             <div className="bg-white rounded-xl p-4 sm:p-6 shadow-sm border border-gray-100">
-              <h3 className="text-base sm:text-lg font-bold text-gray-900 mb-4 sm:mb-6">Questions by Subject</h3>
+              <h3 className="text-base sm:text-lg font-bold text-gray-900 mb-4 sm:mb-6">Questions by Difficulty</h3>
               <div className="w-full overflow-hidden">
                 <ResponsiveContainer width="100%" height={250}>
                 <PieChart>
@@ -344,22 +360,29 @@ export default function ContentCreatorDashboard() {
               </ResponsiveContainer>
               </div>
               <div className="mt-4 space-y-2">
-                {subjectDistribution.map((subject, index) => (
-                  <div key={index} className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <div className="w-3 h-3 rounded-full" style={{ backgroundColor: subject.color }}></div>
-                      <span className="text-sm text-gray-600">{subject.subject}</span>
+                {subjectDistribution.map((difficulty, index) => {
+                  const total = subjectDistribution.reduce((sum, item) => sum + item.count, 0);
+                  const percentage = total > 0 ? Math.round((difficulty.count / total) * 100) : 0;
+                  return (
+                    <div key={index} className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <div className="w-3 h-3 rounded-full" style={{ backgroundColor: difficulty.color }}></div>
+                        <span className="text-sm text-gray-600">{difficulty.subject}</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-semibold text-gray-900">{difficulty.count}</span>
+                        <span className="text-xs text-gray-500">({percentage}%)</span>
+                      </div>
                     </div>
-                    <span className="text-sm font-semibold text-gray-900">{subject.count}</span>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           </div>
 
-          {/* Difficulty Breakdown */}
+          {/* Question Type Distribution */}
           <div className="bg-white rounded-xl p-4 sm:p-6 shadow-sm border border-gray-100 mb-6 sm:mb-8">
-            <h3 className="text-base sm:text-lg font-bold text-gray-900 mb-4 sm:mb-6">Question Difficulty Distribution</h3>
+            <h3 className="text-base sm:text-lg font-bold text-gray-900 mb-4 sm:mb-6">Question Type Distribution</h3>
             <div className="w-full overflow-hidden">
               <ResponsiveContainer width="100%" height={200}>
               <BarChart data={difficultyBreakdown}>
@@ -367,8 +390,7 @@ export default function ContentCreatorDashboard() {
                 <XAxis dataKey="level" stroke="#6B7280" style={{ fontSize: '12px' }} />
                 <YAxis stroke="#6B7280" style={{ fontSize: '12px' }} />
                 <Tooltip contentStyle={{ backgroundColor: '#fff', border: '1px solid #E5E7EB', borderRadius: '8px' }} />
-                <Bar dataKey="count" fill="#8B5CF6" radius={[8, 8, 0, 0]} name="Created" />
-                <Bar dataKey="target" fill="#E5E7EB" radius={[8, 8, 0, 0]} name="Target" />
+                <Bar dataKey="count" fill="#8B5CF6" radius={[8, 8, 0, 0]} name="Questions" />
               </BarChart>
             </ResponsiveContainer>
             </div>
@@ -441,29 +463,6 @@ export default function ContentCreatorDashboard() {
                   </div>
                 </div>
               ))}
-            </div>
-          </div>
-
-          {/* Quick Actions */}
-          <div className="mt-6 sm:mt-8 bg-gradient-to-r from-violet-50 to-purple-50 rounded-xl p-4 sm:p-6 border border-violet-100">
-            <h3 className="text-sm font-semibold text-gray-700 mb-3 sm:mb-4">Quick Actions</h3>
-            <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3">
-              <button className="min-w-[44px] min-h-[44px] px-2 sm:px-4 py-2 sm:py-3 bg-white hover:bg-violet-50 text-gray-700 text-xs sm:text-sm font-medium rounded-lg transition-colors border border-gray-200 hover:border-violet-300 flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-2">
-                <i className="ri-file-add-line text-base sm:text-lg"></i>
-                <span className="text-center">Create</span>
-              </button>
-              <button className="min-w-[44px] min-h-[44px] px-2 sm:px-4 py-2 sm:py-3 bg-white hover:bg-violet-50 text-gray-700 text-xs sm:text-sm font-medium rounded-lg transition-colors border border-gray-200 hover:border-violet-300 flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-2">
-                <i className="ri-draft-line text-base sm:text-lg"></i>
-                <span className="text-center">Drafts</span>
-              </button>
-              <button className="min-w-[44px] min-h-[44px] px-2 sm:px-4 py-2 sm:py-3 bg-white hover:bg-violet-50 text-gray-700 text-xs sm:text-sm font-medium rounded-lg transition-colors border border-gray-200 hover:border-violet-300 flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-2">
-                <i className="ri-database-line text-base sm:text-lg"></i>
-                <span className="text-center">Bank</span>
-              </button>
-              <button className="min-w-[44px] min-h-[44px] px-2 sm:px-4 py-2 sm:py-3 bg-white hover:bg-violet-50 text-gray-700 text-xs sm:text-sm font-medium rounded-lg transition-colors border border-gray-200 hover:border-violet-300 flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-2">
-                <i className="ri-bar-chart-line text-base sm:text-lg"></i>
-                <span className="text-center">Analytics</span>
-              </button>
             </div>
           </div>
         </div>

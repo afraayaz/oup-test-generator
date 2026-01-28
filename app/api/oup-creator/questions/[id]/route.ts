@@ -72,9 +72,17 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
       );
     }
 
-    // Verify ownership
-    const questionRef = doc(db, 'questions', 'oup', 'items', questionId);
-    const questionDoc = await getDoc(questionRef);
+    // Try to find the question in main bank first
+    let questionRef = doc(db, 'questions', 'oup', 'items', questionId);
+    let questionDoc = await getDoc(questionRef);
+    let isFromApprovalQueue = false;
+
+    // If not found in main bank, check approval queue
+    if (!questionDoc.exists()) {
+      questionRef = doc(db, 'questions', 'approval_queue', 'items', questionId);
+      questionDoc = await getDoc(questionRef);
+      isFromApprovalQueue = true;
+    }
 
     if (!questionDoc.exists()) {
       return NextResponse.json(
@@ -83,20 +91,36 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
       );
     }
 
-    if (userRole !== 'oup-admin' && questionDoc.data().createdBy !== userId) {
-      return NextResponse.json(
-        { error: 'Unauthorized: You can only delete your own questions' },
-        { status: 403 }
-      );
+    const questionData = questionDoc.data();
+
+    // Check ownership - compare with both createdBy and createdById fields
+    if (userRole !== 'oup-admin') {
+      const isOwner = questionData.createdBy === userId || 
+                     questionData.createdById === userId ||
+                     questionData.createdBy === request.headers.get('x-user-name');
+      
+      if (!isOwner) {
+        console.log('Ownership check failed:', {
+          userId,
+          userName: request.headers.get('x-user-name'),
+          questionCreatedBy: questionData.createdBy,
+          questionCreatedById: questionData.createdById
+        });
+        return NextResponse.json(
+          { error: 'Unauthorized: You can only delete your own questions' },
+          { status: 403 }
+        );
+      }
     }
 
     // Delete the question
     await deleteDoc(questionRef);
 
-    // Recalculate and update OUP stats
-    try {
-      const statsRef = doc(db, 'question-bank-stats', 'oup');
-      const statsDoc = await getDocs(collection(db, 'questions', 'oup', 'items'));
+    // Recalculate and update OUP stats only if deleted from main bank
+    if (!isFromApprovalQueue) {
+      try {
+        const statsRef = doc(db, 'question-bank-stats', 'oup');
+        const statsDoc = await getDocs(collection(db, 'questions', 'oup', 'items'));
       
       const stats: any = {
         totalQuestions: statsDoc.size,
@@ -116,8 +140,9 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
       });
 
       await setDoc(statsRef, stats, { merge: true });
-    } catch (statsError) {
-      console.error("❌ Error updating OUP stats after deletion:", statsError);
+      } catch (statsError) {
+        console.error("❌ Error updating OUP stats after deletion:", statsError);
+      }
     }
 
     return NextResponse.json({

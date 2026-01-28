@@ -2,9 +2,11 @@
 
 import { useState } from 'react';
 import Sidebar from '@/components/Sidebar';
+import { useUserProfile } from '@/hooks/useUserProfile';
 import { BarChart, Bar, PieChart, Pie, Cell, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
 export default function ModeratorDashboard() {
+  const { user } = useUserProfile();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [stats] = useState({
     pendingReview: 34,
@@ -62,22 +64,13 @@ export default function ModeratorDashboard() {
           </button>
 
           <h1 className="text-lg sm:text-xl lg:text-2xl font-bold text-blue-600">Content Moderator Dashboard</h1>
-          <div className="flex items-center gap-2 sm:gap-3">
-            <div className="text-right hidden sm:block">
-              <div className="text-xs sm:text-sm font-semibold text-gray-900">Lisa Martinez</div>
-              <div className="text-xs text-gray-500">Content Manager</div>
-            </div>
-            <div className="min-w-[44px] min-h-[44px] w-11 h-11 bg-teal-100 rounded-full flex items-center justify-center">
-              <span className="text-teal-600 font-semibold text-sm">LM</span>
-            </div>
-          </div>
         </div>
 
         {/* Main Content */}
         <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto">
           {/* Welcome Section */}
           <div className="bg-gradient-to-r from-teal-500 to-teal-600 rounded-xl sm:rounded-2xl p-4 sm:p-6 lg:p-8 mb-6 sm:mb-8 text-white shadow-lg">
-            <h2 className="text-xl sm:text-2xl lg:text-3xl font-bold mb-1 sm:mb-2">Welcome, Lisa! 🔍</h2>
+            <h2 className="text-xl sm:text-2xl lg:text-3xl font-bold mb-1 sm:mb-2">Welcome, {user?.name || 'Content Manager'}! 🔍</h2>
             <p className="text-sm sm:text-base text-teal-50">Your content quality control center</p>
           </div>
 
