@@ -16,6 +16,7 @@ interface Question {
   manualMarks?: number;
   status: string;
   explanation?: string;
+  imageUrl?: string;
 }
 
 interface ReviewData {
@@ -202,7 +203,19 @@ export default function ReviewResultsPage() {
                       {question.isCorrect ? '✓ Correct' : '✗ Incorrect'}
                     </span>
                   </div>
-                  <p className="text-blue-900">{question.questionText}</p>
+                  <p className="text-blue-900 mb-3">{question.questionText}</p>
+                  
+                  {/* Display question image if available */}
+                  {question.imageUrl && (
+                    <div className="mt-3">
+                      <img 
+                        src={question.imageUrl} 
+                        alt="Question illustration" 
+                        className="max-w-full h-auto rounded-lg border border-blue-300 shadow-sm"
+                        style={{ maxHeight: '400px' }}
+                      />
+                    </div>
+                  )}
                 </div>
 
                 {/* Student Answer - Amber Background */}

@@ -1270,6 +1270,7 @@ const QuizGeneration = () => {
         marks: q.marks,
         isInteractive: q.isInteractive || false,
         interactiveData: q.interactiveData || null,
+        imageUrl: q.imageUrl || null,
       })),
       totalMarks: isMarked ? questions.reduce((sum, q) => sum + q.marks, 0) : null,
       randomization: { seed: newSeed, shuffledOrder: true, shuffleOptions: questions.some(q => q.type === 'multiple') },

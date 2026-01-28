@@ -909,6 +909,17 @@ function QuizAttemptPageContent() {
                                 ? result.questionText.text
                                 : 'Question text unavailable'}
                             </p>
+                            {/* Display image if available in results */}
+                            {result.imageUrl && (
+                              <div className="mt-2">
+                                <img 
+                                  src={result.imageUrl} 
+                                  alt="Question illustration" 
+                                  className="max-w-full h-auto rounded border border-gray-200 shadow-sm"
+                                  style={{ maxHeight: '300px' }}
+                                />
+                              </div>
+                            )}
                           </div>
 
                           {result.status !== 'Not Attempted' && (
@@ -1147,6 +1158,18 @@ function QuizAttemptPageContent() {
               : currentItem.question.text.replace(/\{blank\d+\}/g, '_____')
             }
           </h2>
+
+          {/* Display image if available */}
+          {(currentItem as any).imageUrl && (
+            <div className="mb-6">
+              <img 
+                src={(currentItem as any).imageUrl} 
+                alt="Question illustration" 
+                className="max-w-full h-auto rounded-lg border border-gray-200 shadow-sm mx-auto"
+                style={{ maxHeight: '400px' }}
+              />
+            </div>
+          )}
 
           {currentItem.isInteractive
             ? renderInteractiveQuestion(currentItem, currentQuestion)

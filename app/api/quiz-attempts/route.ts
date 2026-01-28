@@ -172,6 +172,7 @@ export async function POST(request: NextRequest) {
         status: !attempted ? 'Not Attempted' : (['short', 'shortanswer', 'long', 'longanswer'].includes(item.questionType) ? 'Attempted' : (isCorrect ? 'Correct' : 'Incorrect')),
         marks: item.marks || 1,
         explanation: explanation || null,
+        imageUrl: item.imageUrl || null,  // Include image URL for display
       };
     });
 
