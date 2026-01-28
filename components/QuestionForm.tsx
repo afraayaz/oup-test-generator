@@ -348,21 +348,27 @@ export default function QuestionForm({
     try {
       // Upload image if one is selected
       if (imageFile && userId) {
+        console.log('📤 Starting image upload...', { fileName: imageFile.name, size: imageFile.size, userId });
         setImageUploading(true);
         setUploadProgress(0);
         try {
           const imageUrl = await uploadQuestionImage(imageFile, userId, (progress) => {
             setUploadProgress(progress);
           });
+          console.log('✅ Image uploaded successfully:', imageUrl);
           formData.imageUrl = imageUrl;
         } catch (error) {
+          console.error('❌ Image upload failed:', error);
           setImageUploading(false);
           setUploadProgress(0);
-          setToast({ type: "error", message: "Failed to upload image. Please try again." });
+          const errorMessage = error instanceof Error ? error.message : "Failed to upload image. Please try again.";
+          setToast({ type: "error", message: errorMessage });
           return;
         }
         setImageUploading(false);
         setUploadProgress(0);
+      } else if (imageFile && !userId) {
+        console.warn('⚠️ Image file selected but no userId provided');
       }
 
       await onSubmit(formData);

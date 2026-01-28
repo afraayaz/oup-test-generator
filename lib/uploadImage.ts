@@ -11,9 +11,13 @@ export async function uploadQuestionImage(
   onProgress?: (progress: number) => void
 ): Promise<string> {
   try {
-    const apiKey = process.env.NEXT_PUBLIC_IMGBB_API_KEY;
+    // Access the environment variable - Next.js inlines this at build time
+    const apiKey = process.env.NEXT_PUBLIC_IMGBB_API_KEY || '';
+    
+    console.log('🔑 ImgBB API Key present:', !!apiKey, 'Length:', apiKey?.length || 0);
     
     if (!apiKey) {
+      console.error('❌ ImgBB API key is missing!');
       throw new Error('ImgBB API key is not configured. Please add NEXT_PUBLIC_IMGBB_API_KEY to your .env.local file.');
     }
 
