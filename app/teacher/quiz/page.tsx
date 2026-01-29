@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { db } from '@/firebase/firebase';
 import { collection, getDocs, addDoc, serverTimestamp, Timestamp, query, where } from 'firebase/firestore';
 import Sidebar from '@/components/Sidebar';
@@ -371,7 +371,9 @@ const QuizGeneration = () => {
           .map((book: any) => {
             const bookObj = typeof book === 'string' ? { title: book } : book;
             if (bookObj && typeof bookObj === 'object' && 'id' in bookObj && 'title' in bookObj) {
-              bookIdMap[bookObj.title as string] = bookObj.id as string;
+              // Use composite key: subject-grade-title to handle same book name across different grades
+              const bookKey = `${subject}-${grade}-${bookObj.title}`;
+              bookIdMap[bookKey] = bookObj.id as string;
             }
             // Track subject ID if available
             if (bookObj && typeof bookObj === 'object' && 'subjectId' in bookObj) {
@@ -388,7 +390,10 @@ const QuizGeneration = () => {
           })
           .map((book: any) => {
             if (book && typeof book === 'object' && 'id' in book && 'title' in book) {
-              bookIdMap[book.title] = book.id;
+              // Use composite key: subject-grade-title to handle same book name across different grades
+              const normalizedBookGrade = normalizeGrade(book.grade);
+              const bookKey = `${book.subject}-${normalizedBookGrade}-${book.title}`;
+              bookIdMap[bookKey] = book.id;
             }
             // Track subject ID if available
             if (book && typeof book === 'object' && 'subjectId' in book) {
@@ -529,10 +534,12 @@ const QuizGeneration = () => {
       setIsLoadingChapters(true);
       try {
         // Fetch chapters from API (consistent across all accounts) - doesn't require questions to be loaded
-        const bookId = bookIdMap[selectedBook];
+        const normalizedGrade = normalizeGrade(selectedGrade);
+        const bookKey = `${selectedSubject}-${normalizedGrade}-${selectedBook}`;
+        const bookId = bookIdMap[bookKey];
         const subjectId = subjectIdMap[selectedSubject];
         const url = `/api/admin/chapters?subject=${encodeURIComponent(selectedSubject)}&book=${encodeURIComponent(selectedBook)}&bookId=${encodeURIComponent(bookId || '')}&subjectId=${encodeURIComponent(subjectId || '')}`;
-        console.log('🌐 Calling chapters API:', url, { selectedSubject, selectedBook, subjectId, bookId });
+        console.log('🌐 Calling chapters API:', url, { selectedSubject, selectedBook, selectedGrade, normalizedGrade, bookKey, subjectId, bookId });
         
         const chaptersResponse = await fetch(url);
         const chaptersData = await chaptersResponse.json();
@@ -580,7 +587,8 @@ const QuizGeneration = () => {
         const selectedGradeNormalized = String(selectedGrade).replace('Grade ', '').trim().toLowerCase();
         const selectedSubjectLower = selectedSubject.toLowerCase();
         const selectedBookLower = selectedBook.toLowerCase();
-        const selectedBookId = bookIdMap[selectedBook];
+        // Reuse bookKey and bookId from above
+        const selectedBookId = bookId;
 
         const slosSet = new Set<string>();
 
@@ -689,10 +697,12 @@ const QuizGeneration = () => {
     const selectedBookLower = selectedBook.toLowerCase();
     
     // Get the numeric IDs for subject and book
+    const normalizedGradeForKey = normalizeGrade(selectedGrade);
+    const bookKey = `${selectedSubject}-${normalizedGradeForKey}-${selectedBook}`;
     const numericSubjectId = foundSubjectId || subjectIdMap[selectedSubject] || selectedSubject;
-    const numericBookId = (bookIdMap[selectedBook] || selectedBook) as string;
+    const numericBookId = (bookIdMap[bookKey] || selectedBook) as string;
     
-    console.log('📌 Using IDs:', { numericSubjectId, numericBookId, selectedSubject, selectedBook, foundSubjectId });
+    console.log('📌 Using IDs:', { numericSubjectId, numericBookId, bookKey, selectedSubject, selectedBook, foundSubjectId });
     
     let matchedCount = 0;
     let failedGrade = 0, failedSubject = 0, failedBook = 0, failedChapter = 0, failedNoSLO = 0;
@@ -826,8 +836,10 @@ const QuizGeneration = () => {
     const selectedBookLower = selectedBook.toLowerCase();
     
     // Get the numeric IDs for subject and book
+    const normalizedGradeForKey = normalizeGrade(selectedGrade);
+    const bookKey = `${selectedSubject}-${normalizedGradeForKey}-${selectedBook}`;
     const numericSubjectId = foundSubjectId || subjectIdMap[selectedSubject] || selectedSubject;
-    const numericBookId = bookIdMap[selectedBook] || selectedBook;
+    const numericBookId = bookIdMap[bookKey] || selectedBook;
     
     let matchCount = 0;
     let totalQuestions = 0;
@@ -1031,8 +1043,10 @@ const QuizGeneration = () => {
         const normalizedType = normalizeQuestionType(qType);
         
         // Book matching: check both display name and numeric ID from bookIdMap
+        const normalizedGradeForKey = normalizeGrade(selectedGrade);
+        const bookKey = `${selectedSubject}-${normalizedGradeForKey}-${selectedBook}`;
         const selectedBookLower = selectedBook.toLowerCase();
-        const selectedBookId = bookIdMap[selectedBook];
+        const selectedBookId = bookIdMap[bookKey];
         const bookMatch = qBook === selectedBookLower || 
                          qBook === selectedBookId?.toString().toLowerCase() ||
                          qBook === selectedBookId;
@@ -1311,6 +1325,85 @@ const QuizGeneration = () => {
     return newQuestions;
   });
 
+  // Text formatting functions for question editor
+  const applyTextFormatting = (index: number, format: 'bold' | 'italic' | 'highlight', textareaRef: HTMLTextAreaElement | null) => {
+    if (!textareaRef) return;
+    
+    const start = textareaRef.selectionStart;
+    const end = textareaRef.selectionEnd;
+    const selectedText = textareaRef.value.substring(start, end);
+    
+    if (!selectedText) {
+      alert('Please select some text first');
+      return;
+    }
+    
+    let formattedText = '';
+    switch (format) {
+      case 'bold':
+        formattedText = `<b>${selectedText}</b>`;
+        break;
+      case 'italic':
+        formattedText = `<i>${selectedText}</i>`;
+        break;
+      case 'highlight':
+        formattedText = `<mark>${selectedText}</mark>`;
+        break;
+    }
+    
+    const currentText = textareaRef.value;
+    const newText = currentText.substring(0, start) + formattedText + currentText.substring(end);
+    
+    handleEditQuestion(index, 'question', { ...editedQuestions[index].question, text: newText });
+    
+    // Restore focus and selection
+    setTimeout(() => {
+      textareaRef.focus();
+      const newCursorPos = start + formattedText.length;
+      textareaRef.setSelectionRange(newCursorPos, newCursorPos);
+    }, 0);
+  };
+
+  const applyOptionFormatting = (questionIndex: number, optionIndex: number, format: 'bold' | 'italic' | 'highlight', inputRef: HTMLInputElement | null) => {
+    if (!inputRef) return;
+    
+    const start = inputRef.selectionStart || 0;
+    const end = inputRef.selectionEnd || 0;
+    const selectedText = inputRef.value.substring(start, end);
+    
+    if (!selectedText) {
+      alert('Please select some text first');
+      return;
+    }
+    
+    let formattedText = '';
+    switch (format) {
+      case 'bold':
+        formattedText = `<b>${selectedText}</b>`;
+        break;
+      case 'italic':
+        formattedText = `<i>${selectedText}</i>`;
+        break;
+      case 'highlight':
+        formattedText = `<mark>${selectedText}</mark>`;
+        break;
+    }
+    
+    const currentText = inputRef.value;
+    const newText = currentText.substring(0, start) + formattedText + currentText.substring(end);
+    
+    const newOptions = [...editedQuestions[questionIndex].options];
+    newOptions[optionIndex] = { ...newOptions[optionIndex], text: newText };
+    handleEditQuestion(questionIndex, 'options', newOptions);
+    
+    // Restore focus and selection
+    setTimeout(() => {
+      inputRef.focus();
+      const newCursorPos = start + formattedText.length;
+      inputRef.setSelectionRange(newCursorPos, newCursorPos);
+    }, 0);
+  };
+
   const handleSaveChanges = async () => {
     if (!generatedQuiz) return;
     
@@ -1549,6 +1642,18 @@ const QuizGeneration = () => {
     }
   };
 
+  // Helper function to convert newlines to HTML breaks for PDF
+  const convertNewlinesToHtml = (text: string): string => {
+    if (!text || typeof text !== 'string') return text;
+    return text.replace(/\n/g, '<br>');
+  };
+
+  // Helper function to split text by newlines for Word (creates separate paragraphs)
+  const splitTextByNewlines = (text: string): string[] => {
+    if (!text || typeof text !== 'string') return [text];
+    return text.split('\n');
+  };
+
   const downloadQuizPDF = () => {
     if (!generatedQuiz) return;
     
@@ -1615,6 +1720,9 @@ const QuizGeneration = () => {
           .options { margin-bottom: 12px; }
           .option { margin-bottom: 6px; font-size: 16px; font-family: 'Cambria', Georgia, serif; color: #2c3e50; line-height: 1.6; }
           .urdu { font-family: 'Noto Nastaliq Urdu', serif; direction: rtl; text-align: right; margin-right: 20px; }
+          mark { background-color: #fef08a; padding: 2px 4px; border-radius: 2px; }
+          b, strong { font-weight: bold; }
+          i, em { font-style: italic; }
           .page-break { page-break-before: always; }
           @media print { body { margin: 20px; font-family: 'Cambria', Georgia, serif; } .page-break { page-break-before: always; } }
         </style>
@@ -1665,14 +1773,14 @@ const QuizGeneration = () => {
                   </div>
                   ${isMarked ? `<div class="${q.question.isRTL ? 'question-number-marks-urdu' : 'question-number-marks'}">(${q.marks} marks)</div>` : ''}
                 </div>
-                <div class="question-text ${q.question.isRTL ? 'urdu' : ''}">${extractLatexFromFormulas(q.question.text)}</div>
+                <div class="question-text ${q.question.isRTL ? 'urdu' : ''}">${convertNewlinesToHtml(extractLatexFromFormulas(q.question.text))}</div>
                 ${(q as any).imageUrl ? `<div style="margin-top: 10px; margin-bottom: 10px;"><img src="${(q as any).imageUrl}" alt="Question image" style="max-width: 100%; height: auto; max-height: 300px; border: 1px solid #ddd; border-radius: 4px;" /></div>` : ''}
                 ${
                   q.type === 'multiple' && q.options?.length
                     ? `<div class="options ${q.question.isRTL ? 'urdu' : ''}">${q.options
                         .map(
                           (opt: any, j: number) =>
-                            `<div class="option">${q.question.isRTL ? optionLabels(true)[j] : String.fromCharCode(65 + j)}. ${opt.format === 'math' ? '\\(' + opt.text + '\\)' : opt.text}</div>`
+                            `<div class="option">${q.question.isRTL ? optionLabels(true)[j] : String.fromCharCode(65 + j)}. ${opt.format === 'math' ? '\\(' + opt.text + '\\)' : convertNewlinesToHtml(opt.text)}</div>`
                         )
                         .join('')}</div>`
                     : q.type === 'truefalse'
@@ -1787,6 +1895,9 @@ const QuizGeneration = () => {
           .answer-number-english { font-family: Arial, sans-serif; direction: ltr; text-align: left; font-weight: bold; font-size: 18px; }
           .answer-text { font-size: 16px; margin-bottom: 12px; }
           .urdu { font-family: 'Noto Nastaliq Urdu', sans-serif; direction: rtl; text-align: right; }
+          mark { background-color: #fef08a; padding: 2px 4px; border-radius: 2px; }
+          b, strong { font-weight: bold; }
+          i, em { font-style: italic; }
           @media print { body { margin: 20px; } }
         </style>
       </head>
@@ -1808,10 +1919,10 @@ const QuizGeneration = () => {
                   </div>
                   ${isMarked ? `<div class="${q.question.isRTL ? 'answer-number-marks-urdu' : 'answer-number-marks'}">(${q.marks} marks)</div>` : ''}
                 </div>
-                <div class="answer-text ${q.question.isRTL ? 'urdu' : ''}">${extractLatexFromFormulas(q.question.text)}</div>
+                <div class="answer-text ${q.question.isRTL ? 'urdu' : ''}">${convertNewlinesToHtml(extractLatexFromFormulas(q.question.text))}</div>
                 <div class="answer-text"><strong>Answer:</strong> ${
                   q.type === 'multiple' && q.options?.length
-                    ? `${q.question.isRTL ? optionLabels(true)[q.answer.value] : String.fromCharCode(65 + q.answer.value)}. ${q.options[q.answer.value]?.text || q.answer.text}`
+                    ? `${q.question.isRTL ? optionLabels(true)[q.answer.value] : String.fromCharCode(65 + q.answer.value)}. ${convertNewlinesToHtml(q.options[q.answer.value]?.text) || q.answer.text}`
                     : q.type === 'truefalse'
                     ? q.question.isRTL
                       ? q.answer.value
@@ -1822,11 +1933,11 @@ const QuizGeneration = () => {
                       : 'False'
                     : q.type === 'fillblanks'
                     ? typeof q.answer.value === 'string'
-                      ? q.answer.value
+                      ? convertNewlinesToHtml(q.answer.value)
                       : Object.entries(q.answer.value || {})
                         .map(([k, v]) => `${k}: ${Array.isArray(v) ? v.join(q.question.isRTL ? ' یا ' : ' or ') : v}`)
                         .join(', ')
-                    : q.answer.text || q.answer.value
+                    : convertNewlinesToHtml(q.answer.text || q.answer.value)
                 }</div>
               </div>
             `
@@ -1867,6 +1978,39 @@ const QuizGeneration = () => {
     try {
       const docxModule = await import('docx');
       const { Document, Packer, Paragraph, TextRun, Header, Footer, AlignmentType, Table, TableRow, TableCell, WidthType, BorderStyle, ImageRun } = docxModule;
+      
+      // Helper function to parse HTML formatting tags and create TextRun array
+      const parseFormattedText = (text: string, baseFont: string, baseSize: number, baseColor: string, isRTL: boolean): any[] => {
+        if (!text || typeof text !== 'string') return [new TextRun({ text: text || '', font: baseFont, size: baseSize, color: baseColor })];
+        
+        const runs: any[] = [];
+        const regex = /<(b|i|mark)>(.*?)<\/\1>|([^<]+)/g;
+        let match;
+        
+        while ((match = regex.exec(text)) !== null) {
+          if (match[3]) {
+            // Plain text
+            runs.push(new TextRun({ text: match[3], font: baseFont, size: baseSize, color: baseColor }));
+          } else {
+            // Formatted text
+            const tag = match[1];
+            const content = match[2];
+            const runOptions: any = { text: content, font: baseFont, size: baseSize, color: baseColor };
+            
+            if (tag === 'b') {
+              runOptions.bold = true;
+            } else if (tag === 'i') {
+              runOptions.italics = true;
+            } else if (tag === 'mark') {
+              runOptions.highlight = 'yellow';
+            }
+            
+            runs.push(new TextRun(runOptions));
+          }
+        }
+        
+        return runs.length > 0 ? runs : [new TextRun({ text: text, font: baseFont, size: baseSize, color: baseColor })];
+      };
       
       // Helper function to fetch image and convert to buffer
       const fetchImageAsBuffer = async (url: string): Promise<Uint8Array | null> => {
@@ -2137,18 +2281,21 @@ const QuizGeneration = () => {
                   spacing: { before: 200, after: 100 },
                 }),
               ]),
-              new Paragraph({
-                children: [new TextRun({ 
-                  text: q.type === 'fillblanks' 
-                    ? convertFormulasToReadable(q.question.text.replace(/\{blank\d+\}/g, '________'))
-                    : convertFormulasToReadable(q.question.text), 
-                  size: 28, 
-                  font: q.question.isRTL ? 'Noto Nastaliq Urdu' : 'Cambria',
-                  color: '2c3e50'
-                })],
+              // Question text - split by newlines to preserve formatting and parse HTML tags
+              ...splitTextByNewlines(q.type === 'fillblanks' 
+                ? convertFormulasToReadable(q.question.text.replace(/\{blank\d+\}/g, '________'))
+                : convertFormulasToReadable(q.question.text)
+              ).map(line => new Paragraph({
+                children: parseFormattedText(
+                  line || ' ', // Use space for empty lines to preserve line breaks
+                  q.question.isRTL ? 'Noto Nastaliq Urdu' : 'Cambria',
+                  28,
+                  '2c3e50',
+                  q.question.isRTL
+                ),
                 alignment: q.question.isRTL ? AlignmentType.RIGHT : AlignmentType.LEFT,
-                spacing: { after: (q as any).imageUrl ? 50 : 100 },
-              }),
+                spacing: { after: line === '' ? 50 : 100 }, // Less spacing for empty lines
+              })),
               ...((q as any).imageUrl && imageBuffers[i] ? [new Paragraph({
                 children: [
                   new ImageRun({
@@ -2167,37 +2314,51 @@ const QuizGeneration = () => {
                 spacing: { after: 100 },
               })] : []),
               ...(q.type === 'multiple' && q.options?.length
-                ? q.options.map((opt: any, j: number) => {
+                ? q.options.flatMap((opt: any, j: number) => {
                     const optionLabel = q.question.isRTL ? optionLabels(true)[j] : String.fromCharCode(65 + j);
                     const optionText = convertFormulasToReadable(opt.text);
-                    // For RTL (Urdu): Format as "ب. متن" (label. text)
-                    // For LTR (English): Format as "A. text"
-                    const formattedOption = q.question.isRTL 
-                      ? `${optionLabel}. ${optionText}` 
-                      : `${optionLabel}. ${optionText}`;
+                    const optionLines = splitTextByNewlines(optionText);
                     
-                    return new Paragraph({
-                      children: [new TextRun({ 
-                        text: formattedOption, 
-                        size: 26, 
-                        font: q.question.isRTL ? 'Noto Nastaliq Urdu' : 'Cambria',
-                        color: '2c3e50'
-                      })],
-                      alignment: q.question.isRTL ? AlignmentType.RIGHT : AlignmentType.LEFT,
-                      spacing: { after: 60 },
+                    // First line includes the label (A., B., etc.)
+                    return optionLines.map((line, lineIndex) => {
+                      const prefix = lineIndex === 0 ? `${optionLabel}. ` : '   '; // Indent continuation lines
+                      
+                      // Parse formatting for the line content
+                      const textRuns = parseFormattedText(
+                        line || ' ',
+                        q.question.isRTL ? 'Noto Nastaliq Urdu' : 'Cambria',
+                        26,
+                        '2c3e50',
+                        q.question.isRTL
+                      );
+                      
+                      // Add prefix as first text run
+                      const allRuns = [
+                        new TextRun({ 
+                          text: prefix,
+                          size: 26, 
+                          font: q.question.isRTL ? 'Noto Nastaliq Urdu' : 'Cambria',
+                          color: '2c3e50'
+                        }),
+                        ...textRuns
+                      ];
+                      
+                      return new Paragraph({
+                        children: allRuns,
+                        alignment: q.question.isRTL ? AlignmentType.RIGHT : AlignmentType.LEFT,
+                        spacing: { after: lineIndex === optionLines.length - 1 ? 60 : 30 },
+                      });
                     });
                   })
                 : q.type === 'truefalse' && q.options?.length
-                ? q.options.map((opt: any, j: number) => {
+                ? q.options.flatMap((opt: any, j: number) => {
                     const optionLabel = q.question.isRTL ? optionLabels(true)[j] : String.fromCharCode(65 + j);
                     const optionText = q.question.isRTL ? (opt.text === 'True' ? 'صحیح' : 'غلط') : opt.text;
-                    // For RTL (Urdu): Format as "الف. صحیح" (label. text)
-                    // For LTR (English): Format as "A. True"
                     const formattedOption = q.question.isRTL 
                       ? `${optionLabel}. ${optionText}` 
                       : `${optionLabel}. ${optionText}`;
                     
-                    return new Paragraph({
+                    return [new Paragraph({
                       children: [new TextRun({ 
                         text: formattedOption, 
                         size: 26, 
@@ -2206,7 +2367,7 @@ const QuizGeneration = () => {
                       })],
                       alignment: q.question.isRTL ? AlignmentType.RIGHT : AlignmentType.LEFT,
                       spacing: { after: 60 },
-                    });
+                    })];
                   })
                 : q.type === 'fillblanks'
                 ? []
@@ -3179,11 +3340,51 @@ const QuizGeneration = () => {
                         </div>
                       </div>
                       <MathJax dynamic>
+                        {/* Text Formatting Toolbar */}
+                        <div className="flex items-center gap-2 mt-2 mb-2 p-2 bg-gray-50 border border-gray-200 rounded">
+                          <span className="text-xs text-gray-600 font-medium mr-2">Format:</span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const textarea = document.querySelector(`textarea[data-question-index="${index}"]`) as HTMLTextAreaElement;
+                              applyTextFormatting(index, 'bold', textarea);
+                            }}
+                            className="px-2 py-1 text-xs font-bold border border-gray-300 rounded hover:bg-white hover:border-gray-400 transition-colors"
+                            title="Bold (select text first)"
+                          >
+                            <i className="ri-bold"></i> B
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const textarea = document.querySelector(`textarea[data-question-index="${index}"]`) as HTMLTextAreaElement;
+                              applyTextFormatting(index, 'italic', textarea);
+                            }}
+                            className="px-2 py-1 text-xs italic border border-gray-300 rounded hover:bg-white hover:border-gray-400 transition-colors"
+                            title="Italic (select text first)"
+                          >
+                            <i className="ri-italic"></i> I
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const textarea = document.querySelector(`textarea[data-question-index="${index}"]`) as HTMLTextAreaElement;
+                              applyTextFormatting(index, 'highlight', textarea);
+                            }}
+                            className="px-2 py-1 text-xs border border-gray-300 rounded hover:bg-white hover:border-yellow-400 transition-colors bg-yellow-100"
+                            title="Highlight (select text first)"
+                          >
+                            <i className="ri-mark-pen-line"></i> H
+                          </button>
+                          <span className="text-xs text-gray-500 ml-2">Select text then click a format button</span>
+                        </div>
                         <textarea
+                          data-question-index={index}
                           value={convertFormulasToReadable(q.question.text)}
                           onChange={e => handleEditQuestion(index, 'question', { ...q.question, text: e.target.value })}
-                          className={`w-full p-2 border rounded mt-2 ${q.question.isRTL ? 'text-right font-noto-nastaliq' : ''}`}
+                          className={`w-full p-2 border rounded ${q.question.isRTL ? 'text-right font-noto-nastaliq' : ''}`}
                           dir={q.question.isRTL ? 'rtl' : 'ltr'}
+                          rows={4}
                         />
                         {(q as any).imageUrl && (
                           <div className="mt-3 mb-3">
@@ -3202,23 +3403,62 @@ const QuizGeneration = () => {
                               // Check if this option is marked as correct (handle both single and multiple correct answers)
                               const isCorrect = Array.isArray(q.answer.value) ? q.answer.value.includes(i) : q.answer.value === i;
                               return (
-                                <div key={i} className={`flex items-center space-x-2 mb-2 ${q.question.isRTL ? 'space-x-reverse' : ''}`}>
-                                  <span className={`font-semibold ${q.question.isRTL ? 'font-noto-nastaliq' : ''} ${isCorrect ? 'text-green-600' : ''}`}>
-                                    {q.question.isRTL ? optionLabels(true)[i] : String.fromCharCode(65 + i)}.
-                                  </span>
-                                  <input
-                                    value={opt.text}
-                                    onChange={e => {
-                                      const newOptions = [...q.options];
-                                      newOptions[i] = { ...newOptions[i], text: e.target.value };
-                                      handleEditQuestion(index, 'options', newOptions);
-                                    }}
-                                    className={`flex-1 p-2 border rounded ${q.question.isRTL ? 'text-right font-noto-nastaliq' : ''} ${isCorrect ? 'bg-green-50 border-green-400' : ''}`}
-                                    dir={q.question.isRTL ? 'rtl' : 'ltr'}
-                                  />
-                                  {isCorrect && (
-                                    <span className="text-green-600 text-xs font-semibold whitespace-nowrap">✓ Correct</span>
-                                  )}
+                                <div key={i} className="mb-3">
+                                  <div className={`flex items-center space-x-2 mb-1 ${q.question.isRTL ? 'space-x-reverse' : ''}`}>
+                                    <span className={`font-semibold ${q.question.isRTL ? 'font-noto-nastaliq' : ''} ${isCorrect ? 'text-green-600' : ''}`}>
+                                      {q.question.isRTL ? optionLabels(true)[i] : String.fromCharCode(65 + i)}.
+                                    </span>
+                                    <input
+                                      data-option-index={`${index}-${i}`}
+                                      value={opt.text}
+                                      onChange={e => {
+                                        const newOptions = [...q.options];
+                                        newOptions[i] = { ...newOptions[i], text: e.target.value };
+                                        handleEditQuestion(index, 'options', newOptions);
+                                      }}
+                                      className={`flex-1 p-2 border rounded ${q.question.isRTL ? 'text-right font-noto-nastaliq' : ''} ${isCorrect ? 'bg-green-50 border-green-400' : ''}`}
+                                      dir={q.question.isRTL ? 'rtl' : 'ltr'}
+                                    />
+                                    {isCorrect && (
+                                      <span className="text-green-600 text-xs font-semibold whitespace-nowrap">✓ Correct</span>
+                                    )}
+                                  </div>
+                                  {/* Formatting buttons for option */}
+                                  <div className="flex items-center gap-1 ml-8 pl-2">
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        const input = document.querySelector(`input[data-option-index="${index}-${i}"]`) as HTMLInputElement;
+                                        applyOptionFormatting(index, i, 'bold', input);
+                                      }}
+                                      className="px-1.5 py-0.5 text-xs font-bold border border-gray-300 rounded hover:bg-white hover:border-gray-400 transition-colors"
+                                      title="Bold"
+                                    >
+                                      B
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        const input = document.querySelector(`input[data-option-index="${index}-${i}"]`) as HTMLInputElement;
+                                        applyOptionFormatting(index, i, 'italic', input);
+                                      }}
+                                      className="px-1.5 py-0.5 text-xs italic border border-gray-300 rounded hover:bg-white hover:border-gray-400 transition-colors"
+                                      title="Italic"
+                                    >
+                                      I
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        const input = document.querySelector(`input[data-option-index="${index}-${i}"]`) as HTMLInputElement;
+                                        applyOptionFormatting(index, i, 'highlight', input);
+                                      }}
+                                      className="px-1.5 py-0.5 text-xs border border-gray-300 rounded hover:bg-white hover:border-yellow-400 transition-colors bg-yellow-100"
+                                      title="Highlight"
+                                    >
+                                      H
+                                    </button>
+                                  </div>
                                 </div>
                               );
                             })}

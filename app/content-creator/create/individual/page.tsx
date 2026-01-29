@@ -11,6 +11,7 @@ function CreateIndividualQuestionPageContent() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [successMessage, setSuccessMessage] = useState("");
+  const [systemBooks, setSystemBooks] = useState<Array<{ id: string; title: string; subject: string; grade: string; chapters?: number }>>([]);
   const { user } = useUserProfile();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -20,32 +21,91 @@ function CreateIndividualQuestionPageContent() {
   const defaultSubject = searchParams.get("subject") || "";
   const defaultBook = searchParams.get("book") || "";
 
-  // Extract dynamic grades and books from user's assignedBooks
+  // Fetch all books from all subjects for Content Creators
+  useEffect(() => {
+    const fetchSystemBooks = async () => {
+      if (!user) return;
+      
+      try {
+        // Extract unique subjects from assignedBooks
+        const uniqueSubjects = new Set<string>();
+        if (user.assignedBooks) {
+          user.assignedBooks.forEach((book: any) => {
+            if (book.subject) {
+              uniqueSubjects.add(book.subject);
+            }
+          });
+        }
+        
+        const userSubjects = Array.from(uniqueSubjects);
+        console.log('👤 CC assigned subjects (from books):', userSubjects);
+        
+        if (userSubjects.length === 0) {
+          console.log('⚠️ No subjects found in assignedBooks');
+          return;
+        }
+        
+        // Fetch books for all assigned subjects
+        const allBooksPromises = userSubjects.map(async (subjectName: string) => {
+          const response = await fetch(`/api/admin/books-by-subject?subject=${encodeURIComponent(subjectName)}`);
+          const data = await response.json();
+          const books = data.books || [];
+          console.log(`📚 Fetched books for ${subjectName}:`, books.length);
+          
+          // Ensure each book has the subject field set
+          return books.map((book: any) => ({
+            ...book,
+            subject: book.subject || subjectName
+          }));
+        });
+        
+        const booksArrays = await Promise.all(allBooksPromises);
+        const allBooks = booksArrays.flat();
+        
+        console.log('📚 Total systemBooks for CC:', allBooks.length);
+        console.log('📚 SystemBooks with subjects:', allBooks.map(b => ({ title: b.title, subject: b.subject, grade: b.grade })));
+        setSystemBooks(allBooks);
+      } catch (error) {
+        console.error('❌ Error fetching system books:', error);
+      }
+    };
+    
+    if (user?.role === 'content_creator') {
+      fetchSystemBooks();
+    }
+  }, [user]);
+
+  // Extract dynamic grades and books from user's assignedBooks or systemBooks
   const { availableGrades, availableSubjects, submittedBooks } = useMemo(() => {
     const grades = new Set<string>();
     const subjects = new Set<string>();
     const books: Array<{ id: string; title: string; subject: string; grade: string; chapters?: number }> = [];
 
-    if (user?.assignedBooks) {
-      user.assignedBooks.forEach((book: any) => {
-        grades.add(book.grade);
-        subjects.add(book.subject);
-        books.push({
-          id: book.id || book.title,
-          title: book.title,
-          subject: book.subject,
-          grade: book.grade,
-          chapters: book.chapters || 0,
-        });
+    // For Content Creators, use systemBooks; for others, use assignedBooks
+    const booksSource = user?.role === 'content_creator' && systemBooks.length > 0 
+      ? systemBooks 
+      : (user?.assignedBooks || []);
+
+    console.log('📖 Books source for form:', user?.role === 'content_creator' ? 'systemBooks' : 'assignedBooks', booksSource.length);
+
+    booksSource.forEach((book: any) => {
+      grades.add(book.grade);
+      subjects.add(book.subject);
+      books.push({
+        id: book.id || book.title,
+        title: book.title,
+        subject: book.subject,
+        grade: book.grade,
+        chapters: book.chapters || 0,
       });
-    }
+    });
 
     return {
       availableGrades: Array.from(grades).sort(),
       availableSubjects: Array.from(subjects).sort(),
       submittedBooks: books,
     };
-  }, [user?.assignedBooks]);
+  }, [user?.assignedBooks, user?.role, systemBooks]);
 
   const handleQuestionSubmit = async (questionData: QuestionFormData) => {
     console.log('🎯 Submit called with userId:', user?.uid, 'User object:', user);

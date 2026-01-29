@@ -20,6 +20,66 @@ export async function GET(request: NextRequest) {
     const bookId = searchParams.get('bookId');
     let subjectId = searchParams.get('subjectId') || '';
 
+    console.log('📚 Fetching chapters for:', { subject, book, subjectId, bookId });
+
+    // If bookId is provided but subjectId is missing, find subjectId from subject name
+    if (bookId && !subjectId && subject) {
+      console.log('🔍 Looking up subjectId from subject name:', subject);
+      try {
+        const subjectsSnapshot = await currentDb
+          .collection('subjects')
+          .where('name', '==', subject)
+          .limit(1)
+          .get();
+        
+        if (!subjectsSnapshot.empty) {
+          subjectId = subjectsSnapshot.docs[0].id;
+          console.log('✅ Found subjectId:', subjectId);
+        } else {
+          console.log('⚠️ No subject found with name:', subject);
+        }
+      } catch (error) {
+        console.error('❌ Error finding subjectId:', error);
+      }
+    }
+
+    // PRIORITY: If we have bookId and subjectId, use them directly (most accurate)
+    if (bookId && subjectId) {
+      console.log(`✅ Using provided IDs: subjectId="${subjectId}", bookId="${bookId}"`);
+      try {
+        const chaptersSnapshot = await currentDb
+          .collection('subjects')
+          .doc(subjectId)
+          .collection('books')
+          .doc(bookId)
+          .collection('chapters')
+          .get();
+        
+        const directChapters = new Set<string>();
+        chaptersSnapshot.docs.forEach(doc => {
+          const chapterName = doc.data().chapterName || doc.id;
+          directChapters.add(chapterName);
+        });
+        
+        if (directChapters.size > 0) {
+          const chaptersList = Array.from(directChapters).sort();
+          console.log(`✅ Found ${directChapters.size} chapters from direct path:`, chaptersList);
+          resetToPrimaryFirebase();
+          return NextResponse.json({
+            chapters: chaptersList,
+            total: directChapters.size,
+            source: 'direct-path-with-ids',
+            subjectId,
+            bookId
+          });
+        } else {
+          console.log(`⚠️ No chapters found in subjects/${subjectId}/books/${bookId}/chapters`);
+        }
+      } catch (error) {
+        console.log('Error fetching with IDs:', error);
+      }
+    }
+
     if (!subject || !book) {
       return NextResponse.json(
         { error: 'Subject and book are required' },
@@ -27,7 +87,8 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    console.log('📚 Fetching chapters for:', { subject, book, subjectId, bookId });
+    let chapters = new Set<string>();
+    let source = 'unknown';
 
     // If we have bookId but not subjectId, search for the subject that contains this book
     if (bookId && !subjectId) {
@@ -58,8 +119,9 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    const chapters = new Set<string>();
-    let source = 'unknown';
+    // Reset chapters for fallback logic
+    chapters = new Set<string>();
+    source = 'unknown';
 
     // PRIMARY: Try to fetch chapters directly from the subjects/books/chapters path
     if (subjectId && bookId) {

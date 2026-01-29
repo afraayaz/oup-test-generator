@@ -85,13 +85,17 @@ export default function QuestionForm({
 
   // Initialize with defaults
   useEffect(() => {
+    console.log('📋 QuestionForm defaults:', { defaultGrade, defaultSubject, defaultBook });
     if (defaultGrade || defaultSubject || defaultBook) {
+      console.log('✅ Setting form defaults');
       setFormData((prev) => ({
         ...prev,
         grade: defaultGrade || "",
         subject: defaultSubject || "",
         book: defaultBook || "",
       }));
+    } else {
+      console.log('⚠️ No defaults provided');
     }
   }, [defaultGrade, defaultSubject, defaultBook, grades, subjects, submittedBooks]);
 
@@ -106,20 +110,33 @@ export default function QuestionForm({
       try {
         setChaptersLoading(true);
         
-        // Find the book object to get its ID
+        // Find the book object to get its ID - match by title, grade, AND subject
         const selectedBook = submittedBooks.find(
-          (book) => book.title.toLowerCase() === formData.book.toLowerCase()
+          (book) => 
+            book.title.toLowerCase() === formData.book.toLowerCase() &&
+            book.subject.toLowerCase() === formData.subject.toLowerCase() &&
+            book.grade.replace(/^Grade\s+/, '').trim() === formData.grade.replace(/^Grade\s+/, '').trim()
         );
         
-        if (!selectedBook) {
+        if (!selectedBook || !selectedBook.id) {
+          console.warn('⚠️ Book not found or missing ID:', formData.book);
+          console.log('📚 Available books:', submittedBooks.map(b => ({ title: b.title, id: b.id, grade: b.grade })));
           setAvailableChapters([]);
           return;
         }
 
-        // Call the chapters API
-        const response = await fetch(
-          `/api/admin/chapters?subject=${encodeURIComponent(formData.subject)}&book=${encodeURIComponent(formData.book)}&bookId=${encodeURIComponent(selectedBook.id || '')}`
-        );
+        console.log('📚 Fetching chapters with:', {
+          bookId: selectedBook.id,
+          bookTitle: selectedBook.title,
+          bookGrade: selectedBook.grade,
+          subject: formData.subject
+        });
+
+        // Call the chapters API - API will find subjectId from subject name
+        const url = `/api/admin/chapters?subject=${encodeURIComponent(formData.subject)}&book=${encodeURIComponent(formData.book)}&bookId=${encodeURIComponent(selectedBook.id)}`;
+        console.log('📚 Fetching from:', url);
+        
+        const response = await fetch(url);
 
         if (response.ok) {
           const data = await response.json();
@@ -385,20 +402,64 @@ export default function QuestionForm({
   };
 
   const getAvailableBooks = () => {
-    if (!submittedBooks || !formData.grade || !formData.subject) return [];
+    if (!submittedBooks || !formData.subject) {
+      console.log('📚 No books available - missing submittedBooks or subject');
+      return [];
+    }
     
-    return submittedBooks.filter((book) => {
-      // Normalize grades for comparison (handle "6" vs "Grade 6")
-      const normalizeGrade = (grade: string) => grade.replace(/^Grade\s+/, '').trim();
-      const formGrade = normalizeGrade(formData.grade);
-      const bookGrade = normalizeGrade(book.grade);
+    // If no grade is selected, show all books for the subject
+    if (!formData.grade) {
+      const filtered = submittedBooks.filter((book) => {
+        const formSubject = formData.subject.toLowerCase().trim();
+        const bookSubject = book.subject.toLowerCase().trim();
+        return bookSubject === formSubject;
+      });
       
-      // Normalize subjects for comparison (case-insensitive)
-      const formSubject = formData.subject.toLowerCase().trim();
+      console.log('📚 Filtering by subject only:', {
+        subject: formData.subject,
+        totalBooks: submittedBooks.length,
+        filteredBooks: filtered.length,
+        filtered: filtered.map(b => ({ title: b.title, grade: b.grade, subject: b.subject }))
+      });
+      
+      return filtered;
+    }
+    
+    // Normalize grades for comparison (handle "6" vs "Grade 6" vs "Class 6")
+    const normalizeGrade = (grade: string) => {
+      if (!grade) return '';
+      // Remove "Grade " or "Class " prefix and trim
+      return grade.replace(/^(Grade|Class)\s+/i, '').trim();
+    };
+    
+    const formGrade = normalizeGrade(formData.grade);
+    const formSubject = formData.subject.toLowerCase().trim();
+    
+    console.log('📚 Filtering books with:', { 
+      rawGrade: formData.grade, 
+      normalizedGrade: formGrade, 
+      subject: formSubject 
+    });
+    
+    const filtered = submittedBooks.filter((book) => {
+      const bookGrade = normalizeGrade(book.grade);
       const bookSubject = book.subject.toLowerCase().trim();
       
-      return bookGrade === formGrade && bookSubject === formSubject;
+      const gradeMatch = bookGrade === formGrade;
+      const subjectMatch = bookSubject === formSubject;
+      
+      console.log(`  Book: ${book.title} | Grade: "${book.grade}" (${bookGrade}) = ${gradeMatch} | Subject: "${book.subject}" = ${subjectMatch}`);
+      
+      return gradeMatch && subjectMatch;
     });
+    
+    console.log('📚 Filter result:', {
+      totalBooks: submittedBooks.length,
+      filteredBooks: filtered.length,
+      filtered: filtered.map(b => ({ title: b.title, grade: b.grade, subject: b.subject }))
+    });
+    
+    return filtered;
   };
 
   const getAvailableChapters = () => {
@@ -463,7 +524,7 @@ export default function QuestionForm({
               <select
                 value={formData.book}
                 onChange={(e) => setFormData({ ...formData, book: e.target.value, chapter: "" })}
-                disabled={!formData.grade}
+                disabled={!formData.subject}
                 className={`w-full px-2 sm:px-3 py-1.5 sm:py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100 text-xs sm:text-sm ${errors.book ? "border-red-500" : "border-gray-300"}`}
               >
                 <option value="">Select Book</option>

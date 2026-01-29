@@ -24,12 +24,106 @@ export default function ContentCreatorDashboard() {
   const [subjectDistribution, setSubjectDistribution] = useState<any[]>([]);
   const [difficultyBreakdown, setDifficultyBreakdown] = useState<any[]>([]);
   const [recentQuestions, setRecentQuestions] = useState<any[]>([]);
+  const [selectedDifficultyGrade, setSelectedDifficultyGrade] = useState<string>('overall');
+  const [selectedTypeGrade, setSelectedTypeGrade] = useState<string>('overall');
+  const [availableGrades, setAvailableGrades] = useState<string[]>([]);
+  const [allQuestions, setAllQuestions] = useState<any[]>([]);
 
   useEffect(() => {
     if (user?.uid) {
       fetchDashboardData();
     }
   }, [user?.uid]);
+
+  // Recalculate difficulty distribution when grade filter changes
+  useEffect(() => {
+    if (allQuestions.length === 0) return;
+
+    const normalizeGrade = (grade: string) => {
+      if (!grade) return '';
+      return grade.replace(/^grade\s*/i, '').trim();
+    };
+
+    // Filter questions by selected grade
+    const filteredQuestions = selectedDifficultyGrade === 'overall' 
+      ? allQuestions 
+      : allQuestions.filter(q => normalizeGrade(q.grade) === selectedDifficultyGrade);
+
+    // Calculate difficulty distribution
+    const difficultyCounts: { [key: string]: number } = { Easy: 0, Medium: 0, Hard: 0 };
+    filteredQuestions.forEach(q => {
+      const difficulty = q.difficulty || 'Medium';
+      if (difficultyCounts[difficulty] !== undefined) {
+        difficultyCounts[difficulty]++;
+      }
+    });
+
+    // Create pie chart data
+    const difficultyColors = { Easy: '#10B981', Medium: '#F59E0B', Hard: '#EF4444' };
+    const difficultyPieData = Object.entries(difficultyCounts).map(([level, count]) => ({
+      subject: level,
+      count,
+      color: difficultyColors[level as keyof typeof difficultyColors]
+    }));
+    setSubjectDistribution(difficultyPieData);
+  }, [selectedDifficultyGrade, allQuestions]);
+
+  // Recalculate question type distribution when grade filter changes
+  useEffect(() => {
+    if (allQuestions.length === 0) return;
+
+    const normalizeGrade = (grade: string) => {
+      if (!grade) return '';
+      return grade.replace(/^grade\s*/i, '').trim();
+    };
+
+    // Filter questions by selected grade
+    const filteredQuestions = selectedTypeGrade === 'overall' 
+      ? allQuestions 
+      : allQuestions.filter(q => normalizeGrade(q.grade) === selectedTypeGrade);
+
+    // Calculate question type distribution
+    const typeLabels: { [key: string]: string } = {
+      multiple: "MCQ",
+      truefalse: "True/False",
+      short: "Short Answer",
+      long: "Long Answer",
+      fillblanks: "Fill Blanks",
+      matching: "Matching",
+      ordering: "Ordering",
+      categorization: "Categorization",
+      "drag-drop": "Drag & Drop"
+    };
+    
+    const typeColors: { [key: string]: string } = {
+      "MCQ": "#8B5CF6",
+      "True/False": "#10B981",
+      "Short Answer": "#F59E0B",
+      "Long Answer": "#EF4444",
+      "Fill Blanks": "#06B6D4",
+      "Matching": "#EC4899",
+      "Ordering": "#6366F1",
+      "Categorization": "#84CC16",
+      "Drag & Drop": "#F97316"
+    };
+    
+    const typeCounts: { [key: string]: number } = {};
+    filteredQuestions.forEach(q => {
+      const type = q.type || 'multiple';
+      const label = typeLabels[type] || type;
+      typeCounts[label] = (typeCounts[label] || 0) + 1;
+    });
+    
+    const typeData = Object.entries(typeCounts)
+      .map(([type, count]) => ({
+        level: type,
+        count: count,
+        color: typeColors[type] || "#8B5CF6"
+      }))
+      .sort((a, b) => b.count - a.count);
+    
+    setDifficultyBreakdown(typeData);
+  }, [selectedTypeGrade, allQuestions]);
 
   // Refetch data when window gains focus (user comes back to dashboard)
   useEffect(() => {
@@ -118,9 +212,31 @@ export default function ContentCreatorDashboard() {
       }
       setCreationTrendData(weekData);
 
+      // Extract unique grades from questions
+      const normalizeGrade = (grade: string) => {
+        if (!grade) return '';
+        return grade.replace(/^grade\s*/i, '').trim();
+      };
+      
+      const uniqueGrades = [...new Set(questions.map(q => normalizeGrade(q.grade)).filter(Boolean))].sort((a, b) => {
+        const aNum = parseInt(a);
+        const bNum = parseInt(b);
+        if (!isNaN(aNum) && !isNaN(bNum)) return aNum - bNum;
+        return a.localeCompare(b);
+      });
+      setAvailableGrades(uniqueGrades);
+
+      // Store all questions for later filtering
+      setAllQuestions(questions);
+
+      // Filter questions by selected grade for difficulty calculation
+      const filteredQuestions = selectedDifficultyGrade === 'overall' 
+        ? questions 
+        : questions.filter(q => normalizeGrade(q.grade) === selectedDifficultyGrade);
+
       // Calculate difficulty distribution for pie chart
       const difficultyCounts: { [key: string]: number } = { Easy: 0, Medium: 0, Hard: 0 };
-      questions.forEach(q => {
+      filteredQuestions.forEach(q => {
         const difficulty = q.difficulty || 'Medium';
         if (difficultyCounts[difficulty] !== undefined) {
           difficultyCounts[difficulty]++;
@@ -136,48 +252,8 @@ export default function ContentCreatorDashboard() {
       }));
       setSubjectDistribution(difficultyPieData);
 
-      // Calculate question type distribution for bar chart
-      const typeLabels: { [key: string]: string } = {
-        multiple: "MCQ",
-        truefalse: "True/False",
-        short: "Short Answer",
-        long: "Long Answer",
-        fillblanks: "Fill Blanks",
-        matching: "Matching",
-        ordering: "Ordering",
-        categorization: "Categorization",
-        "drag-drop": "Drag & Drop"
-      };
-      
-      // Define colors for each question type
-      const typeColors: { [key: string]: string } = {
-        "MCQ": "#8B5CF6",
-        "True/False": "#10B981",
-        "Short Answer": "#F59E0B",
-        "Long Answer": "#EF4444",
-        "Fill Blanks": "#06B6D4",
-        "Matching": "#EC4899",
-        "Ordering": "#6366F1",
-        "Categorization": "#84CC16",
-        "Drag & Drop": "#F97316"
-      };
-      
-      const typeCounts: { [key: string]: number } = {};
-      questions.forEach(q => {
-        const type = q.type || 'multiple';
-        const label = typeLabels[type] || type;
-        typeCounts[label] = (typeCounts[label] || 0) + 1;
-      });
-      
-      const typeData = Object.entries(typeCounts)
-        .map(([type, count]) => ({
-          level: type,
-          count: count,
-          color: typeColors[type] || "#8B5CF6"
-        }))
-        .sort((a, b) => b.count - a.count);
-      
-      setDifficultyBreakdown(typeData);
+      // Question type distribution will be calculated in separate useEffect
+      // based on selectedTypeGrade filter
 
       // Get recent questions (last 4)
       const sortedQuestions = questions
@@ -378,11 +454,25 @@ export default function ContentCreatorDashboard() {
 
               {/* Question Type Distribution */}
               <div className="bg-white rounded-xl sm:rounded-2xl p-4 sm:p-5 md:p-6 lg:p-8 shadow-lg border border-gray-100 hover:shadow-xl transition-shadow duration-300">
-                <div className="flex items-center gap-2 sm:gap-3 mb-4 sm:mb-6">
-                  <div className="w-8 h-8 sm:w-10 sm:h-10 bg-gradient-to-br from-indigo-500 to-blue-600 rounded-lg flex items-center justify-center">
-                    <i className="ri-bar-chart-box-line text-white text-base sm:text-lg"></i>
+                <div className="flex items-center justify-between mb-4 sm:mb-6">
+                  <div className="flex items-center gap-2 sm:gap-3">
+                    <div className="w-8 h-8 sm:w-10 sm:h-10 bg-gradient-to-br from-indigo-500 to-blue-600 rounded-lg flex items-center justify-center">
+                      <i className="ri-bar-chart-box-line text-white text-base sm:text-lg"></i>
+                    </div>
+                    <h3 className="text-base sm:text-lg md:text-xl font-bold text-gray-900">Question Type Distribution</h3>
                   </div>
-                  <h3 className="text-base sm:text-lg md:text-xl font-bold text-gray-900">Question Type Distribution</h3>
+                  
+                  {/* Grade Filter Dropdown */}
+                  <select
+                    value={selectedTypeGrade}
+                    onChange={(e) => setSelectedTypeGrade(e.target.value)}
+                    className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent bg-white text-gray-700 hover:border-indigo-400 transition-colors cursor-pointer"
+                  >
+                    <option value="overall">All Grades</option>
+                    {availableGrades.map(grade => (
+                      <option key={grade} value={grade}>Grade {grade}</option>
+                    ))}
+                  </select>
                 </div>
                 <div className="w-full overflow-hidden">
                   <ResponsiveContainer width="100%" height={200}>
@@ -407,11 +497,25 @@ export default function ContentCreatorDashboard() {
 
             {/* Right Column - Difficulty Pie Chart */}
             <div className="bg-white rounded-xl sm:rounded-2xl p-4 sm:p-5 md:p-6 lg:p-8 shadow-lg border border-gray-100 hover:shadow-xl transition-shadow duration-300 h-full flex flex-col">
-              <div className="flex items-center gap-2 sm:gap-3 mb-4 sm:mb-6">
-                <div className="w-8 h-8 sm:w-10 sm:h-10 bg-gradient-to-br from-purple-500 to-pink-600 rounded-lg flex items-center justify-center">
-                  <i className="ri-pie-chart-2-line text-white text-base sm:text-lg"></i>
+              <div className="flex items-center justify-between mb-4 sm:mb-6">
+                <div className="flex items-center gap-2 sm:gap-3">
+                  <div className="w-8 h-8 sm:w-10 sm:h-10 bg-gradient-to-br from-purple-500 to-pink-600 rounded-lg flex items-center justify-center">
+                    <i className="ri-pie-chart-2-line text-white text-base sm:text-lg"></i>
+                  </div>
+                  <h3 className="text-base sm:text-lg md:text-xl font-bold text-gray-900">Questions by Difficulty</h3>
                 </div>
-                <h3 className="text-base sm:text-lg md:text-xl font-bold text-gray-900">Questions by Difficulty</h3>
+                
+                {/* Grade Filter Dropdown */}
+                <select
+                  value={selectedDifficultyGrade}
+                  onChange={(e) => setSelectedDifficultyGrade(e.target.value)}
+                  className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent bg-white text-gray-700 hover:border-purple-400 transition-colors cursor-pointer"
+                >
+                  <option value="overall">All Grades</option>
+                  {availableGrades.map(grade => (
+                    <option key={grade} value={grade}>Grade {grade}</option>
+                  ))}
+                </select>
               </div>
               <div className="w-full overflow-hidden flex-1 flex items-center justify-center">
                 <ResponsiveContainer width="100%" height="100%" minHeight={350}>

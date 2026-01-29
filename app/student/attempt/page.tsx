@@ -175,9 +175,15 @@ function QuizAttemptPageContent() {
     switch (questionType) {
       case 'multiple':
       case 'mcqs':
-        return answer.value === userAnswer;
+        // Case-insensitive comparison for MCQs
+        const correctAnswerMCQ = String(answer.value || '').toLowerCase().trim();
+        const userAnswerMCQ = String(userAnswer || '').toLowerCase().trim();
+        return correctAnswerMCQ === userAnswerMCQ;
       case 'truefalse':
-        return answer.value === userAnswer;
+        // Case-insensitive comparison for True/False
+        const correctAnswerTF = String(answer.value || '').toLowerCase().trim();
+        const userAnswerTF = String(userAnswer || '').toLowerCase().trim();
+        return correctAnswerTF === userAnswerTF;
       case 'fill':
       case 'fillinblank':
       case 'fillblanks':

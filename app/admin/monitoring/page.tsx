@@ -338,16 +338,25 @@ export default function ContentMonitoring() {
   };
 
   const handleManageChapters = async (book: any, subject: any) => {
+    console.log('📚 [Manage Chapters] Opening for book:', {
+      bookId: book.id,
+      bookTitle: book.title,
+      subjectId: subject.id,
+      subjectName: subject.name
+    });
+    
     setSelectedBook(book);
     setSelectedBookSubjectId(subject.id);
     
     // Fetch existing chapters
     try {
-      const response = await fetch(
-        `/api/admin/books/chapters?bookId=${book.id}&subjectId=${subject.id}`
-      );
+      const url = `/api/admin/books/chapters?bookId=${book.id}&subjectId=${subject.id}`;
+      console.log('📚 [Manage Chapters] Fetching from:', url);
+      
+      const response = await fetch(url);
       if (response.ok) {
         const data = await response.json();
+        console.log('📚 [Manage Chapters] Received chapters:', data.chapters?.length || 0);
         setExistingChapters(data.chapters || []);
       }
     } catch (error) {

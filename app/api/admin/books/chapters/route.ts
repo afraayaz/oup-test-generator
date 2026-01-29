@@ -10,6 +10,8 @@ export async function GET(request: NextRequest) {
     const bookId = searchParams.get('bookId');
     const subjectId = searchParams.get('subjectId');
 
+    console.log('📖 [GET Chapters] Request params:', { bookId, subjectId });
+
     if (!bookId || !subjectId) {
       return NextResponse.json(
         { error: 'Book ID and Subject ID are required' },
@@ -17,8 +19,11 @@ export async function GET(request: NextRequest) {
       );
     }
 
+    const chaptersPath = `${FIRESTORE_BASE_URL}/subjects/${subjectId}/books/${bookId}/chapters`;
+    console.log('📖 [GET Chapters] Fetching from path:', chaptersPath);
+
     const response = await fetch(
-      `${FIRESTORE_BASE_URL}/subjects/${subjectId}/books/${bookId}/chapters`,
+      chaptersPath,
       {
         method: 'GET',
         headers: {
@@ -30,12 +35,15 @@ export async function GET(request: NextRequest) {
     if (!response.ok) {
       // If chapters don't exist, return empty array
       if (response.status === 404) {
+        console.log('📖 [GET Chapters] No chapters found (404)');
         return NextResponse.json({ chapters: [] });
       }
       throw new Error(`HTTP error! status: ${response.status}`);
     }
 
     const data = await response.json();
+    console.log('📖 [GET Chapters] Found documents:', data.documents?.length || 0);
+    
     const chapters = (data.documents || []).map((doc: any) => {
       const pathParts = doc.name.split('/');
       const id = pathParts[pathParts.length - 1];
@@ -51,6 +59,7 @@ export async function GET(request: NextRequest) {
       };
     }).sort((a: any, b: any) => a.chapterNo - b.chapterNo);
 
+    console.log('📖 [GET Chapters] Returning chapters:', chapters.map(c => c.chapterName));
     return NextResponse.json({ chapters });
   } catch (error) {
     console.error('Error fetching chapters:', error);
@@ -66,6 +75,8 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     const { bookId, subjectId, chapterNo, chapterName, topic, description } = body;
+
+    console.log('📝 [POST Chapter] Creating chapter:', { bookId, subjectId, chapterNo, chapterName });
 
     if (!bookId || !subjectId || !chapterNo || !chapterName) {
       return NextResponse.json(
@@ -85,8 +96,11 @@ export async function POST(request: NextRequest) {
       },
     };
 
+    const chapterPath = `${FIRESTORE_BASE_URL}/subjects/${subjectId}/books/${bookId}/chapters/${chapterId}`;
+    console.log('📝 [POST Chapter] Saving to path:', chapterPath);
+
     const response = await fetch(
-      `${FIRESTORE_BASE_URL}/subjects/${subjectId}/books/${bookId}/chapters/${chapterId}`,
+      chapterPath,
       {
         method: 'PATCH',
         headers: {
@@ -109,6 +123,7 @@ export async function POST(request: NextRequest) {
       createdAt: new Date().toISOString(),
     };
 
+    console.log('✅ [POST Chapter] Chapter created successfully');
     return NextResponse.json({ chapter: createdChapter });
   } catch (error) {
     console.error('Error creating chapter:', error);
