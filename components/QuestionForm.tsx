@@ -927,7 +927,7 @@ export default function QuestionForm({
           {(formData.type === "short" || formData.type === "long") && (
             <div className="mb-4 sm:mb-6">
               <label className="block text-sm font-medium text-gray-700 mb-2">Correct Answer *</label>
-              {isUrduSubject && focusedMathField === "correctAnswer" && (
+              {isUrduSubject && focusedMathField === "question" && (
                 <UrduKeyboard
                   isVisible={true}
                   onInsert={insertLanguageCharacter}

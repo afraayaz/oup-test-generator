@@ -59,7 +59,7 @@ export async function GET(request: NextRequest) {
       };
     }).sort((a: any, b: any) => a.chapterNo - b.chapterNo);
 
-    console.log('📖 [GET Chapters] Returning chapters:', chapters.map(c => c.chapterName));
+    console.log('📖 [GET Chapters] Returning chapters:', chapters.map((c: any) => c.chapterName));
     return NextResponse.json({ chapters });
   } catch (error) {
     console.error('Error fetching chapters:', error);

@@ -56,7 +56,7 @@ export async function GET(request: NextRequest) {
           .get();
         
         const directChapters = new Set<string>();
-        chaptersSnapshot.docs.forEach(doc => {
+        chaptersSnapshot.docs.forEach((doc: any) => {
           const chapterName = doc.data().chapterName || doc.id;
           directChapters.add(chapterName);
         });
@@ -135,7 +135,7 @@ export async function GET(request: NextRequest) {
           .collection('chapters')
           .get();
         
-        chaptersSnapshot.docs.forEach(doc => {
+        chaptersSnapshot.docs.forEach((doc: any) => {
           // Use chapterName field if available, otherwise use doc id
           const chapterName = doc.data().chapterName || doc.id;
           chapters.add(chapterName);
@@ -168,7 +168,7 @@ export async function GET(request: NextRequest) {
             .where('book', '==', bookId)
             .get();
           
-          const oupQuestions = oupSnapshot.docs.map(doc => doc.data());
+          const oupQuestions = oupSnapshot.docs.map((doc: any) => doc.data());
           console.log(`✅ Found ${oupQuestions.length} OUP questions using numeric IDs`);
           allQuestions = [...allQuestions, ...oupQuestions];
         } catch (error) {
@@ -187,7 +187,7 @@ export async function GET(request: NextRequest) {
                 .where('book', '==', bookId)
                 .get();
               
-              const schoolQuestions = schoolSnapshot.docs.map(doc => doc.data());
+              const schoolQuestions = schoolSnapshot.docs.map((doc: any) => doc.data());
               if (schoolQuestions.length > 0) {
                 console.log(`✅ Found ${schoolQuestions.length} school questions using numeric IDs`);
                 allQuestions = [...allQuestions, ...schoolQuestions];
@@ -212,7 +212,7 @@ export async function GET(request: NextRequest) {
             .where('book', '==', book)
             .get();
           
-          const oupQuestions = oupSnapshot.docs.map(doc => doc.data());
+          const oupQuestions = oupSnapshot.docs.map((doc: any) => doc.data());
           console.log(`✅ Found ${oupQuestions.length} OUP questions with display names`);
           allQuestions = [...allQuestions, ...oupQuestions];
         } catch (error) {
@@ -231,7 +231,7 @@ export async function GET(request: NextRequest) {
                 .where('book', '==', book)
                 .get();
               
-              const schoolQuestions = schoolSnapshot.docs.map(doc => doc.data());
+              const schoolQuestions = schoolSnapshot.docs.map((doc: any) => doc.data());
               if (schoolQuestions.length > 0) {
                 console.log(`✅ Found ${schoolQuestions.length} school questions with display names`);
                 allQuestions = [...allQuestions, ...schoolQuestions];
@@ -292,9 +292,9 @@ export async function GET(request: NextRequest) {
         // Retry with secondary Firebase
         const backupDb = await getDb();
         const fallbackParams = new URL('http://localhost?' + new URL(request.url).searchParams).searchParams;
-        const fallbackSubject = fallbackParams.get('subject') || subject;
-        const fallbackBook = fallbackParams.get('book') || book;
-        const fallbackBookId = fallbackParams.get('bookId') || bookId;
+        const fallbackSubject = fallbackParams.get('subject') || '';
+        const fallbackBook = fallbackParams.get('book') || '';
+        const fallbackBookId = fallbackParams.get('bookId') || '';
         let fallbackSubjectId = fallbackParams.get('subjectId') || '';
         
         // Simplified fallback - just try to get chapters
@@ -309,7 +309,7 @@ export async function GET(request: NextRequest) {
             .collection('chapters')
             .get();
           
-          fallbackSnapshot.docs.forEach(doc => {
+          fallbackSnapshot.docs.forEach((doc: any) => {
             fallbackChapters.add(doc.data().chapterName || doc.id);
           });
         }

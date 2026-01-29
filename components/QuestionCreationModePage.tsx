@@ -438,7 +438,7 @@ export default function QuestionCreationModePage({
           
           // Filter systemBooks to only show books of their assigned subjects (case-insensitive)
           booksToSearch = systemBooks.filter((book: any) => {
-            const hasMatch = assignedSubjects.some(subj => {
+            const hasMatch = assignedSubjects.some((subj: any) => {
               const subjLower = subj.toString().trim().toLowerCase();
               const bookSubjLower = book.subject?.toString().trim().toLowerCase();
               console.log(`  Comparing: "${subjLower}" === "${bookSubjLower}" ? ${subjLower === bookSubjLower}`);
@@ -458,7 +458,7 @@ export default function QuestionCreationModePage({
         });
         
         console.log('📚 Books matching subject:', booksForSubject.length);
-        console.log('📚 All books for subject:', booksForSubject.map(b => ({ title: b.title, grade: b.grade })));
+        console.log('📚 All books for subject:', booksForSubject.map((b: any) => ({ title: b.title, grade: b.grade })));
         
         if (formData.grade) {
           // Grade is selected: filter by both grade and subject
