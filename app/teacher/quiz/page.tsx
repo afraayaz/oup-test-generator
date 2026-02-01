@@ -295,6 +295,19 @@ const QuizGeneration = () => {
   const [availableStudents, setAvailableStudents] = useState<any[]>([]);
   const [showStudentSelection, setShowStudentSelection] = useState(false);
 
+  // Paper formatting settings
+  const [paperFormat, setPaperFormat] = useState({
+    questionFontSize: 17,
+    questionFontFamily: 'Cambria',
+    optionFontSize: 16,
+    optionFontFamily: 'Cambria',
+    questionLineSpacing: 1.7,
+    answerLineSpacing: 24,
+    questionMarginBottom: 28,
+  });
+  const [showFormatting, setShowFormatting] = useState(false);
+  const [showCognitiveLevel, setShowCognitiveLevel] = useState(true);
+
   // Dynamic data from user profile
   const grades = user?.assignedGrades || [];
   const subjects = user?.subjects || [];
@@ -1188,6 +1201,7 @@ const QuizGeneration = () => {
           subject: q.subject,
           difficulty: q.difficulty,
           slo: q.slo || '',
+          cognitiveLevel: q.cognitiveLevel || null,
           marks: isMarked ? config.marks : 0,
           question: { text: questionText, format: q.subject === 'Math' ? 'math' : 'text', isRTL: q.subject === 'Urdu' },
           options,
@@ -1263,6 +1277,8 @@ const QuizGeneration = () => {
       book: selectedBook,
       chapters: selectedChapters,
       slos: selectedSLOs,
+      schoolId: user?.schoolId || '',
+      schoolName: user?.schoolName || '',
       questionConfiguration: Object.entries(questionConfig).filter(([_, config]) => config.count > 0).map(([type, config]) => ({
         type,
         count: config.count,
@@ -1702,29 +1718,33 @@ const QuizGeneration = () => {
         <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js"></script>
         <style>
           @import url('https://fonts.googleapis.com/css2?family=Noto+Nastaliq+Urdu:wght@400;700&display=swap');
-          body { font-family: 'Cambria', Georgia, serif; margin: 40px; line-height: 1.8; color: #2c3e50; direction: ltr; font-size: 16px; }
+          body { font-family: '${paperFormat.questionFontFamily}', Georgia, serif; margin: 40px; line-height: ${paperFormat.questionLineSpacing}; color: #2c3e50; direction: ltr; font-size: 16px; }
           .header { border-bottom: 1px solid #2c3e50; padding-bottom: 12px; margin-bottom: 20px; }
           .title { font-family: 'Calibri', 'Arial', sans-serif; font-size: 26px; font-weight: bold; color: #1a1a1a; text-align: center; margin-bottom: 12px; letter-spacing: 0.5px; }
           .header-table { width: 100%; border-collapse: collapse; margin-bottom: 12px; border: 1px solid #1a1a1a; font-family: 'Calibri', 'Arial', sans-serif; }
           .header-table td { padding: 6px 8px; font-size: 12px; color: #1a1a1a; vertical-align: middle; border: 0.5px solid #999999; }
           .header-table .label { font-weight: 600; width: 25%; background-color: #ecf0f1; font-family: 'Calibri', 'Arial', sans-serif; }
-          .header-table .value { width: 25%; font-family: 'Cambria', Georgia, serif; }
+          .header-table .value { width: 25%; font-family: '${paperFormat.questionFontFamily}', Georgia, serif; }
           .name-field { min-height: 12px; }
-          .question { margin-bottom: 28px; page-break-inside: avoid; }
+          .question { margin-bottom: ${paperFormat.questionMarginBottom}px; page-break-inside: avoid; }
           .question-number { margin-bottom: 10px; overflow: hidden; display: flex; justify-content: space-between; align-items: center; }
           .question-number-urdu { font-family: 'Noto Nastaliq Urdu', serif; direction: rtl; text-align: right; font-weight: 700; font-size: 19px; }
           .question-number-marks { font-family: 'Calibri', 'Arial', sans-serif; direction: ltr; text-align: right; font-weight: 600; font-size: 14px; }
           .question-number-marks-urdu { font-family: 'Calibri', 'Arial', sans-serif; direction: ltr; text-align: left; font-weight: 600; font-size: 14px; }
           .question-number-english { font-family: 'Calibri', 'Arial', sans-serif; direction: ltr; text-align: left; font-weight: 600; font-size: 19px; }
-          .question-text { font-family: 'Cambria', Georgia, serif; font-size: 17px; margin-bottom: 14px; font-weight: 500; color: #1a1a1a; line-height: 1.7; }
+          .question-text { font-family: '${paperFormat.questionFontFamily}', Georgia, serif; font-size: ${paperFormat.questionFontSize}px; margin-bottom: 14px; font-weight: 500; color: #1a1a1a; line-height: ${paperFormat.questionLineSpacing}; }
           .options { margin-bottom: 12px; }
-          .option { margin-bottom: 6px; font-size: 16px; font-family: 'Cambria', Georgia, serif; color: #2c3e50; line-height: 1.6; }
+          .option { margin-bottom: 6px; font-size: ${paperFormat.optionFontSize}px; font-family: '${paperFormat.optionFontFamily}', Georgia, serif; color: #2c3e50; line-height: 1.6; }
           .urdu { font-family: 'Noto Nastaliq Urdu', serif; direction: rtl; text-align: right; margin-right: 20px; }
           mark { background-color: #fef08a; padding: 2px 4px; border-radius: 2px; }
           b, strong { font-weight: bold; }
           i, em { font-style: italic; }
+          .cognitive-badge { display: inline-block; font-size: 10px; padding: 2px 6px; margin-left: 8px; border-radius: 3px; font-weight: 600; font-family: 'Calibri', 'Arial', sans-serif; }
+          .cognitive-knowledge { background-color: #dbeafe; color: #1e40af; border: 1px solid #3b82f6; }
+          .cognitive-understanding { background-color: #dcfce7; color: #166534; border: 1px solid #22c55e; }
+          .cognitive-application { background-color: #fef3c7; color: #92400e; border: 1px solid #f59e0b; }
           .page-break { page-break-before: always; }
-          @media print { body { margin: 20px; font-family: 'Cambria', Georgia, serif; } .page-break { page-break-before: always; } }
+          @media print { body { margin: 20px; font-family: '${paperFormat.questionFontFamily}', Georgia, serif; } .page-break { page-break-before: always; } }
         </style>
       </head>
       <body>
@@ -1773,7 +1793,14 @@ const QuizGeneration = () => {
                   </div>
                   ${isMarked ? `<div class="${q.question.isRTL ? 'question-number-marks-urdu' : 'question-number-marks'}">(${q.marks} marks)</div>` : ''}
                 </div>
-                <div class="question-text ${q.question.isRTL ? 'urdu' : ''}">${convertNewlinesToHtml(extractLatexFromFormulas(q.question.text))}</div>
+                <div class="question-text ${q.question.isRTL ? 'urdu' : ''}">
+                  ${convertNewlinesToHtml(extractLatexFromFormulas(q.question.text))}
+                  ${showCognitiveLevel && q.cognitiveLevel ? 
+                    (q.cognitiveLevel.knowledge ? '<span class="cognitive-badge cognitive-knowledge">Knowledge</span>' : '') +
+                    (q.cognitiveLevel.understanding ? '<span class="cognitive-badge cognitive-understanding">Understanding</span>' : '') +
+                    (q.cognitiveLevel.application ? '<span class="cognitive-badge cognitive-application">Application</span>' : '')
+                  : ''}
+                </div>
                 ${(q as any).imageUrl ? `<div style="margin-top: 10px; margin-bottom: 10px;"><img src="${(q as any).imageUrl}" alt="Question image" style="max-width: 100%; height: auto; max-height: 300px; border: 1px solid #ddd; border-radius: 4px;" /></div>` : ''}
                 ${
                   q.type === 'multiple' && q.options?.length
@@ -1796,7 +1823,7 @@ const QuizGeneration = () => {
                   (q.type === 'short' || q.type === 'long')
                     ? `<div class="answer-lines" style="margin-top: 12px;">
                         ${Array.from({ length: answerLines[(editedQuestions.indexOf(q) + '-lines') as any] ?? defaultAnswerLines }).map(() => 
-                          `<div style="border-bottom: 1px solid #333; height: 24px; margin-bottom: 8px;"></div>`
+                          `<div style="border-bottom: 1px solid #333; height: ${paperFormat.answerLineSpacing}px; margin-bottom: 8px;"></div>`
                         ).join('')}
                       </div>`
                     : ''
@@ -1977,7 +2004,7 @@ const QuizGeneration = () => {
     if (!generatedQuiz) return;
     try {
       const docxModule = await import('docx');
-      const { Document, Packer, Paragraph, TextRun, Header, Footer, AlignmentType, Table, TableRow, TableCell, WidthType, BorderStyle, ImageRun } = docxModule;
+      const { Document, Packer, Paragraph, TextRun, Header, Footer, AlignmentType, Table, TableRow, TableCell, WidthType, BorderStyle, ImageRun, ShadingType } = docxModule;
       
       // Helper function to parse HTML formatting tags and create TextRun array
       const parseFormattedText = (text: string, baseFont: string, baseSize: number, baseColor: string, isRTL: boolean): any[] => {
@@ -2288,14 +2315,58 @@ const QuizGeneration = () => {
               ).map(line => new Paragraph({
                 children: parseFormattedText(
                   line || ' ', // Use space for empty lines to preserve line breaks
-                  q.question.isRTL ? 'Noto Nastaliq Urdu' : 'Cambria',
-                  28,
+                  q.question.isRTL ? 'Noto Nastaliq Urdu' : paperFormat.questionFontFamily,
+                  paperFormat.questionFontSize * 2, // Convert to half-points (Word uses half-points)
                   '2c3e50',
                   q.question.isRTL
                 ),
                 alignment: q.question.isRTL ? AlignmentType.RIGHT : AlignmentType.LEFT,
-                spacing: { after: line === '' ? 50 : 100 }, // Less spacing for empty lines
+                spacing: { 
+                  after: line === '' ? 50 : Math.round((paperFormat.questionLineSpacing - 1) * 120),
+                  line: Math.round(paperFormat.questionLineSpacing * 240),
+                  lineRule: 'atLeast' as any
+                },
               })),
+              // Cognitive Level badges
+              ...(showCognitiveLevel && q.cognitiveLevel && (q.cognitiveLevel.knowledge || q.cognitiveLevel.understanding || q.cognitiveLevel.application) ? [
+                new Paragraph({
+                  children: [
+                    ...(q.cognitiveLevel.knowledge ? [
+                      new TextRun({ 
+                        text: ' Knowledge ', 
+                        size: 18, 
+                        font: 'Calibri',
+                        bold: true,
+                        color: '1e40af',
+                        shading: { fill: 'dbeafe', type: ShadingType.SOLID }
+                      }),
+                      new TextRun({ text: '  ', size: 18 })
+                    ] : []),
+                    ...(q.cognitiveLevel.understanding ? [
+                      new TextRun({ 
+                        text: ' Understanding ', 
+                        size: 18, 
+                        font: 'Calibri',
+                        bold: true,
+                        color: '166534',
+                        shading: { fill: 'dcfce7', type: ShadingType.SOLID }
+                      }),
+                      new TextRun({ text: '  ', size: 18 })
+                    ] : []),
+                    ...(q.cognitiveLevel.application ? [
+                      new TextRun({ 
+                        text: ' Application ', 
+                        size: 18, 
+                        font: 'Calibri',
+                        bold: true,
+                        color: '92400e',
+                        shading: { fill: 'fef3c7', type: ShadingType.SOLID }
+                      })
+                    ] : [])
+                  ],
+                  spacing: { after: 100 }
+                })
+              ] : []),
               ...((q as any).imageUrl && imageBuffers[i] ? [new Paragraph({
                 children: [
                   new ImageRun({
@@ -2326,8 +2397,8 @@ const QuizGeneration = () => {
                       // Parse formatting for the line content
                       const textRuns = parseFormattedText(
                         line || ' ',
-                        q.question.isRTL ? 'Noto Nastaliq Urdu' : 'Cambria',
-                        26,
+                        q.question.isRTL ? 'Noto Nastaliq Urdu' : paperFormat.optionFontFamily,
+                        paperFormat.optionFontSize * 2, // Convert to half-points
                         '2c3e50',
                         q.question.isRTL
                       );
@@ -2336,8 +2407,8 @@ const QuizGeneration = () => {
                       const allRuns = [
                         new TextRun({ 
                           text: prefix,
-                          size: 26, 
-                          font: q.question.isRTL ? 'Noto Nastaliq Urdu' : 'Cambria',
+                          size: paperFormat.optionFontSize * 2, 
+                          font: q.question.isRTL ? 'Noto Nastaliq Urdu' : paperFormat.optionFontFamily,
                           color: '2c3e50'
                         }),
                         ...textRuns
@@ -2392,7 +2463,10 @@ const QuizGeneration = () => {
                           color: '999999'
                         })],
                         alignment: q.question.isRTL ? AlignmentType.RIGHT : AlignmentType.LEFT,
-                        spacing: { after: 100 },
+                        spacing: { 
+                          after: Math.round(paperFormat.answerLineSpacing * 4.17), // Convert px to twips (1px = ~4.17 twips)
+                          before: 50
+                        },
                       })
                     )),
                   ]),
@@ -3178,6 +3252,148 @@ const QuizGeneration = () => {
                     <h4 className="text-lg font-semibold">Total Marks: {isMarked ? editedQuestions.reduce((sum, q) => sum + q.marks, 0) : 'N/A'}</h4>
                   </div>
                   
+                  {/* Paper Formatting Section */}
+                  <div className="mb-6 p-4 bg-purple-50 border border-purple-200 rounded-lg">
+                    <div 
+                      className="flex items-center justify-between cursor-pointer"
+                      onClick={() => setShowFormatting(!showFormatting)}
+                    >
+                      <h4 className="text-md font-semibold text-gray-900 flex items-center">
+                        <i className="ri-font-size-2 mr-2 text-purple-600"></i>
+                        Paper Formatting
+                      </h4>
+                      <button 
+                        type="button"
+                        className="text-purple-600 hover:text-purple-800 transition-colors"
+                      >
+                        <i className={`ri-arrow-${showFormatting ? 'up' : 'down'}-s-line text-xl`}></i>
+                      </button>
+                    </div>
+                    
+                    {showFormatting && (
+                      <>
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mt-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Question Font Size (px)
+                        </label>
+                        <input
+                          type="number"
+                          value={paperFormat.questionFontSize}
+                          onChange={e => setPaperFormat({...paperFormat, questionFontSize: parseInt(e.target.value) || 17})}
+                          min="10"
+                          max="30"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Question Font Family
+                        </label>
+                        <select
+                          value={paperFormat.questionFontFamily}
+                          onChange={e => setPaperFormat({...paperFormat, questionFontFamily: e.target.value})}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                        >
+                          <option value="Cambria">Cambria</option>
+                          <option value="Arial">Arial</option>
+                          <option value="Times New Roman">Times New Roman</option>
+                          <option value="Georgia">Georgia</option>
+                          <option value="Calibri">Calibri</option>
+                          <option value="Verdana">Verdana</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Option Font Size (px)
+                        </label>
+                        <input
+                          type="number"
+                          value={paperFormat.optionFontSize}
+                          onChange={e => setPaperFormat({...paperFormat, optionFontSize: parseInt(e.target.value) || 16})}
+                          min="10"
+                          max="30"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Option Font Family
+                        </label>
+                        <select
+                          value={paperFormat.optionFontFamily}
+                          onChange={e => setPaperFormat({...paperFormat, optionFontFamily: e.target.value})}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                        >
+                          <option value="Cambria">Cambria</option>
+                          <option value="Arial">Arial</option>
+                          <option value="Times New Roman">Times New Roman</option>
+                          <option value="Georgia">Georgia</option>
+                          <option value="Calibri">Calibri</option>
+                          <option value="Verdana">Verdana</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Question Line Spacing
+                        </label>
+                        <input
+                          type="number"
+                          value={paperFormat.questionLineSpacing}
+                          onChange={e => setPaperFormat({...paperFormat, questionLineSpacing: parseFloat(e.target.value) || 1.7})}
+                          min="1"
+                          max="3"
+                          step="0.1"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Answer Line Spacing (px)
+                        </label>
+                        <input
+                          type="number"
+                          value={paperFormat.answerLineSpacing}
+                          onChange={e => setPaperFormat({...paperFormat, answerLineSpacing: parseInt(e.target.value) || 24})}
+                          min="16"
+                          max="50"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Question Margin Bottom (px)
+                        </label>
+                        <input
+                          type="number"
+                          value={paperFormat.questionMarginBottom}
+                          onChange={e => setPaperFormat({...paperFormat, questionMarginBottom: parseInt(e.target.value) || 28})}
+                          min="10"
+                          max="60"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                        />
+                      </div>
+                    </div>
+                    <div className="mt-4 flex items-center">
+                      <input
+                        type="checkbox"
+                        id="showCognitiveLevel"
+                        checked={showCognitiveLevel}
+                        onChange={(e) => setShowCognitiveLevel(e.target.checked)}
+                        className="w-4 h-4 text-purple-600 border-gray-300 rounded focus:ring-purple-500"
+                      />
+                      <label htmlFor="showCognitiveLevel" className="ml-2 text-sm font-medium text-gray-700 cursor-pointer">
+                        Show Cognitive Level (Bloom Taxonomy) badges in exported papers
+                      </label>
+                    </div>
+                    <div className="mt-3 text-xs text-gray-600">
+                      <i className="ri-information-line mr-1"></i>
+                      These settings will be applied to PDF and Word exports
+                    </div>
+                      </>
+                    )}
+                  </div>
+                  
                   {/* Quiz Settings Section - Only for Online Quizzes */}
                   {quizFormat === 'Online' && (
                   <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
@@ -3307,10 +3523,31 @@ const QuizGeneration = () => {
 
                   {editedQuestions.map((q, index) => (
                     <div key={index} className="mb-4 p-4 border rounded-lg">
-                      <div className="flex justify-between items-center">
-                        <h5 className={`font-medium ${q.question.isRTL ? 'text-right font-noto-nastaliq' : ''}`}>
-                          Question {index + 1} ({q.type})
-                        </h5>
+                      <div className="flex justify-between items-center mb-2">
+                        <div className="flex items-center gap-2">
+                          <h5 className={`font-medium ${q.question.isRTL ? 'text-right font-noto-nastaliq' : ''}`}>
+                            Question {index + 1} ({q.type})
+                          </h5>
+                          {q.cognitiveLevel && (q.cognitiveLevel.knowledge || q.cognitiveLevel.understanding || q.cognitiveLevel.application) && (
+                            <div className="flex gap-1">
+                              {q.cognitiveLevel.knowledge && (
+                                <span className="text-xs px-2 py-0.5 bg-blue-100 text-blue-700 border border-blue-300 rounded font-semibold">
+                                  Knowledge
+                                </span>
+                              )}
+                              {q.cognitiveLevel.understanding && (
+                                <span className="text-xs px-2 py-0.5 bg-green-100 text-green-700 border border-green-300 rounded font-semibold">
+                                  Understanding
+                                </span>
+                              )}
+                              {q.cognitiveLevel.application && (
+                                <span className="text-xs px-2 py-0.5 bg-yellow-100 text-yellow-700 border border-yellow-300 rounded font-semibold">
+                                  Application
+                                </span>
+                              )}
+                            </div>
+                          )}
+                        </div>
                         <div className="flex items-center space-x-2">
                           <button
                             onClick={() => openReplaceModal(index)}

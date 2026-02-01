@@ -87,11 +87,15 @@ function TeacherCreateIndividualQuestionPageContent() {
       if (!response.ok) throw new Error("Failed to create question");
 
       setSuccessMessage("✅ Question created successfully! It's now in your Question Bank.");
-      setTimeout(() => setSuccessMessage(""), 2000);
-      window.scrollTo(0, 0);
+      
+      // Scroll to top immediately to show success message
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      
+      setTimeout(() => setSuccessMessage(""), 5000); // Show message for 5 seconds
     } catch (error) {
       console.error("Error creating question:", error);
       setSuccessMessage("❌ Failed to create question. Please try again.");
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     } finally {
       setLoading(false);
     }
@@ -138,8 +142,11 @@ function TeacherCreateIndividualQuestionPageContent() {
         <div className="flex-1 overflow-auto w-full">
           <div className="w-full max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
             {successMessage && (
-              <div className="mb-6 p-4 rounded-lg bg-green-100 text-green-800">
-                {successMessage}
+              <div className="sticky top-0 z-20 mb-6 p-4 rounded-lg bg-green-50 border-2 border-green-500 text-green-800 shadow-lg animate-pulse">
+                <div className="flex items-center gap-3">
+                  <span className="text-2xl">{successMessage.includes('✅') ? '✅' : '❌'}</span>
+                  <span className="font-semibold">{successMessage}</span>
+                </div>
               </div>
             )}
 

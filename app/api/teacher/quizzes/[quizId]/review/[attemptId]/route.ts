@@ -50,7 +50,8 @@ export async function GET(
       marks: result.marks || 0,
       manualMarks: result.manualMarks,
       status: result.status || 'Not Attempted',
-      explanation: result.explanation || ''
+      explanation: result.explanation || '',
+      cognitiveLevel: result.cognitiveLevel || null
     })) || [];
 
     return NextResponse.json({
@@ -156,7 +157,8 @@ export async function PUT(
       marks: q.marks || 0,
       manualMarks: q.manualMarks,
       status: q.status || 'Not Attempted',
-      explanation: q.explanation || ''
+      explanation: q.explanation || '',
+      cognitiveLevel: q.cognitiveLevel || null
     }));
 
     return NextResponse.json({

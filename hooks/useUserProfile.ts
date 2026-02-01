@@ -10,6 +10,8 @@ export interface UserProfile {
   schoolId: string;
   schoolName: string;
   uid?: string;
+  class?: string; // Student's grade/class
+  grade?: string; // Alias for class
   subjects?: string[];
   assignedGrades?: string[];
   assignedBooks?: { id: string; title: string; subject: string; grade: string; chapters: number }[];
@@ -182,6 +184,8 @@ export function useUserProfile() {
             schoolId: userDoc.fields?.schoolId?.stringValue || '',
             schoolName: userDoc.fields?.schoolName?.stringValue || '',
             uid: authUser.uid,
+            class: userDoc.fields?.class?.stringValue || userDoc.fields?.grade?.stringValue || '',
+            grade: userDoc.fields?.grade?.stringValue || userDoc.fields?.class?.stringValue || '',
             subjects: subjects.length > 0 ? subjects : undefined,
             assignedGrades: assignedGrades.length > 0 ? assignedGrades : undefined,
             assignedBooks: assignedBooks,

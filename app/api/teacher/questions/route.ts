@@ -166,6 +166,11 @@ export async function POST(request: NextRequest) {
       correctAnswer: body.correctAnswer || "",
       explanation: body.explanation || "",
       blanks: body.type === "fillblanks" ? body.blanks || {} : {},
+      cognitiveLevel: body.cognitiveLevel || {
+        knowledge: false,
+        understanding: false,
+        application: false,
+      },
       createdBy: userId,
       createdByName: userName,
       createdAt: serverTimestamp(),

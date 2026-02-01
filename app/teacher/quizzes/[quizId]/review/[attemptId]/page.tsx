@@ -17,6 +17,11 @@ interface Question {
   status: string;
   explanation?: string;
   imageUrl?: string;
+  cognitiveLevel?: {
+    knowledge: boolean;
+    understanding: boolean;
+    application: boolean;
+  };
 }
 
 interface ReviewData {
@@ -196,7 +201,28 @@ export default function ReviewResultsPage() {
                 {/* Question Header - Blue Background */}
                 <div className="bg-blue-50 border-b border-blue-200 p-4 sm:p-6">
                   <div className="flex items-start justify-between mb-2">
-                    <h3 className="font-semibold text-blue-900">Question {idx + 1} ({question.questionType})</h3>
+                    <div className="flex items-center gap-2">
+                      <h3 className="font-semibold text-blue-900">Question {idx + 1} ({question.questionType})</h3>
+                      {question.cognitiveLevel && (question.cognitiveLevel.knowledge || question.cognitiveLevel.understanding || question.cognitiveLevel.application) && (
+                        <div className="flex gap-1">
+                          {question.cognitiveLevel.knowledge && (
+                            <span className="text-xs px-2 py-0.5 bg-blue-100 text-blue-700 border border-blue-300 rounded font-semibold">
+                              Knowledge
+                            </span>
+                          )}
+                          {question.cognitiveLevel.understanding && (
+                            <span className="text-xs px-2 py-0.5 bg-green-100 text-green-700 border border-green-300 rounded font-semibold">
+                              Understanding
+                            </span>
+                          )}
+                          {question.cognitiveLevel.application && (
+                            <span className="text-xs px-2 py-0.5 bg-yellow-100 text-yellow-700 border border-yellow-300 rounded font-semibold">
+                              Application
+                            </span>
+                          )}
+                        </div>
+                      )}
+                    </div>
                     <span className={`px-2 py-1 text-xs font-medium rounded-full ${
                       question.isCorrect ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
                     }`}>

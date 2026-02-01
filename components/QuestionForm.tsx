@@ -36,6 +36,11 @@ export interface QuestionFormData {
   explanation: string;
   blanks: { [key: string]: string[] };
   imageUrl?: string; // Optional image URL
+  cognitiveLevel?: {
+    knowledge: boolean;
+    understanding: boolean;
+    application: boolean;
+  };
 }
 
 const initialFormData: QuestionFormData = {
@@ -51,6 +56,11 @@ const initialFormData: QuestionFormData = {
   explanation: "",
   blanks: {},
   imageUrl: "", // Initialize imageUrl field
+  cognitiveLevel: {
+    knowledge: false,
+    understanding: false,
+    application: false,
+  },
 };
 
 export default function QuestionForm({
@@ -652,6 +662,49 @@ export default function QuestionForm({
                 <option value="long">Long Answer</option>
                 <option value="fillblanks">Fill in the Blanks</option>
               </select>
+            </div>
+
+            {/* Cognitive Level */}
+            <div className="sm:col-span-2">
+              <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-2">Cognitive Level (Bloom Taxonomy)</label>
+              <div className="flex flex-wrap gap-4">
+                <label className="flex items-center space-x-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={formData.cognitiveLevel?.knowledge || false}
+                    onChange={(e) => {
+                      const current = formData.cognitiveLevel || {knowledge: false, understanding: false, application: false};
+                      setFormData({...formData, cognitiveLevel: {...current, knowledge: e.target.checked}});
+                    }}
+                    className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                  />
+                  <span className="text-xs sm:text-sm text-gray-700">Knowledge</span>
+                </label>
+                <label className="flex items-center space-x-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={formData.cognitiveLevel?.understanding || false}
+                    onChange={(e) => {
+                      const current = formData.cognitiveLevel || {knowledge: false, understanding: false, application: false};
+                      setFormData({...formData, cognitiveLevel: {...current, understanding: e.target.checked}});
+                    }}
+                    className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                  />
+                  <span className="text-xs sm:text-sm text-gray-700">Understanding</span>
+                </label>
+                <label className="flex items-center space-x-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={formData.cognitiveLevel?.application || false}
+                    onChange={(e) => {
+                      const current = formData.cognitiveLevel || {knowledge: false, understanding: false, application: false};
+                      setFormData({...formData, cognitiveLevel: {...current, application: e.target.checked}});
+                    }}
+                    className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                  />
+                  <span className="text-xs sm:text-sm text-gray-700">Application</span>
+                </label>
+              </div>
             </div>
           </div>
 
