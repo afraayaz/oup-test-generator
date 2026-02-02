@@ -18,6 +18,7 @@ interface SidebarProps {
   currentPage: string;
   open?: boolean;
   onClose?: () => void;
+  hideProfile?: boolean;
 }
 
 export default function Sidebar({
@@ -25,6 +26,7 @@ export default function Sidebar({
   currentPage,
   open,
   onClose,
+  hideProfile = false,
 }: SidebarProps) {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [internalMobileOpen, setInternalMobileOpen] = useState(false);
@@ -279,7 +281,7 @@ export default function Sidebar({
       {open === undefined && (
         <button
           onClick={toggleMobileMenu}
-          className="lg:hidden fixed top-4 left-4 z-50 min-h-[44px] min-w-[44px] flex items-center justify-center bg-[#002147] text-white rounded-lg shadow-lg active:bg-blue-900"
+          className="lg:hidden fixed top-4 left-4 z-50 min-h-[44px] min-w-[44px] flex items-center justify-center bg-[#0B1F3B] text-white rounded-xl shadow-lg active:bg-[#1F46D8] transition-all duration-200"
         >
           <i
             className={`${isMobileOpen ? "ri-close-line" : "ri-menu-line"} text-2xl`}
@@ -298,7 +300,7 @@ export default function Sidebar({
       {/* Sidebar */}
       <div
         className={`
-        fixed top-0 left-0 bg-[#002147] border-r border-gray-200 h-screen transition-all duration-300 z-40
+        fixed top-0 left-0 bg-[#0B1F3B] border-r border-gray-800 h-screen transition-all duration-300 z-40 rounded-r-[24px]
         ${isCollapsed ? "w-16" : "w-64"}
         ${isMobileOpen ? "translate-x-0" : "-translate-x-full"}
         lg:translate-x-0
@@ -309,19 +311,19 @@ export default function Sidebar({
             <div className="flex items-center space-x-3">
               {!isCollapsed && (
                 <div>
-                  <h1 className="text-xl font-bold text-white">
+                  <h1 className="text-xl font-bold text-[#FFFFFF]">
                     Test Generator
                   </h1>
-                  <p className="text-xs text-gray-300">{userRole} Panel</p>
+                  <p className="text-xs text-[#FFFFFF] opacity-75">{userRole} Panel</p>
                 </div>
               )}
             </div>
             <button
               onClick={() => setIsCollapsed(!isCollapsed)}
-              className="hidden lg:flex min-h-[44px] min-w-[44px] items-center justify-center rounded-lg hover:bg-blue-900 active:bg-blue-800 cursor-pointer transition-colors"
+              className="hidden lg:flex min-h-[44px] min-w-[44px] items-center justify-center rounded-xl hover:bg-white/10 transition-all duration-200 cursor-pointer"
             >
               <i
-                className={`ri-menu-${isCollapsed ? "unfold" : "fold"}-line text-gray-300 text-xl`}
+                className={`ri-menu-${isCollapsed ? "unfold" : "fold"}-line text-[#FFFFFF] text-xl`}
               ></i>
             </button>
           </div>
@@ -334,17 +336,19 @@ export default function Sidebar({
                 <Link
                   href={item.href}
                   onClick={closeMobileMenu}
-                  className={`flex items-center space-x-3 px-3 py-3 rounded-lg transition-colors cursor-pointer ${
+                  className={`flex items-center space-x-3 px-4 py-3 rounded-xl transition-all duration-200 cursor-pointer text-[15px] ${
                     currentPage === item.id
-                      ? "bg-blue-800 text-white border-r-2 border-white"
-                      : "text-gray-300 hover:bg-blue-900"
+                      ? "bg-[#FFFFFF] text-[#0B1F3B]"
+                      : "text-[#FFFFFF] hover:bg-white/12"
                   }`}
                 >
                   <i
-                    className={`${item.icon} w-5 h-5 flex items-center justify-center`}
+                    className={`${item.icon} w-5 h-5 flex items-center justify-center ${
+                      currentPage === item.id ? "text-[#0B1F3B]" : "text-[#FFFFFF]"
+                    }`}
                   ></i>
                   {!isCollapsed && (
-                    <span className="text-sm font-medium whitespace-nowrap">
+                    <span className="font-medium whitespace-nowrap">
                       {item.label}
                     </span>
                   )}
@@ -356,15 +360,15 @@ export default function Sidebar({
 
         <div className="absolute bottom-6 left-0 right-0 px-4 space-y-3">
           {/* User Profile Card */}
-          {user && !isCollapsed && (
-            <div className="bg-blue-900 rounded-lg p-3 mb-3">
+          {user && !isCollapsed && !hideProfile && (
+            <div className="bg-white/10 rounded-xl p-3 mb-3">
               <div className="flex items-center space-x-2">
-                <div className="w-10 h-10 bg-blue-800 rounded-full flex items-center justify-center text-white text-xs font-semibold flex-shrink-0">
+                <div className="w-10 h-10 bg-[#1F46D8] rounded-full flex items-center justify-center text-white text-xs font-semibold flex-shrink-0">
                   {(user.name || 'U').split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()}
                 </div>
                 <div className="min-w-0 flex-1">
-                  <p className="text-sm font-semibold text-white truncate">{user.name || 'User'}</p>
-                  <p className="text-xs text-blue-200 truncate capitalize">{user.role || 'User'}</p>
+                  <p className="text-sm font-semibold text-[#FFFFFF] truncate">{user.name || 'User'}</p>
+                  <p className="text-xs text-[#FFFFFF] opacity-75 truncate capitalize">{user.role || 'User'}</p>
                 </div>
               </div>
             </div>
@@ -375,11 +379,11 @@ export default function Sidebar({
               handleLogout();
               closeMobileMenu();
             }}
-            className="w-full flex items-center space-x-3 px-3 py-3 rounded-lg text-gray-300 hover:bg-blue-900 transition-colors cursor-pointer"
+            className="w-full flex items-center space-x-3 px-4 py-3 rounded-xl text-[#FFFFFF] hover:bg-white/12 transition-all duration-200 cursor-pointer text-[15px]"
           >
             <i className="ri-logout-box-line w-5 h-5 flex items-center justify-center"></i>
             {!isCollapsed && (
-              <span className="text-sm font-medium whitespace-nowrap">
+              <span className="font-medium whitespace-nowrap">
                 Logout
               </span>
             )}

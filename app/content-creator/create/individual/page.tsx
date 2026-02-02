@@ -165,12 +165,12 @@ function CreateIndividualQuestionPageContent() {
   }
 
   return (
-    <div className="h-screen bg-gray-50 w-screen overflow-hidden">
+    <div className="flex min-h-screen bg-gray-50">
       {/* Sidebar */}
       <Sidebar userRole="Content Creator" currentPage="create" open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
 
       {/* Main Content */}
-      <div className="fixed top-0 right-0 bottom-0 left-0 lg:left-64 flex flex-col overflow-hidden">
+      <div className="flex-1 xl:ml-[256px] min-w-0 flex flex-col">
         {/* Header */}
         <div className="bg-white border-b border-gray-200 sticky top-0 z-10 flex-shrink-0">
           <div className="flex items-center justify-between px-4 sm:px-6 py-3 sm:py-4">

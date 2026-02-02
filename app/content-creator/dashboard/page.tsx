@@ -28,12 +28,12 @@ export default function ContentCreatorDashboard() {
   const [selectedTypeGrade, setSelectedTypeGrade] = useState<string>('overall');
   const [availableGrades, setAvailableGrades] = useState<string[]>([]);
   const [allQuestions, setAllQuestions] = useState<any[]>([]);
+  const [hasFetched, setHasFetched] = useState(false);
 
   useEffect(() => {
-    if (user?.uid) {
-      fetchDashboardData();
-    }
-  }, [user?.uid]);
+    if (!user?.uid || hasFetched) return;
+    fetchDashboardData();
+  }, [user?.uid, hasFetched]);
 
   // Recalculate difficulty distribution when grade filter changes
   useEffect(() => {
@@ -125,28 +125,8 @@ export default function ContentCreatorDashboard() {
     setDifficultyBreakdown(typeData);
   }, [selectedTypeGrade, allQuestions]);
 
-  // Refetch data when window gains focus (user comes back to dashboard)
-  useEffect(() => {
-    const handleFocus = () => {
-      if (user?.uid) {
-        fetchDashboardData();
-      }
-    };
-
-    window.addEventListener('focus', handleFocus);
-    
-    // Also refetch every 30 seconds while on the page
-    const interval = setInterval(() => {
-      if (user?.uid && document.visibilityState === 'visible') {
-        fetchDashboardData();
-      }
-    }, 30000);
-
-    return () => {
-      window.removeEventListener('focus', handleFocus);
-      clearInterval(interval);
-    };
-  }, [user?.uid]);
+  // Optional: Refetch data periodically (only if needed)
+  // Removed aggressive refetch on window focus to prevent loading flicker
 
   const fetchDashboardData = async () => {
     if (!user?.uid) return;
@@ -292,6 +272,8 @@ export default function ContentCreatorDashboard() {
         thisWeek: thisWeekQuestions,
         approvalRate: 100 // All approved since no approval workflow
       });
+      
+      setHasFetched(true);
 
     } catch (error) {
       console.error('Error fetching dashboard data:', error);
@@ -302,12 +284,12 @@ export default function ContentCreatorDashboard() {
 
   if (loading) {
     return (
-      <div className="flex min-h-screen bg-gray-50">
+      <div className="flex min-h-screen bg-white">
         <Sidebar userRole="Content Creator" currentPage="dashboard" open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
         <div className="flex-1 lg:ml-[256px] flex items-center justify-center">
           <div className="text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-violet-600 mx-auto mb-4"></div>
-            <p className="text-gray-600">Loading dashboard...</p>
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#1F46D8] mx-auto mb-4"></div>
+            <p className="text-[#6B7280]">Loading dashboard...</p>
           </div>
         </div>
       </div>
@@ -315,122 +297,126 @@ export default function ContentCreatorDashboard() {
   }
 
   return (
-    <div className="flex min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
+    <div className="flex min-h-screen bg-white">
       <Sidebar userRole="Content Creator" currentPage="dashboard" open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
       
       <div className="flex-1 xl:ml-[256px] min-w-0">
-        {/* Header with Glass Effect */}
-        <div className="bg-white/80 backdrop-blur-md border-b border-gray-200/50 px-3 sm:px-4 md:px-6 lg:px-8 py-3 sm:py-4 md:py-5 flex items-center justify-between sticky top-0 z-10 shadow-sm">
+        {/* Header */}
+        <div className="bg-white border-b border-gray-200 px-7 py-5 flex items-center justify-between sticky top-0 z-10 shadow-sm">
           {/* Mobile Menu Button */}
           <button
             onClick={() => setSidebarOpen(true)}
-            className="xl:hidden min-w-[44px] min-h-[44px] w-12 h-12 flex items-center justify-center text-gray-600 hover:text-violet-600 hover:bg-violet-50 rounded-xl transition-all duration-200 hover:scale-105"
+            className="xl:hidden min-w-[44px] min-h-[44px] w-12 h-12 flex items-center justify-center text-[#0B1F3B] hover:text-[#1F46D8] hover:bg-[#E8EEFF] rounded-xl transition-all duration-200"
             aria-label="Open menu"
           >
             <i className="ri-menu-line text-2xl"></i>
           </button>
 
-          <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1">
-            <div className="hidden sm:flex w-8 h-8 md:w-10 md:h-10 bg-gradient-to-br from-violet-500 to-purple-600 rounded-xl items-center justify-center shadow-lg flex-shrink-0">
-              <i className="ri-dashboard-line text-white text-lg md:text-xl"></i>
-            </div>
-            <h1 className="text-base sm:text-lg md:text-xl xl:text-2xl font-bold bg-gradient-to-r from-violet-600 to-purple-600 bg-clip-text text-transparent truncate">
+          <div className="flex items-center justify-between gap-3 min-w-0 flex-1">
+            <h1 className="text-2xl font-bold text-[#1F46D8] truncate">
               Content Creator Dashboard
             </h1>
+            {/* Profile Section */}
+            {user && (
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-[#1F46D8] rounded-full flex items-center justify-center text-white text-sm font-bold">
+                  {(user.name || 'U').split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()}
+                </div>
+                <div className="hidden md:block">
+                  <p className="text-sm font-bold text-[#0A0A0A]">{user.name || 'User'}</p>
+                  <p className="text-xs text-[#6B7280] capitalize">{user.role || 'Content Creator'}</p>
+                </div>
+              </div>
+            )}
           </div>
-          <div className="w-12 h-12"></div>
         </div>
 
-        {/* Main Content */}
-        <div className="p-3 sm:p-4 md:p-6 xl:p-8 w-full">
-          {/* Welcome Section - Larger Size */}
-          <div className="relative bg-gradient-to-r from-violet-600 via-purple-600 to-violet-700 rounded-xl sm:rounded-2xl p-4 sm:p-6 md:p-8 xl:p-10 mb-4 sm:mb-6 text-white shadow-xl overflow-hidden">
-            {/* Animated Background Patterns */}
-            <div className="absolute inset-0 opacity-10">
-              <div className="absolute top-0 left-0 w-48 h-48 bg-white rounded-full blur-3xl -translate-x-1/2 -translate-y-1/2"></div>
-              <div className="absolute bottom-0 right-0 w-64 h-64 bg-purple-300 rounded-full blur-3xl translate-x-1/2 translate-y-1/2"></div>
-            </div>
-            <div className="relative z-10 flex items-center gap-3 sm:gap-4 md:gap-6">
-              <div className="w-12 h-12 sm:w-16 sm:h-16 md:w-20 md:h-20 bg-white/20 backdrop-blur-sm rounded-xl sm:rounded-2xl flex items-center justify-center flex-shrink-0">
-                <i className="ri-quill-pen-line text-2xl sm:text-3xl md:text-4xl text-white"></i>
+        {/* Main Content - 12 Column Grid Layout */}
+        <div className="p-7 w-full">
+          {/* ROW 1: Welcome Banner (col 1-8) + Approval Progress (col 9-12) */}
+          <div className="grid grid-cols-12 gap-5 mb-5">
+            {/* Welcome Banner - Spans 8 columns */}
+            <div className="col-span-12 lg:col-span-8 h-[110px] bg-[#E8EEFF] rounded-[20px] p-6">
+              <div className="flex items-center gap-2 mb-2">
+                <h2 className="text-[28px] font-bold text-[#1F46D8]">Welcome Back!</h2>
+                <p className="text-[28px] font-bold text-[#1F46D8]">{user?.name || 'Content Creator'}</p>
               </div>
-              <div className="min-w-0">
-                <h2 className="text-xl sm:text-2xl md:text-3xl xl:text-4xl font-bold mb-1">Welcome Back!</h2>
-                <p className="text-violet-100 text-base sm:text-lg">{user?.name || 'Content Creator'}</p>
+              <p className="text-[14px] text-[#0A0A0A]">Here is an overview of your question creation workplace</p>
+            </div>
+
+            {/* Approval Progress Stat Card - Spans 4 columns */}
+            <div className="col-span-12 lg:col-span-4 h-[110px] bg-[#1F46D8] rounded-[20px] p-5 text-white hover:scale-[1.02] transition-all duration-200 flex items-center justify-between">
+              <div className="flex-1">
+                <h3 className="text-[36px] font-bold mb-1">{stats.questionsApproved}</h3>
+                <p className="text-[16px]">Questions Approved</p>
+              </div>
+              {/* Progress Ring */}
+              <div className="relative w-16 h-16 flex-shrink-0">
+                <svg className="w-16 h-16 transform -rotate-90">
+                  <circle
+                    cx="32"
+                    cy="32"
+                    r="28"
+                    stroke="rgba(255,255,255,0.2)"
+                    strokeWidth="6"
+                    fill="none"
+                  />
+                  <circle
+                    cx="32"
+                    cy="32"
+                    r="28"
+                    stroke="#FFD600"
+                    strokeWidth="6"
+                    fill="none"
+                    strokeDasharray={`${(stats.approvalRate / 100) * 176} 176`}
+                    strokeLinecap="round"
+                  />
+                </svg>
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <span className="text-xs font-bold text-white">{stats.approvalRate}%</span>
+                </div>
               </div>
             </div>
           </div>
 
-          {/* KPI Cards Row with Enhanced Design */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3 sm:gap-4 md:gap-6 mb-4 sm:mb-6 md:mb-8">
-            {/* Questions Created */}
-            <div className="group bg-white rounded-xl sm:rounded-2xl p-4 sm:p-5 md:p-6 shadow-lg hover:shadow-2xl transition-all duration-300 border border-gray-100 hover:border-violet-200 hover:-translate-y-1">
-              <div className="flex items-start justify-between mb-3 sm:mb-4">
-                <div className="w-12 h-12 sm:w-14 sm:h-14 bg-gradient-to-br from-violet-500 to-purple-600 rounded-lg sm:rounded-xl flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform duration-300">
-                  <i className="ri-file-list-3-line text-xl sm:text-2xl text-white"></i>
-                </div>
-                <div className="px-2 sm:px-3 py-1 bg-violet-50 text-violet-600 text-xs font-bold rounded-full border border-violet-100">
-                  TOTAL
-                </div>
+          {/* ROW 2: Three Stat Cards - Each spans 4 columns */}
+          <div className="grid grid-cols-12 gap-5 mb-5">
+            {/* Questions Created - Columns 1-4 */}
+            <div className="col-span-12 md:col-span-4 h-[120px] bg-[#2148D8] rounded-[20px] p-5 text-white hover:scale-[1.02] transition-all duration-200 relative">
+              <i className="ri-file-list-3-line text-4xl text-white absolute bottom-5 right-5"></i>
+              <div className="flex flex-col justify-center h-full">
+                <h3 className="text-[34px] font-bold mb-1">{stats.questionsCreated}</h3>
+                <p className="text-[16px]">Questions Created</p>
               </div>
-              <h3 className="text-2xl sm:text-3xl md:text-4xl font-extrabold bg-gradient-to-r from-violet-600 to-purple-600 bg-clip-text text-transparent mb-1 sm:mb-2">{stats.questionsCreated}</h3>
-              <p className="text-xs sm:text-sm font-medium text-gray-600">Questions Created</p>
             </div>
 
-            {/* Approved Questions */}
-            <div className="group bg-white rounded-xl sm:rounded-2xl p-4 sm:p-5 md:p-6 shadow-lg hover:shadow-2xl transition-all duration-300 border border-gray-100 hover:border-green-200 hover:-translate-y-1">
-              <div className="flex items-start justify-between mb-3 sm:mb-4">
-                <div className="w-12 h-12 sm:w-14 sm:h-14 bg-gradient-to-br from-green-500 to-emerald-600 rounded-lg sm:rounded-xl flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform duration-300">
-                  <i className="ri-checkbox-circle-line text-xl sm:text-2xl text-white"></i>
-                </div>
-                <div className="px-2 sm:px-3 py-1 bg-green-50 text-green-600 text-xs font-bold rounded-full border border-green-100">
-                  {stats.approvalRate}%
-                </div>
+            {/* Pending Review - Columns 5-8 */}
+            <div className="col-span-12 md:col-span-4 h-[120px] bg-[#2148D8] rounded-[20px] p-5 text-white hover:scale-[1.02] transition-all duration-200 relative">
+              <i className="ri-time-line text-4xl text-white absolute bottom-5 right-5"></i>
+              <div className="flex flex-col justify-center h-full">
+                <h3 className="text-[34px] font-bold mb-1">{stats.pendingReview}</h3>
+                <p className="text-[16px]">Pending Review</p>
               </div>
-              <h3 className="text-2xl sm:text-3xl md:text-4xl font-extrabold bg-gradient-to-r from-green-600 to-emerald-600 bg-clip-text text-transparent mb-1 sm:mb-2">{stats.questionsApproved}</h3>
-              <p className="text-xs sm:text-sm font-medium text-gray-600">Approved Questions</p>
             </div>
 
-            {/* Pending Review */}
-            <div className="group bg-white rounded-xl sm:rounded-2xl p-4 sm:p-5 md:p-6 shadow-lg hover:shadow-2xl transition-all duration-300 border border-gray-100 hover:border-orange-200 hover:-translate-y-1">
-              <div className="flex items-start justify-between mb-3 sm:mb-4">
-                <div className="w-12 h-12 sm:w-14 sm:h-14 bg-gradient-to-br from-orange-500 to-amber-600 rounded-lg sm:rounded-xl flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform duration-300">
-                  <i className="ri-time-line text-xl sm:text-2xl text-white"></i>
-                </div>
-                <div className="px-2 sm:px-3 py-1 bg-orange-50 text-orange-600 text-xs font-bold rounded-full border border-orange-100">
-                  REVIEW
-                </div>
+            {/* This Week - Columns 9-12 */}
+            <div className="col-span-12 md:col-span-4 h-[120px] bg-[#2148D8] rounded-[20px] p-5 text-white hover:scale-[1.02] transition-all duration-200 relative">
+              <i className="ri-calendar-check-line text-4xl text-white absolute bottom-5 right-5"></i>
+              <div className="flex flex-col justify-center h-full">
+                <h3 className="text-[34px] font-bold mb-1">{stats.thisWeek}</h3>
+                <p className="text-[16px]">Created This Week</p>
               </div>
-              <h3 className="text-2xl sm:text-3xl md:text-4xl font-extrabold bg-gradient-to-r from-orange-600 to-amber-600 bg-clip-text text-transparent mb-1 sm:mb-2">{stats.pendingReview}</h3>
-              <p className="text-xs sm:text-sm font-medium text-gray-600">Pending Review</p>
-            </div>
-
-            {/* This Week */}
-            <div className="group bg-white rounded-xl sm:rounded-2xl p-4 sm:p-5 md:p-6 shadow-lg hover:shadow-2xl transition-all duration-300 border border-gray-100 hover:border-blue-200 hover:-translate-y-1">
-              <div className="flex items-start justify-between mb-3 sm:mb-4">
-                <div className="w-12 h-12 sm:w-14 sm:h-14 bg-gradient-to-br from-blue-500 to-cyan-600 rounded-lg sm:rounded-xl flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform duration-300">
-                  <i className="ri-calendar-check-line text-xl sm:text-2xl text-white"></i>
-                </div>
-                <div className="px-2 sm:px-3 py-1 bg-blue-50 text-blue-600 text-xs font-bold rounded-full border border-blue-100">
-                  7 DAYS
-                </div>
-              </div>
-              <h3 className="text-2xl sm:text-3xl md:text-4xl font-extrabold bg-gradient-to-r from-blue-600 to-cyan-600 bg-clip-text text-transparent mb-1 sm:mb-2">{stats.thisWeek}</h3>
-              <p className="text-xs sm:text-sm font-medium text-gray-600">Created This Week</p>
             </div>
           </div>
 
-          {/* Charts Row with Enhanced Design */}
-          <div className="grid grid-cols-1 xl:grid-cols-2 gap-3 sm:gap-4 md:gap-6 mb-4 sm:mb-6 md:mb-8">
-            {/* Left Column - Creation Trend & Question Type Distribution stacked */}
-            <div className="space-y-3 sm:space-y-4 md:space-y-6">
+          {/* ROW 3: Charts Row */}
+          <div className="grid grid-cols-12 gap-5 mb-5">
+            {/* Left: Question Creation Trend - Columns 1-8 */}
+            <div className="col-span-12 lg:col-span-8 flex flex-col gap-5">
               {/* Question Creation Trend */}
-              <div className="bg-white rounded-xl sm:rounded-2xl p-4 sm:p-5 md:p-6 lg:p-8 shadow-lg border border-gray-100 hover:shadow-xl transition-shadow duration-300">
-                <div className="flex items-center gap-2 sm:gap-3 mb-4 sm:mb-6">
-                  <div className="w-8 h-8 sm:w-10 sm:h-10 bg-gradient-to-br from-violet-500 to-purple-600 rounded-lg flex items-center justify-center">
-                    <i className="ri-line-chart-line text-white text-base sm:text-lg"></i>
-                  </div>
-                  <h3 className="text-base sm:text-lg md:text-xl font-bold text-gray-900">Question Creation Trend</h3>
+              <div className="bg-[#FFFEE0] border-2 border-[#1F46D8] rounded-[20px] p-5">
+                <div className="flex items-center gap-3 mb-4">
+                  <h3 className="text-lg font-semibold text-[#1F46D8]">Question Creation Trend</h3>
                 </div>
                 <div className="w-full overflow-hidden">
                   <ResponsiveContainer width="100%" height={200} minHeight={200}>
@@ -453,20 +439,17 @@ export default function ContentCreatorDashboard() {
               </div>
 
               {/* Question Type Distribution */}
-              <div className="bg-white rounded-xl sm:rounded-2xl p-4 sm:p-5 md:p-6 lg:p-8 shadow-lg border border-gray-100 hover:shadow-xl transition-shadow duration-300">
-                <div className="flex items-center justify-between mb-4 sm:mb-6">
-                  <div className="flex items-center gap-2 sm:gap-3">
-                    <div className="w-8 h-8 sm:w-10 sm:h-10 bg-gradient-to-br from-indigo-500 to-blue-600 rounded-lg flex items-center justify-center">
-                      <i className="ri-bar-chart-box-line text-white text-base sm:text-lg"></i>
-                    </div>
-                    <h3 className="text-base sm:text-lg md:text-xl font-bold text-gray-900">Question Type Distribution</h3>
+              <div className="bg-[#FFFEE0] border-2 border-[#1F46D8] rounded-[20px] p-5 flex-1">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center gap-3">
+                    <h3 className="text-lg font-semibold text-[#1F46D8]">Question Type Distribution</h3>
                   </div>
                   
                   {/* Grade Filter Dropdown */}
                   <select
                     value={selectedTypeGrade}
                     onChange={(e) => setSelectedTypeGrade(e.target.value)}
-                    className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent bg-white text-gray-700 hover:border-indigo-400 transition-colors cursor-pointer"
+                    className="px-3 py-1.5 text-sm border border-[#1F46D8] rounded-xl focus:ring-2 focus:ring-[#1F46D8] focus:border-transparent bg-white text-[#1F46D8] hover:border-[#1F46D8] transition-colors cursor-pointer"
                   >
                     <option value="overall">All Grades</option>
                     {availableGrades.map(grade => (
@@ -474,8 +457,8 @@ export default function ContentCreatorDashboard() {
                     ))}
                   </select>
                 </div>
-                <div className="w-full overflow-hidden">
-                  <ResponsiveContainer width="100%" height={200}>
+                <div className="w-full overflow-hidden flex-1">
+                  <ResponsiveContainer width="100%" height="100%" minHeight={200}>
                   <BarChart data={difficultyBreakdown}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
                     <XAxis dataKey="level" stroke="#6B7280" style={{ fontSize: '12px' }} />
@@ -495,141 +478,63 @@ export default function ContentCreatorDashboard() {
               </div>
             </div>
 
-            {/* Right Column - Difficulty Pie Chart */}
-            <div className="bg-white rounded-xl sm:rounded-2xl p-4 sm:p-5 md:p-6 lg:p-8 shadow-lg border border-gray-100 hover:shadow-xl transition-shadow duration-300 h-full flex flex-col">
-              <div className="flex items-center justify-between mb-4 sm:mb-6">
-                <div className="flex items-center gap-2 sm:gap-3">
-                  <div className="w-8 h-8 sm:w-10 sm:h-10 bg-gradient-to-br from-purple-500 to-pink-600 rounded-lg flex items-center justify-center">
-                    <i className="ri-pie-chart-2-line text-white text-base sm:text-lg"></i>
+            {/* Right: Questions by Difficulty - Columns 9-12 */}
+            <div className="col-span-12 lg:col-span-4 bg-[#E8EEFF] border-2 border-[#1F46D8] rounded-[20px] p-5 flex flex-col">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center gap-3">
+                    <h3 className="text-lg font-semibold text-[#1F46D8]">Questions by Difficulty</h3>
                   </div>
-                  <h3 className="text-base sm:text-lg md:text-xl font-bold text-gray-900">Questions by Difficulty</h3>
-                </div>
-                
-                {/* Grade Filter Dropdown */}
-                <select
-                  value={selectedDifficultyGrade}
-                  onChange={(e) => setSelectedDifficultyGrade(e.target.value)}
-                  className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent bg-white text-gray-700 hover:border-purple-400 transition-colors cursor-pointer"
-                >
-                  <option value="overall">All Grades</option>
-                  {availableGrades.map(grade => (
-                    <option key={grade} value={grade}>Grade {grade}</option>
-                  ))}
-                </select>
-              </div>
-              <div className="w-full overflow-hidden flex-1 flex items-center justify-center">
-                <ResponsiveContainer width="100%" height="100%" minHeight={350}>
-                <PieChart>
-                  <Pie
-                    data={subjectDistribution}
-                    cx="50%"
-                    cy="50%"
-                    innerRadius={80}
-                    outerRadius={120}
-                    paddingAngle={5}
-                    dataKey="count"
+                  
+                  {/* Grade Filter Dropdown */}
+                  <select
+                    value={selectedDifficultyGrade}
+                    onChange={(e) => setSelectedDifficultyGrade(e.target.value)}
+                    className="px-3 py-1.5 text-sm border border-[#1F46D8] rounded-xl focus:ring-2 focus:ring-[#1F46D8] focus:border-transparent bg-white text-[#1F46D8] hover:border-[#1F46D8] transition-colors cursor-pointer"
                   >
-                    {subjectDistribution.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.color} />
+                    <option value="overall">All Grades</option>
+                    {availableGrades.map(grade => (
+                      <option key={grade} value={grade}>Grade {grade}</option>
                     ))}
-                  </Pie>
-                  <Tooltip />
-                </PieChart>
-              </ResponsiveContainer>
-              </div>
-              <div className="mt-4 sm:mt-6 space-y-2">
-                {subjectDistribution.map((difficulty, index) => {
-                  const total = subjectDistribution.reduce((sum, item) => sum + item.count, 0);
-                  const percentage = total > 0 ? Math.round((difficulty.count / total) * 100) : 0;
-                  return (
-                    <div key={index} className="flex items-center justify-between p-2 rounded-lg hover:bg-gray-50 transition-colors duration-200">
-                      <div className="flex items-center gap-3">
-                        <div className="w-4 h-4 rounded-full shadow-sm" style={{ backgroundColor: difficulty.color }}></div>
-                        <span className="text-sm font-medium text-gray-700">{difficulty.subject}</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm font-bold text-gray-900">{difficulty.count}</span>
-                        <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded-full">{percentage}%</span>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          </div>
-
-          {/* Recent Questions */}
-          <div className="bg-white rounded-xl sm:rounded-2xl p-4 sm:p-5 md:p-6 lg:p-8 shadow-lg border border-gray-100 hover:shadow-xl transition-shadow duration-300">
-            <div className="flex items-center justify-between mb-4 sm:mb-6 gap-2 sm:gap-3">
-              <div className="flex items-center gap-2 sm:gap-3 min-w-0">
-                <div className="w-8 h-8 sm:w-10 sm:h-10 bg-gradient-to-br from-violet-500 to-purple-600 rounded-lg flex items-center justify-center flex-shrink-0">
-                  <i className="ri-article-line text-white text-base sm:text-lg"></i>
+                  </select>
                 </div>
-                <h3 className="text-base sm:text-lg md:text-xl font-bold text-gray-900 truncate">Recent Questions</h3>
-              </div>
-              <button className="min-w-[44px] min-h-[44px] px-4 py-2 text-violet-600 hover:text-white text-xs sm:text-sm font-semibold bg-violet-50 hover:bg-violet-600 rounded-xl transition-all duration-200 hover:shadow-lg flex-shrink-0">
-                View All →
-              </button>
-            </div>
-            
-            <div className="space-y-2 sm:space-y-3">
-              {recentQuestions.map((question) => (
-                <div key={question.id} className="group border-2 border-gray-100 rounded-xl p-4 sm:p-5 hover:border-violet-200 hover:shadow-md transition-all duration-200 bg-gradient-to-r from-white to-gray-50">
-                  {/* Mobile: Stacked layout */}
-                  <div className="block sm:hidden">
-                    <p className="text-sm font-semibold text-gray-900 mb-3 line-clamp-2">{question.text}</p>
-                    <div className="grid grid-cols-2 gap-2 mb-3">
-                      <span className="px-2 py-1 bg-blue-50 text-blue-600 text-xs rounded">{question.subject}</span>
-                      <span className="px-2 py-1 bg-gray-100 text-gray-600 text-xs rounded">{question.grade}</span>
-                    </div>
-                    <div className="grid grid-cols-3 gap-2 mb-3">
-                      <span className={`px-2 py-1 text-xs rounded text-center ${
-                        question.difficulty === 'Easy' ? 'bg-green-50 text-green-600' :
-                        question.difficulty === 'Medium' ? 'bg-orange-50 text-orange-600' :
-                        'bg-red-50 text-red-600'
-                      }`}>
-                        {question.difficulty}
-                      </span>
-                      <span className="px-2 py-1 text-xs text-gray-400 text-center">{question.time}</span>
-                      <div className={`px-2 py-1 rounded-full text-xs font-semibold text-center ${
-                        question.status === 'approved' ? 'bg-green-100 text-green-700' :
-                        question.status === 'pending' ? 'bg-orange-100 text-orange-700' :
-                        'bg-red-100 text-red-700'
-                      }`}>
-                        {question.status === 'approved' ? '✓' : question.status === 'pending' ? '⏳' : '✗'}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Tablet+: Horizontal layout */}
-                  <div className="hidden sm:flex sm:items-start sm:justify-between sm:gap-4">
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-semibold text-gray-900 mb-2 line-clamp-2">{question.text}</p>
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="px-2 py-1 bg-blue-50 text-blue-600 text-xs rounded">{question.subject}</span>
-                        <span className="px-2 py-1 bg-gray-100 text-gray-600 text-xs rounded">{question.grade}</span>
-                        <span className={`px-2 py-1 text-xs rounded ${
-                          question.difficulty === 'Easy' ? 'bg-green-50 text-green-600' :
-                          question.difficulty === 'Medium' ? 'bg-orange-50 text-orange-600' :
-                          'bg-red-50 text-red-600'
-                        }`}>
-                          {question.difficulty}
-                        </span>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-3 flex-shrink-0">
-                      <p className="text-xs text-gray-400 whitespace-nowrap">{question.time}</p>
-                      <div className={`px-3 py-1 rounded-full text-xs font-semibold whitespace-nowrap ${
-                        question.status === 'approved' ? 'bg-green-100 text-green-700' :
-                        question.status === 'pending' ? 'bg-orange-100 text-orange-700' :
-                        'bg-red-100 text-red-700'
-                      }`}>
-                        {question.status.charAt(0).toUpperCase() + question.status.slice(1)}
-                      </div>
-                    </div>
-                  </div>
+                <div className="w-full overflow-hidden flex-1 flex items-center justify-center">
+                  <ResponsiveContainer width="100%" height="100%" minHeight={350}>
+                  <PieChart>
+                    <Pie
+                      data={subjectDistribution}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={80}
+                      outerRadius={120}
+                      paddingAngle={5}
+                      dataKey="count"
+                    >
+                      {subjectDistribution.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.color} />
+                      ))}
+                    </Pie>
+                    <Tooltip />
+                  </PieChart>
+                </ResponsiveContainer>
                 </div>
-              ))}
+                <div className="mt-4 space-y-2">
+                  {subjectDistribution.map((difficulty, index) => {
+                    const total = subjectDistribution.reduce((sum, item) => sum + item.count, 0);
+                    const percentage = total > 0 ? Math.round((difficulty.count / total) * 100) : 0;
+                    return (
+                      <div key={index} className="flex items-center justify-between p-2 rounded-lg hover:bg-gray-50 transition-colors duration-200">
+                        <div className="flex items-center gap-3">
+                          <div className="w-4 h-4 rounded-full shadow-sm" style={{ backgroundColor: difficulty.color }}></div>
+                          <span className="text-sm font-medium text-gray-700">{difficulty.subject}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-bold text-gray-900">{difficulty.count}</span>
+                          <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded-full">{percentage}%</span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
             </div>
           </div>
         </div>
