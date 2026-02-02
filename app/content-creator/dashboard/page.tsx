@@ -318,7 +318,7 @@ export default function ContentCreatorDashboard() {
     <div className="flex min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
       <Sidebar userRole="Content Creator" currentPage="dashboard" open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
       
-      <div className="flex-1 xl:ml-[256px] min-w-0">
+      <div className="flex-1 xl:pl-[256px] min-w-0">
         {/* Header with Glass Effect */}
         <div className="bg-white/80 backdrop-blur-md border-b border-gray-200/50 px-3 sm:px-4 md:px-6 lg:px-8 py-3 sm:py-4 md:py-5 flex items-center justify-between sticky top-0 z-10 shadow-sm">
           {/* Mobile Menu Button */}
