@@ -295,76 +295,86 @@ export default function ContentCreatorDashboard() {
         {/* Main Content */}
         <div className="p-4 sm:p-6 xl:p-8 w-full">
           {/* Welcome Section */}
-          <div className="relative bg-[#EAF2FF] border border-[#C9D9FF] rounded-xl sm:rounded-2xl p-4 sm:p-6 md:p-8 mb-4 sm:mb-6 text-[#003087] shadow">
-            <div className="flex items-center gap-3 sm:gap-4">
-              <div className="w-12 h-12 sm:w-14 sm:h-14 bg-[#003087] text-white rounded-xl flex items-center justify-center">
-                <i className="ri-quill-pen-line text-2xl"></i>
-              </div>
-              <div className="min-w-0">
-                <h2 className="text-xl sm:text-2xl md:text-3xl font-bold">Welcome back, {user?.name || 'Creator'}!</h2>
-                <p className="text-[#244986] mt-1">Here is an overview of your question creation workplace.</p>
-              </div>
-            </div>
-          </div>
+         
+{/* ================================
+   ROW 1 : WELCOME + APPROVED CARD
+================================== */}
+<div className="grid grid-cols-1 xl:grid-cols-3 gap-4 mb-6">
 
-          {/* KPI Cards Row — rearranged like screenshot */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 md:gap-6 mb-6">
-            {/* 1. Questions Created */}
-            <div className="bg-white border border-[#D0DAF5] rounded-xl p-5 shadow hover:shadow-md transition">
-              <div className="flex items-start justify-between mb-4">
-                <div className="w-12 h-12 bg-[#003087] rounded-lg flex items-center justify-center text-white">
-                  <i className="ri-file-list-3-line text-2xl"></i>
-                </div>
-                <div className="px-2 py-1 bg-[#EAF2FF] text-[#003087] text-xs font-bold rounded-full border border-[#C9D9FF]">
-                  TOTAL
-                </div>
-              </div>
-              <h3 className="text-3xl font-extrabold text-[#003087]">{stats.questionsCreated}</h3>
-              <p className="text-sm text-[#4A5568] mt-1">Questions Created</p>
-            </div>
+  {/* Welcome Banner - Takes 2 columns on xl */}
+  <div className="col-span-2 bg-[#EAF2FF] border border-[#C9D9FF] rounded-xl p-6 shadow">
+    <div className="flex items-center gap-4">
+      <div className="w-14 h-14 bg-[#003087] text-white rounded-xl flex items-center justify-center">
+        <i className="ri-quill-pen-line text-3xl"></i>
+      </div>
+      <div>
+        <h2 className="text-2xl font-bold text-[#003087]">
+          Welcome back, {user?.name || "Creator"}!
+        </h2>
+        <p className="text-[#244986] mt-1">
+          Here is an overview of your question creation workplace.
+        </p>
+      </div>
+    </div>
+  </div>
 
-            {/* 2. Created This Week */}
-            <div className="bg-white border border-[#D0DAF5] rounded-xl p-5 shadow hover:shadow-md transition">
-              <div className="flex items-start justify-between mb-4">
-                <div className="w-12 h-12 bg-[#003087] rounded-lg flex items-center justify-center text-white">
-                  <i className="ri-calendar-check-line text-2xl"></i>
-                </div>
-                <div className="px-2 py-1 bg-[#EAF2FF] text-[#003087] text-xs font-bold rounded-full border border-[#C9D9FF]">
-                  7 DAYS
-                </div>
-              </div>
-              <h3 className="text-3xl font-extrabold text-[#003087]">{stats.thisWeek}</h3>
-              <p className="text-sm text-[#4A5568] mt-1">Created This Week</p>
-            </div>
+  {/* Questions Approved (Right side card) */}
+  <div className="bg-[#003087] text-white rounded-xl p-6 shadow flex flex-col justify-center">
+    <div className="flex items-center justify-between mb-3">
+      <div className="w-12 h-12 bg-white bg-opacity-20 rounded-lg flex items-center justify-center">
+        <i className="ri-checkbox-circle-line text-2xl"></i>
+      </div>
+      <span className="px-2 py-1 text-xs font-semibold bg-white bg-opacity-20 rounded-full">
+        {stats.approvalRate}%
+      </span>
+    </div>
+    <h3 className="text-3xl font-extrabold">{stats.questionsApproved}</h3>
+    <p className="text-sm mt-1">Questions Approved</p>
+  </div>
+</div>
 
-            {/* 3. Questions Approved */}
-            <div className="bg-white border border-[#D0DAF5] rounded-xl p-5 shadow hover:shadow-md transition">
-              <div className="flex items-start justify-between mb-4">
-                <div className="w-12 h-12 bg-[#0054A6] rounded-lg flex items-center justify-center text-white">
-                  <i className="ri-checkbox-circle-line text-2xl"></i>
-                </div>
-                <div className="px-2 py-1 bg-[#FDF7CC] text-[#5C4A00] text-xs font-bold rounded-full border border-[#FFE680]">
-                  {stats.approvalRate}%
-                </div>
-              </div>
-              <h3 className="text-3xl font-extrabold text-[#003087]">{stats.questionsApproved}</h3>
-              <p className="text-sm text-[#4A5568] mt-1">Questions Approved</p>
-            </div>
+{/* ================================
+   ROW 2 : THREE BLUE STAT CARDS
+================================== */}
+<div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4 mb-8">
 
-            {/* 4. Pending Review */}
-            <div className="bg-white border border-[#D0DAF5] rounded-xl p-5 shadow hover:shadow-md transition">
-              <div className="flex items-start justify-between mb-4">
-                <div className="w-12 h-12 bg-[#244986] rounded-lg flex items-center justify-center text-white">
-                  <i className="ri-time-line text-2xl"></i>
-                </div>
-                <div className="px-2 py-1 bg-[#EAF2FF] text-[#003087] text-xs font-bold rounded-full border border-[#C9D9FF]">
-                  REVIEW
-                </div>
-              </div>
-              <h3 className="text-3xl font-extrabold text-[#003087]">{stats.pendingReview}</h3>
-              <p className="text-sm text-[#4A5568] mt-1">Pending Review</p>
-            </div>
-          </div>
+  {/* Questions Created */}
+  <div className="bg-[#003087] text-white rounded-xl p-6 shadow">
+    <div className="flex items-center justify-between mb-3">
+      <div className="w-12 h-12 bg-white bg-opacity-20 rounded-lg flex items-center justify-center">
+        <i className="ri-file-list-3-line text-2xl"></i>
+      </div>
+      <span className="px-2 py-1 text-xs bg-white bg-opacity-20 rounded-full">TOTAL</span>
+    </div>
+    <h3 className="text-3xl font-extrabold">{stats.questionsCreated}</h3>
+    <p className="text-sm mt-1">Questions Created</p>
+  </div>
+
+  {/* Created This Week */}
+  <div className="bg-[#003087] text-white rounded-xl p-6 shadow">
+    <div className="flex items-center justify-between mb-3">
+      <div className="w-12 h-12 bg-white bg-opacity-20 rounded-lg flex items-center justify-center">
+        <i className="ri-calendar-check-line text-2xl"></i>
+      </div>
+      <span className="px-2 py-1 text-xs bg-white bg-opacity-20 rounded-full">7 DAYS</span>
+    </div>
+    <h3 className="text-3xl font-extrabold">{stats.thisWeek}</h3>
+    <p className="text-sm mt-1">Created This Week</p>
+  </div>
+
+  {/* Pending Review */}
+  <div className="bg-[#003087] text-white rounded-xl p-6 shadow">
+    <div className="flex items-center justify-between mb-3">
+      <div className="w-12 h-12 bg-white bg-opacity-20 rounded-lg flex items-center justify-center">
+        <i className="ri-time-line text-2xl"></i>
+      </div>
+      <span className="px-2 py-1 text-xs bg-white bg-opacity-20 rounded-full">REVIEW</span>
+    </div>
+    <h3 className="text-3xl font-extrabold">{stats.pendingReview}</h3>
+    <p className="text-sm mt-1">Pending Review</p>
+  </div>
+
+</div>
 
           {/* Charts Row */}
           <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 md:gap-6 mb-6">
