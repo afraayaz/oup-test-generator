@@ -406,7 +406,7 @@ const QuestionCreator = () => {
       const questionsRef = collection(db, 'questions');
       const question = {
         ...formData,
-        language: formData.subject === 'Urdu' ? 'ur' : 'en',
+        language: (formData.subject === 'Urdu' || formData.subject === 'Islamiyat') ? 'ur' : 'en',
         createdBy: 'current_user_id',
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
@@ -637,7 +637,7 @@ const QuestionCreator = () => {
           understanding: row.understanding?.toString().toUpperCase() === 'Y',
           application: row.application?.toString().toUpperCase() === 'Y',
         },
-        language: subject === 'Urdu' ? 'ur' : 'en',
+        language: (subject === 'Urdu' || subject === 'Islamiyat') ? 'ur' : 'en',
         createdBy: 'current_user_id',
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
@@ -703,7 +703,7 @@ const QuestionCreator = () => {
     const normalizedText = normalizeFormulas(formData.questionText);
     
     return (
-      <div className={`border p-4 mt-4 rounded-lg bg-gray-50 ${formData.subject === 'Urdu' ? 'text-right' : ''}`}>
+      <div className={`border p-4 mt-4 rounded-lg bg-gray-50 ${(formData.subject === 'Urdu' || formData.subject === 'Islamiyat') ? 'text-right' : ''}`}>
         <h4 className="text-sm font-medium text-gray-700 mb-2">Preview:</h4>
         <div className="mb-2 text-base">
           <MathJax dynamic hideUntilTypeset="first">
@@ -837,7 +837,7 @@ const QuestionCreator = () => {
     blanks: (blankId) => `جوابات ${blankId} کے لیے (مثال: جواب1|جواب2)`,
   };
 
-  const isUrdu = formData.subject === 'Urdu';
+  const isUrdu = formData.subject === 'Urdu' || formData.subject === 'Islamiyat';
   const inputDir = isUrdu ? 'rtl' : 'ltr';
   const inputFont = isUrdu ? 'font-[Noto Nastaliq Urdu]' : '';
   const optionLabels = isUrdu ? ['ا', 'ب', 'ج', 'د', 'ھ', 'و'] : ['A', 'B', 'C', 'D', 'E', 'F'];

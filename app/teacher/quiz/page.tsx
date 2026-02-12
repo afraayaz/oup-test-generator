@@ -1203,7 +1203,7 @@ const QuizGeneration = () => {
           slo: q.slo || '',
           cognitiveLevel: q.cognitiveLevel || null,
           marks: isMarked ? config.marks : 0,
-          question: { text: questionText, format: q.subject === 'Math' ? 'math' : 'text', isRTL: q.subject === 'Urdu' },
+          question: { text: questionText, format: q.subject === 'Math' ? 'math' : 'text', isRTL: q.subject === 'Urdu' || q.subject === 'Islamiyat' },
           options,
           answer,
           explanation: { text: q.explanation || '', format: 'text', isRTL: false },
@@ -1310,7 +1310,7 @@ const QuizGeneration = () => {
       })),
       totalMarks: isMarked ? questions.reduce((sum, q) => sum + q.marks, 0) : null,
       randomization: { seed: newSeed, shuffledOrder: true, shuffleOptions: questions.some(q => q.type === 'multiple') },
-      rendering: { respectRTL: selectedSubject === 'Urdu', renderMath: selectedSubject === 'Math' },
+      rendering: { respectRTL: selectedSubject === 'Urdu' || selectedSubject === 'Islamiyat', renderMath: selectedSubject === 'Math' },
       status: 'draft',
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
@@ -1631,7 +1631,7 @@ const QuizGeneration = () => {
       question: { 
         text: newQuestion.questionText, 
         format: newQuestion.subject === 'Math' ? 'math' : 'text', 
-        isRTL: newQuestion.subject === 'Urdu' 
+        isRTL: newQuestion.subject === 'Urdu' || newQuestion.subject === 'Islamiyat' 
       },
       options: (newQuestion.type === 'multiple' || newQuestion.type === 'mcq') ? newQuestion.options?.map((opt: any) => ({
         text: opt || '',

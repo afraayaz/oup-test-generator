@@ -68,9 +68,20 @@ export default function BulkUploadPage({
     return grades.sort();
   };
 
-  // Get subjects from user's assigned subjects
-  const allAvailableSubjects = ["Mathematics", "Science", "English", "History", "Geography"];
-  const subjects = user?.subjects && user.subjects.length > 0 ? user.subjects : allAvailableSubjects;
+  // Get subjects from user's assigned books
+  const getAvailableSubjects = () => {
+    if (!user?.assignedBooks || user.assignedBooks.length === 0) {
+      return [];
+    }
+    const uniqueSubjects = new Set<string>();
+    user.assignedBooks.forEach((book: any) => {
+      if (book.subject) {
+        uniqueSubjects.add(book.subject);
+      }
+    });
+    return Array.from(uniqueSubjects);
+  };
+  const subjects = getAvailableSubjects();
 
   // Get available books for selected grade and subject
   const getAvailableBooks = () => {

@@ -217,41 +217,8 @@ export default function QuestionCreationModePage({
     }
   };
 
-  // Pre-populate subject for content creators
-  useEffect(() => {
-    console.log('📋 Pre-populate useEffect triggered:', {
-      userRole,
-      hasUser: !!user,
-      hasAssignedBooks: !!user?.assignedBooks,
-      assignedBooksCount: user?.assignedBooks?.length || 0,
-      assignedBooks: user?.assignedBooks
-    });
-
-    if (userRole === "Content Creator" && user && user.assignedBooks && user.assignedBooks.length > 0) {
-      // Get unique subjects from assignedBooks
-      const subjectSet = new Set<string>();
-      user.assignedBooks.forEach((book: any) => {
-        if (book.subject) {
-          subjectSet.add(book.subject);
-        }
-      });
-      const assignedSubjects = Array.from(subjectSet);
-      
-      console.log('✅ Assigned subjects found:', assignedSubjects);
-      
-      if (assignedSubjects.length > 0) {
-        // Auto-select the first assigned subject for content creators
-        const firstSubject = assignedSubjects[0];
-        console.log('📌 Setting subject to:', firstSubject);
-        
-        setFormData(prev => ({
-          ...prev,
-          subject: firstSubject,
-          book: "" // Reset book when subject changes
-        }));
-      }
-    }
-  }, [user, userRole]);
+  // Note: Content creators can now select from multiple assigned subjects
+  // Subject selection is handled in the form dropdown, not auto-filled
 
   // Get all unique grades from user's subjectGradePairs or assignedBooks
   const getAvailableGrades = useMemo(() => {
@@ -985,18 +952,24 @@ export default function QuestionCreationModePage({
                   </div>
                 ) : (
                   <>
-                    {/* For Content Creators: Show Subject first (pre-selected, disabled) */}
+                    {/* For Content Creators: Subject Selection (from their assigned subjects) */}
                     {userRole === "Content Creator" && (
                       <div>
                         <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-2">
                           Subject *
                         </label>
-                        <input
-                          type="text"
+                        <select
                           value={formData.subject}
-                          disabled
-                          className="w-full px-3 py-2 sm:py-2.5 border rounded-lg text-sm bg-gray-100 text-gray-600 cursor-not-allowed"
-                        />
+                          onChange={(e) => handleSubjectChange(e.target.value)}
+                          className="w-full px-3 py-2 sm:py-2.5 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        >
+                          <option value="">Select Subject</option>
+                          {getAvailableSubjects().map((subject) => (
+                            <option key={subject} value={subject}>
+                              {subject}
+                            </option>
+                          ))}
+                        </select>
                       </div>
                     )}
 

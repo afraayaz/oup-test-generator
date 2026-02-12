@@ -81,7 +81,7 @@ export default function QuestionForm({
   const [formData, setFormData] = useState<QuestionFormData>(initialFormData);
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
   const [toast, setToast] = useState<{ type: "error" | "success" | "info"; message: string } | null>(null);
-  const [focusedMathField, setFocusedMathField] = useState<"question" | "explanation" | "option" | "blank" | null>(null);
+  const [focusedMathField, setFocusedMathField] = useState<"question" | "explanation" | "option" | "blank" | "correctAnswer" | null>(null);
   const [activeOptionIndex, setActiveOptionIndex] = useState(-1);
   const [availableChapters, setAvailableChapters] = useState<string[]>([]); // Store fetched chapters
   const [chaptersLoading, setChaptersLoading] = useState(false); // Loading state for chapters
@@ -178,7 +178,7 @@ export default function QuestionForm({
     fetchChapters();
   }, [formData.book, formData.subject, formData.grade, submittedBooks]);
 
-  const optionLabels = formData.subject === "Urdu" 
+  const optionLabels = (formData.subject === "Urdu" || formData.subject === "Islamiyat")
     ? ["ا", "ب", "ج", "د", "ه", "و"]  // Urdu letters: Alif, Bay, Jeem, Dal, Hay, Waw
     : ["A", "B", "C", "D", "E", "F"];
 
@@ -269,6 +269,11 @@ export default function QuestionForm({
       }));
     } else if (focusedMathField === "blank" && activeBlankId) {
       handleBlankChange(activeBlankId, (formData.blanks[activeBlankId]?.join("|") || "") + symbol);
+    } else if (focusedMathField === "correctAnswer") {
+      setFormData((prev) => ({
+        ...prev,
+        correctAnswer: (typeof prev.correctAnswer === 'string' ? prev.correctAnswer : '') + symbol,
+      }));
     }
   };
 
@@ -277,14 +282,14 @@ export default function QuestionForm({
     insertMathSymbol(character);
   };
 
-  const handleMathFieldFocus = (field: "question" | "explanation" | "option" | "blank", optionIdx?: number, blankId?: string) => {
+  const handleMathFieldFocus = (field: "question" | "explanation" | "option" | "blank" | "correctAnswer", optionIdx?: number, blankId?: string) => {
     setFocusedMathField(field);
     if (optionIdx !== undefined) setActiveOptionIndex(optionIdx);
     if (blankId) setActiveBlankId(blankId);
   };
 
   const isMathSubject = formData.subject.toLowerCase().includes("math") || formData.subject.toLowerCase().includes("mathematics");
-  const isUrduSubject = formData.subject.toLowerCase().includes("urdu");
+  const isUrduSubject = formData.subject.toLowerCase().includes("urdu") || formData.subject.toLowerCase().includes("islamiyat");
 
   // Image handling functions
   const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -586,14 +591,14 @@ export default function QuestionForm({
                   type="text"
                   value={formData.topic || ""}
                   onChange={(e) => setFormData({ ...formData, topic: e.target.value })}
-                  onFocus={() => formData.subject === "Urdu" && setUrduKeyboardFocus("topic")}
+                  onFocus={() => (formData.subject === "Urdu" || formData.subject === "Islamiyat") && setUrduKeyboardFocus("topic")}
                   onBlur={() => setUrduKeyboardFocus(null)}
-                  placeholder={formData.subject === "Urdu" ? "موضوع درج کریں" : "e.g., Linear Equations"}
+                  placeholder={(formData.subject === "Urdu" || formData.subject === "Islamiyat") ? "موضوع درج کریں" : "e.g., Linear Equations"}
                   className={`w-full px-2 sm:px-3 py-1.5 sm:py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-xs sm:text-sm ${errors.topic ? "border-red-500" : "border-gray-300"}`}
-                  dir={formData.subject === "Urdu" ? "rtl" : "ltr"}
+                  dir={(formData.subject === "Urdu" || formData.subject === "Islamiyat") ? "rtl" : "ltr"}
                 />
                 {errors.topic && <p className="text-red-500 text-xs sm:text-sm mt-1">{errors.topic}</p>}
-                {formData.subject === "Urdu" && urduKeyboardFocus === "topic" && (
+                {(formData.subject === "Urdu" || formData.subject === "Islamiyat") && urduKeyboardFocus === "topic" && (
                   <div className="mt-2">
                     <UrduKeyboard
                       isVisible={true}
@@ -614,14 +619,14 @@ export default function QuestionForm({
                   type="text"
                   value={formData.slo || ""}
                   onChange={(e) => setFormData({ ...formData, slo: e.target.value })}
-                  onFocus={() => formData.subject === "Urdu" && setUrduKeyboardFocus("slo")}
+                  onFocus={() => (formData.subject === "Urdu" || formData.subject === "Islamiyat") && setUrduKeyboardFocus("slo")}
                   onBlur={() => setUrduKeyboardFocus(null)}
-                  placeholder={formData.subject === "Urdu" ? "سیکھنے کے نتائج درج کریں" : "Student Learning Outcome (Optional)"}
+                  placeholder={(formData.subject === "Urdu" || formData.subject === "Islamiyat") ? "سیکھنے کے نتائج درج کریں" : "Student Learning Outcome (Optional)"}
                   className={`w-full px-2 sm:px-3 py-1.5 sm:py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-xs sm:text-sm ${errors.slo ? "border-red-500" : "border-gray-300"}`}
-                  dir={formData.subject === "Urdu" ? "rtl" : "ltr"}
+                  dir={(formData.subject === "Urdu" || formData.subject === "Islamiyat") ? "rtl" : "ltr"}
                 />
                 {errors.slo && <p className="text-red-500 text-xs sm:text-sm mt-1">{errors.slo}</p>}
-                {formData.subject === "Urdu" && urduKeyboardFocus === "slo" && (
+                {(formData.subject === "Urdu" || formData.subject === "Islamiyat") && urduKeyboardFocus === "slo" && (
                   <div className="mt-2">
                     <UrduKeyboard
                       isVisible={true}
@@ -980,7 +985,7 @@ export default function QuestionForm({
           {(formData.type === "short" || formData.type === "long") && (
             <div className="mb-4 sm:mb-6">
               <label className="block text-sm font-medium text-gray-700 mb-2">Correct Answer *</label>
-              {isUrduSubject && focusedMathField === "question" && (
+              {isUrduSubject && focusedMathField === "correctAnswer" && (
                 <UrduKeyboard
                   isVisible={true}
                   onInsert={insertLanguageCharacter}
@@ -989,7 +994,7 @@ export default function QuestionForm({
               <textarea
                 value={formData.correctAnswer}
                 onChange={(e) => setFormData({ ...formData, correctAnswer: e.target.value })}
-                onFocus={() => isUrduSubject && handleMathFieldFocus("correctAnswer" as any)}
+                onFocus={() => isUrduSubject && handleMathFieldFocus("correctAnswer")}
                 onBlur={() => isUrduSubject && setFocusedMathField(null)}
                 placeholder="Enter the correct answer"
                 rows={formData.type === "long" ? 6 : 3}
