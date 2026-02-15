@@ -193,7 +193,7 @@ export default function SchoolAdminDashboard() {
             <i className="ri-menu-line text-2xl"></i>
           </button>
 
-          <h1 className="text-lg sm:text-xl lg:text-2xl font-bold text-indigo-600">School Admin Dashboard</h1>
+          <h1 className="text-lg sm:text-xl lg:text-2xl font-bold text-indigo-600 font-gibson-semibold">School Admin Dashboard</h1>
         </div>
 
         {/* Main Content */}

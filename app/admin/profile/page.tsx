@@ -267,7 +267,7 @@ export default function AdminProfile() {
             <i className="ri-menu-line text-2xl"></i>
           </button>
 
-          <h1 className="text-lg sm:text-xl lg:text-2xl font-bold text-gray-900">Admin Profile & Settings</h1>
+          <h1 className="text-lg sm:text-xl lg:text-2xl font-bold text-gray-900 font-gibson-semibold">Admin Profile & Settings</h1>
         </div>
 
         <div className="p-4 sm:p-6 lg:p-8">

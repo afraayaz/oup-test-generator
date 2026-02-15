@@ -74,7 +74,7 @@ export default function UsersClient({ students, teachers, contentManagers, schoo
           </button>
 
           <div>
-            <h1 className="text-lg sm:text-xl lg:text-2xl font-bold text-indigo-600">User Management</h1>
+            <h1 className="text-lg sm:text-xl lg:text-2xl font-bold text-indigo-600 font-gibson-semibold">User Management</h1>
             <p className="text-xs sm:text-sm text-gray-500">
               {schoolId ? (
                 <>Viewing users for school: <span className="font-medium text-indigo-500">{schoolId}</span></>

@@ -40,7 +40,7 @@ export default function NotificationsPage() {
             <i className="ri-menu-line text-2xl"></i>
           </button>
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">Notifications</h1>
+            <h1 className="text-2xl font-bold text-gray-900 font-gibson-semibold">Notifications</h1>
             <p className="text-sm text-gray-600">Stay updated with the latest quiz alerts and results.</p>
           </div>
         </div>

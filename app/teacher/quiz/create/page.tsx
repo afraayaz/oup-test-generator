@@ -229,6 +229,7 @@ export default function CreateQuizPage() {
           {/* Header */}
           <div className="bg-white border-b border-gray-200 px-4 sm:px-6 lg:px-8 py-4">
             <div className="flex items-center gap-3">
+            <div className="flex items-center gap-3">
               <button
                 onClick={() => setSidebarOpen(true)}
                 className="lg:hidden min-w-[44px] min-h-[44px] w-11 h-11 flex items-center justify-center text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
@@ -237,7 +238,7 @@ export default function CreateQuizPage() {
                 <i className="ri-menu-line text-2xl"></i>
               </button>
               <div>
-                <h1 className="text-2xl font-bold text-gray-800">Create Quiz</h1>
+                <h1 className="text-2xl font-bold text-gray-800 font-gibson-semibold">Create Quiz</h1>
                 <p className="text-gray-600 text-sm">Step 1: Select Question Bank</p>
               </div>
             </div>
@@ -468,7 +469,7 @@ export default function CreateQuizPage() {
       <div className="flex min-h-screen bg-gray-50">
         <Sidebar userRole="Teacher" currentPage="quiz" open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
 
-        <div className="flex-1 lg:ml-64">
+        <div className="flex-1 xl:ml-64">
           {/* Header */}
           <div className="bg-white border-b border-gray-200 px-4 sm:px-6 lg:px-8 py-4">
             <div className="flex items-center gap-3">
@@ -480,7 +481,7 @@ export default function CreateQuizPage() {
                 <i className="ri-menu-line text-2xl"></i>
               </button>
               <div>
-                <h1 className="text-2xl font-bold text-gray-800">Create Quiz</h1>
+                <h1 className="text-2xl font-bold text-gray-800 font-gibson-semibold">Create Quiz</h1>
                 <p className="text-gray-600 text-sm">Step 2: Select Subject, Grade & Book</p>
               </div>
             </div>
@@ -650,7 +651,7 @@ export default function CreateQuizPage() {
                   <i className="ri-menu-line text-2xl"></i>
                 </button>
                 <div>
-                  <h1 className="text-2xl font-bold text-gray-800">Create Quiz</h1>
+                  <h1 className="text-2xl font-bold text-gray-800 font-gibson-semibold">Create Quiz</h1>
                   <p className="text-gray-600 text-sm">Step 3: Select Questions</p>
                 </div>
               </div>

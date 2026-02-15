@@ -180,7 +180,7 @@ export default function ReviewQueue() {
               <i className="ri-menu-line text-2xl"></i>
             </button>
             <div>
-              <h1 className="text-lg sm:text-xl lg:text-2xl font-bold text-teal-600">Question Review Queue</h1>
+              <h1 className="text-lg sm:text-xl lg:text-2xl font-bold text-teal-600 font-gibson-semibold">Question Review Queue</h1>
               {userSubjects.length > 0 && (
                 <p className="text-sm text-gray-600">
                   Managing: {userSubjects.join(', ')}

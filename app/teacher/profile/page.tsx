@@ -93,7 +93,7 @@ export default function TeacherProfile() {
                 <i className="ri-menu-line text-2xl"></i>
               </button>
               <div>
-                <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-900 mb-1 sm:mb-2">Profile Management</h1>
+                <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-900 mb-1 sm:mb-2 font-gibson-semibold">Profile Management</h1>
                 <p className="text-sm sm:text-base text-gray-600">Manage your personal information and account settings</p>
               </div>
             </div>

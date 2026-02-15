@@ -839,7 +839,7 @@ const QuestionCreator = () => {
 
   const isUrdu = formData.subject === 'Urdu' || formData.subject === 'Islamiyat';
   const inputDir = isUrdu ? 'rtl' : 'ltr';
-  const inputFont = isUrdu ? 'font-[Noto Nastaliq Urdu]' : '';
+  const inputFont = isUrdu ? 'font-oup-nastaliq' : '';
   const optionLabels = isUrdu ? ['ا', 'ب', 'ج', 'د', 'ھ', 'و'] : ['A', 'B', 'C', 'D', 'E', 'F'];
 
   const mathJaxConfig = {
@@ -863,7 +863,7 @@ const QuestionCreator = () => {
                 <i className="ri-menu-line text-2xl"></i>
               </button>
               <div>
-                <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-900 mb-1 sm:mb-2">Create Question</h1>
+                <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-900 mb-1 sm:mb-2 font-gibson-semibold">Create Question</h1>
                 <p className="text-xs sm:text-sm lg:text-base text-gray-600">Add individual questions or upload multiple questions for your classes</p>
               </div>
             </div>

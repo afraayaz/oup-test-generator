@@ -24,9 +24,9 @@ export default function ContentCreatorDashboard() {
   const [subjectDistribution, setSubjectDistribution] = useState<any[]>([]);
   const [difficultyBreakdown, setDifficultyBreakdown] = useState<any[]>([]);
   const [recentQuestions, setRecentQuestions] = useState<any[]>([]);
-  const [selectedDifficultyGrade, setSelectedDifficultyGrade] = useState<string>('overall');
-  const [selectedTypeGrade, setSelectedTypeGrade] = useState<string>('overall');
+  const [filters, setFilters] = useState({ subject: 'all', grade: 'all' });
   const [availableGrades, setAvailableGrades] = useState<string[]>([]);
+  const [availableSubjects, setAvailableSubjects] = useState<string[]>([]);
   const [allQuestions, setAllQuestions] = useState<any[]>([]);
   const [hasFetched, setHasFetched] = useState(false);
 
@@ -35,19 +35,26 @@ export default function ContentCreatorDashboard() {
     fetchDashboardData();
   }, [user?.uid, hasFetched]);
 
-  // Recalculate difficulty distribution when grade filter changes
+  // Helper function to normalize grade
+  const normalizeGrade = (grade: string) => {
+    if (!grade) return '';
+    return grade.replace(/^grade\s*/i, '').trim();
+  };
+
+  // Helper function to get filtered questions
+  const getFilteredQuestions = () => {
+    return allQuestions.filter(q => {
+      const matchSubject = filters.subject === 'all' || q.subject === filters.subject;
+      const matchGrade = filters.grade === 'all' || normalizeGrade(q.grade) === filters.grade;
+      return matchSubject && matchGrade;
+    });
+  };
+
+  // Recalculate difficulty distribution when filters change
   useEffect(() => {
     if (allQuestions.length === 0) return;
 
-    const normalizeGrade = (grade: string) => {
-      if (!grade) return '';
-      return grade.replace(/^grade\s*/i, '').trim();
-    };
-
-    // Filter questions by selected grade
-    const filteredQuestions = selectedDifficultyGrade === 'overall' 
-      ? allQuestions 
-      : allQuestions.filter(q => normalizeGrade(q.grade) === selectedDifficultyGrade);
+    const filteredQuestions = getFilteredQuestions();
 
     // Calculate difficulty distribution
     const difficultyCounts: { [key: string]: number } = { Easy: 0, Medium: 0, Hard: 0 };
@@ -66,23 +73,8 @@ export default function ContentCreatorDashboard() {
       color: difficultyColors[level as keyof typeof difficultyColors]
     }));
     setSubjectDistribution(difficultyPieData);
-  }, [selectedDifficultyGrade, allQuestions]);
 
-  // Recalculate question type distribution when grade filter changes
-  useEffect(() => {
-    if (allQuestions.length === 0) return;
-
-    const normalizeGrade = (grade: string) => {
-      if (!grade) return '';
-      return grade.replace(/^grade\s*/i, '').trim();
-    };
-
-    // Filter questions by selected grade
-    const filteredQuestions = selectedTypeGrade === 'overall' 
-      ? allQuestions 
-      : allQuestions.filter(q => normalizeGrade(q.grade) === selectedTypeGrade);
-
-    // Calculate question type distribution
+    // Calculate question type distribution with same filtered questions
     const typeLabels: { [key: string]: string } = {
       multiple: "MCQ",
       truefalse: "True/False",
@@ -123,7 +115,15 @@ export default function ContentCreatorDashboard() {
       .sort((a, b) => b.count - a.count);
     
     setDifficultyBreakdown(typeData);
-  }, [selectedTypeGrade, allQuestions]);
+  }, [filters, allQuestions]);
+
+  // Extract unique subjects from questions
+  useEffect(() => {
+    if (allQuestions.length === 0) return;
+    
+    const uniqueSubjects = [...new Set(allQuestions.map(q => q.subject).filter(Boolean))].sort();
+    setAvailableSubjects(uniqueSubjects);
+  }, [allQuestions]);
 
   // Optional: Refetch data periodically (only if needed)
   // Removed aggressive refetch on window focus to prevent loading flicker
@@ -206,13 +206,15 @@ export default function ContentCreatorDashboard() {
       });
       setAvailableGrades(uniqueGrades);
 
+      // Extract unique subjects
+      const uniqueSubjects = [...new Set(questions.map(q => q.subject).filter(Boolean))].sort();
+      setAvailableSubjects(uniqueSubjects);
+
       // Store all questions for later filtering
       setAllQuestions(questions);
 
-      // Filter questions by selected grade for difficulty calculation
-      const filteredQuestions = selectedDifficultyGrade === 'overall' 
-        ? questions 
-        : questions.filter(q => normalizeGrade(q.grade) === selectedDifficultyGrade);
+      // Filter questions based on current filters
+      const filteredQuestions = questions;
 
       // Calculate difficulty distribution for pie chart
       const difficultyCounts: { [key: string]: number } = { Easy: 0, Medium: 0, Hard: 0 };
@@ -300,20 +302,20 @@ export default function ContentCreatorDashboard() {
     <div className="flex min-h-screen bg-white">
       <Sidebar userRole="Content Creator" currentPage="dashboard" open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
       
-      <div className="flex-1 xl:ml-[256px] min-w-0">
+      <div className="flex-1 lg:ml-[256px] min-w-0">
         {/* Header */}
         <div className="bg-white border-b border-gray-200 px-7 py-5 flex items-center justify-between sticky top-0 z-10 shadow-sm">
           {/* Mobile Menu Button */}
           <button
             onClick={() => setSidebarOpen(true)}
-            className="xl:hidden min-w-[44px] min-h-[44px] w-12 h-12 flex items-center justify-center text-[#0B1F3B] hover:text-[#1F46D8] hover:bg-[#E8EEFF] rounded-xl transition-all duration-200"
+            className="lg:hidden min-w-[44px] min-h-[44px] w-12 h-12 flex items-center justify-center text-[#0B1F3B] hover:text-[#1F46D8] hover:bg-[#E8EEFF] rounded-xl transition-all duration-200"
             aria-label="Open menu"
           >
             <i className="ri-menu-line text-2xl"></i>
           </button>
 
           <div className="flex items-center justify-between gap-3 min-w-0 flex-1">
-            <h1 className="text-2xl font-bold text-[#1F46D8] truncate">
+            <h1 className="text-2xl font-bold text-[#1F46D8] truncate font-gibson-semibold">
               Content Creator Dashboard
             </h1>
             {/* Profile Section */}
@@ -409,12 +411,68 @@ export default function ContentCreatorDashboard() {
             </div>
           </div>
 
+          {/* Centralized Filter Panel */}
+          <div className="bg-white border-2 border-[#1F46D8] rounded-[20px] p-5 mb-5">
+            <div className="flex items-center gap-4 flex-wrap">
+              <h3 className="text-lg font-semibold text-[#1F46D8] flex items-center gap-2">
+                <i className="ri-filter-3-line"></i>
+                Filters
+              </h3>
+              
+              {/* Subject Filter */}
+              <div className="flex items-center gap-2">
+                <label className="text-sm font-medium text-gray-700">Subject:</label>
+                <select
+                  value={filters.subject}
+                  onChange={(e) => setFilters({...filters, subject: e.target.value})}
+                  className="px-3 py-2 text-sm border border-[#1F46D8] rounded-xl focus:ring-2 focus:ring-[#1F46D8] focus:border-transparent bg-white text-[#1F46D8] hover:border-[#2148D8] transition-colors cursor-pointer"
+                >
+                  <option value="all">All Subjects</option>
+                  {availableSubjects.map(subject => (
+                    <option key={subject} value={subject}>{subject}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Grade Filter */}
+              <div className="flex items-center gap-2">
+                <label className="text-sm font-medium text-gray-700">Grade:</label>
+                <select
+                  value={filters.grade}
+                  onChange={(e) => setFilters({...filters, grade: e.target.value})}
+                  className="px-3 py-2 text-sm border border-[#1F46D8] rounded-xl focus:ring-2 focus:ring-[#1F46D8] focus:border-transparent bg-white text-[#1F46D8] hover:border-[#2148D8] transition-colors cursor-pointer"
+                >
+                  <option value="all">All Grades</option>
+                  {availableGrades.map(grade => (
+                    <option key={grade} value={grade}>Grade {grade}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Clear Filters Button */}
+              {(filters.subject !== 'all' || filters.grade !== 'all') && (
+                <button
+                  onClick={() => setFilters({subject: 'all', grade: 'all'})}
+                  className="px-4 py-2 text-sm bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl transition-colors flex items-center gap-2"
+                >
+                  <i className="ri-close-circle-line"></i>
+                  Clear Filters
+                </button>
+              )}
+
+              {/* Filter Status Indicator */}
+              <div className="ml-auto text-sm text-gray-600">
+                Showing <span className="font-bold text-[#1F46D8]">{getFilteredQuestions().length}</span> of <span className="font-bold">{allQuestions.length}</span> questions
+              </div>
+            </div>
+          </div>
+
           {/* ROW 3: Charts Row */}
-          <div className="grid grid-cols-12 gap-5 mb-5">
+          <div className="grid grid-cols-12 gap-5">
             {/* Left: Question Creation Trend - Columns 1-8 */}
-            <div className="col-span-12 lg:col-span-8 flex flex-col gap-5">
+            <div className="col-span-12 lg:col-span-8 flex flex-col gap-5 h-full">
               {/* Question Creation Trend */}
-              <div className="bg-[#FFFEE0] border-2 border-[#1F46D8] rounded-[20px] p-5">
+              <div className="bg-[#FFFEE0] border-2 border-[#1F46D8] rounded-[20px] p-5 flex-shrink-0">
                 <div className="flex items-center gap-3 mb-4">
                   <h3 className="text-lg font-semibold text-[#1F46D8]">Question Creation Trend</h3>
                 </div>
@@ -439,26 +497,12 @@ export default function ContentCreatorDashboard() {
               </div>
 
               {/* Question Type Distribution */}
-              <div className="bg-[#FFFEE0] border-2 border-[#1F46D8] rounded-[20px] p-5 flex-1">
+              <div className="bg-[#FFFEE0] border-2 border-[#1F46D8] rounded-[20px] p-5 flex-1 flex flex-col min-h-0">
                 <div className="flex items-center justify-between mb-4">
-                  <div className="flex items-center gap-3">
-                    <h3 className="text-lg font-semibold text-[#1F46D8]">Question Type Distribution</h3>
-                  </div>
-                  
-                  {/* Grade Filter Dropdown */}
-                  <select
-                    value={selectedTypeGrade}
-                    onChange={(e) => setSelectedTypeGrade(e.target.value)}
-                    className="px-3 py-1.5 text-sm border border-[#1F46D8] rounded-xl focus:ring-2 focus:ring-[#1F46D8] focus:border-transparent bg-white text-[#1F46D8] hover:border-[#1F46D8] transition-colors cursor-pointer"
-                  >
-                    <option value="overall">All Grades</option>
-                    {availableGrades.map(grade => (
-                      <option key={grade} value={grade}>Grade {grade}</option>
-                    ))}
-                  </select>
+                  <h3 className="text-lg font-semibold text-[#1F46D8]">Question Type Distribution</h3>
                 </div>
-                <div className="w-full overflow-hidden flex-1">
-                  <ResponsiveContainer width="100%" height="100%" minHeight={200}>
+                <div className="w-full flex-1 min-h-[300px]">
+                  <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={difficultyBreakdown}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
                     <XAxis dataKey="level" stroke="#6B7280" style={{ fontSize: '12px' }} />
@@ -479,26 +523,12 @@ export default function ContentCreatorDashboard() {
             </div>
 
             {/* Right: Questions by Difficulty - Columns 9-12 */}
-            <div className="col-span-12 lg:col-span-4 bg-[#E8EEFF] border-2 border-[#1F46D8] rounded-[20px] p-5 flex flex-col">
-                <div className="flex items-center justify-between mb-4">
-                  <div className="flex items-center gap-3">
-                    <h3 className="text-lg font-semibold text-[#1F46D8]">Questions by Difficulty</h3>
-                  </div>
-                  
-                  {/* Grade Filter Dropdown */}
-                  <select
-                    value={selectedDifficultyGrade}
-                    onChange={(e) => setSelectedDifficultyGrade(e.target.value)}
-                    className="px-3 py-1.5 text-sm border border-[#1F46D8] rounded-xl focus:ring-2 focus:ring-[#1F46D8] focus:border-transparent bg-white text-[#1F46D8] hover:border-[#1F46D8] transition-colors cursor-pointer"
-                  >
-                    <option value="overall">All Grades</option>
-                    {availableGrades.map(grade => (
-                      <option key={grade} value={grade}>Grade {grade}</option>
-                    ))}
-                  </select>
+            <div className="col-span-12 lg:col-span-4 bg-[#E8EEFF] border-2 border-[#1F46D8] rounded-[20px] p-5 flex flex-col min-h-[600px]">
+                <div className="flex items-center justify-between mb-4 flex-shrink-0">
+                  <h3 className="text-lg font-semibold text-[#1F46D8]">Questions by Difficulty</h3>
                 </div>
-                <div className="w-full overflow-hidden flex-1 flex items-center justify-center">
-                  <ResponsiveContainer width="100%" height="100%" minHeight={350}>
+                <div className="w-full flex-1 flex items-center justify-center min-h-0">
+                  <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
                     <Pie
                       data={subjectDistribution}
@@ -517,7 +547,7 @@ export default function ContentCreatorDashboard() {
                   </PieChart>
                 </ResponsiveContainer>
                 </div>
-                <div className="mt-4 space-y-2">
+                <div className="mt-4 space-y-2 flex-shrink-0">
                   {subjectDistribution.map((difficulty, index) => {
                     const total = subjectDistribution.reduce((sum, item) => sum + item.count, 0);
                     const percentage = total > 0 ? Math.round((difficulty.count / total) * 100) : 0;

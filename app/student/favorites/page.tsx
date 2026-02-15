@@ -159,7 +159,7 @@ export default function LeaderboardPage() {
           >
             <i className="ri-menu-line text-2xl"></i>
           </button>
-          <h1 className="text-lg sm:text-xl lg:text-2xl font-bold text-purple-600">Leaderboard</h1>
+          <h1 className="text-lg sm:text-xl lg:text-2xl font-bold text-purple-600 font-gibson-semibold">Leaderboard</h1>
         </div>
 
         {/* Main Content */}

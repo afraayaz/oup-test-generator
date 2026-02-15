@@ -134,7 +134,7 @@ function TeacherCreateIndividualQuestionPageContent() {
                 />
               </svg>
             </button>
-            <h1 className="text-lg sm:text-2xl font-bold text-gray-900">Create Question</h1>
+            <h1 className="text-lg sm:text-2xl font-bold text-gray-900 font-gibson-semibold">Create Question</h1>
             <div className="w-10" />
           </div>
         </div>

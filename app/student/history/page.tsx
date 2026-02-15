@@ -40,7 +40,7 @@ export default function QuizHistoryPage() {
             <i className="ri-menu-line text-2xl"></i>
           </button>
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">Quiz History</h1>
+            <h1 className="text-2xl font-bold text-gray-900 font-gibson-semibold">Quiz History</h1>
             <p className="text-sm text-gray-600">Review your past quiz performances and retake quizzes.</p>
           </div>
         </div>

@@ -318,14 +318,6 @@ export default function Sidebar({
                 </div>
               )}
             </div>
-            <button
-              onClick={() => setIsCollapsed(!isCollapsed)}
-              className="hidden lg:flex min-h-[44px] min-w-[44px] items-center justify-center rounded-xl hover:bg-white/10 transition-all duration-200 cursor-pointer"
-            >
-              <i
-                className={`ri-menu-${isCollapsed ? "unfold" : "fold"}-line text-[#FFFFFF] text-xl`}
-              ></i>
-            </button>
           </div>
         </div>
 

@@ -119,7 +119,7 @@ export default function MyQuestions() {
             >
               <i className="ri-menu-line text-2xl"></i>
             </button>
-            <h1 className="text-lg sm:text-xl lg:text-2xl font-bold text-teal-600">My Submitted Questions</h1>
+            <h1 className="text-lg sm:text-xl lg:text-2xl font-bold text-teal-600 font-gibson-semibold">My Submitted Questions</h1>
           </div>
 
           {/* Stats Cards */}

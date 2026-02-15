@@ -41,7 +41,7 @@ function TeacherCreateQuestionPageContent() {
       <Sidebar userRole="Teacher" currentPage="create" open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
 
       {/* Main Content */}
-      <div className="fixed top-0 right-0 bottom-0 left-0 lg:left-64 flex flex-col overflow-hidden">
+      <div className="fixed top-0 right-0 bottom-0 left-0 xl:left-64 flex flex-col overflow-hidden">
         {/* Header with Toggle */}
         <div className="bg-white border-b border-gray-200 sticky top-0 z-10 flex-shrink-0">
           <div className="flex items-center justify-between px-4 sm:px-6 py-3 sm:py-4">
@@ -63,7 +63,7 @@ function TeacherCreateQuestionPageContent() {
                 />
               </svg>
             </button>
-            <h1 className="text-lg sm:text-2xl font-bold text-gray-900">
+            <h1 className="text-lg sm:text-2xl font-bold text-gray-900 font-gibson-semibold">
               {mode === 'create' ? 'Create Questions' : 'My Question Bank'}
             </h1>
             

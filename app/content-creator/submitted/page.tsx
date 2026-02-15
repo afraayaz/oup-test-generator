@@ -23,7 +23,7 @@ export default function SubmittedPage() {
       <div className="flex-1 lg:ml-[256px]">
         {/* Header */}
         <div className="bg-white border-b border-gray-200 px-4 sm:px-6 lg:px-8 py-6 flex items-center justify-center sticky top-0 z-10">
-          <h1 className="text-2xl font-bold text-blue-600">Question Submitted</h1>
+          <h1 className="text-2xl font-bold text-blue-600 font-gibson-semibold">Question Submitted</h1>
         </div>
 
         {/* Main Content */}

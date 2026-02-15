@@ -224,7 +224,7 @@ export default function DashboardClient({ initialQuizHistory, initialUpcomingQui
           >
             <i className="ri-menu-line text-2xl"></i>
           </button>
-          <h1 className="text-lg sm:text-xl lg:text-2xl font-bold text-purple-600">Student Dashboard</h1>
+          <h1 className="text-lg sm:text-xl lg:text-2xl font-bold text-purple-600 font-gibson-semibold">Student Dashboard</h1>
           <div className="w-11 h-11"></div>
         </div>
 

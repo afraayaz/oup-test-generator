@@ -379,7 +379,7 @@ export default function AdminDashboard() {
             <i className="ri-menu-line text-2xl"></i>
           </button>
 
-          <h1 className="text-lg sm:text-xl lg:text-2xl font-bold text-blue-600">Admin Dashboard</h1>
+          <h1 className="text-lg sm:text-xl lg:text-2xl font-bold text-blue-600 font-gibson-semibold">Admin Dashboard</h1>
         </div>
 
         {/* Main Content */}

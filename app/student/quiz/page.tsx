@@ -407,7 +407,7 @@ export default function QuizGeneratorPage() {
           >
             <i className="ri-menu-line text-2xl"></i>
           </button>
-          <h1 className="text-2xl font-bold text-gray-900">Generate Quiz</h1>
+          <h1 className="text-2xl font-bold text-gray-900 font-gibson-semibold">Generate Quiz</h1>
         </div>
 
         {!quizStarted && (

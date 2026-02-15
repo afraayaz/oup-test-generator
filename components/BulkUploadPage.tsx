@@ -459,7 +459,7 @@ export default function BulkUploadPage({
                 />
               </svg>
             </button>
-            <h1 className="text-lg sm:text-2xl font-bold text-gray-900">Bulk Upload Questions</h1>
+            <h1 className="text-lg sm:text-2xl font-bold text-gray-900 font-gibson-semibold">Bulk Upload Questions</h1>
             <div className="w-10" />
           </div>
         </div>

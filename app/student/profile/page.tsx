@@ -38,7 +38,7 @@ export default function ProfilePage() {
             <i className="ri-menu-line text-2xl"></i>
           </button>
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">Profile</h1>
+            <h1 className="text-2xl font-bold text-gray-900 font-gibson-semibold">Profile</h1>
             <p className="text-sm text-gray-600">View and update your personal information.</p>
           </div>
         </div>

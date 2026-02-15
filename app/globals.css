@@ -1,5 +1,30 @@
 @import url('https://cdnjs.cloudflare.com/ajax/libs/remixicon/4.5.0/remixicon.min.css');
 @import url('https://fonts.googleapis.com/css2?family=Noto+Nastaliq+Urdu:wght@400;500;600;700&display=swap');
+
+@font-face {
+  font-family: 'OUP Mehr Nastaliq';
+  src: url('/fonts/OUPMehrnastaliqbeta8-Regular.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Gibson';
+  src: url('/fonts/Gibson-SemiBold.ttf') format('truetype');
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Gibson Regular';
+  src: url('/fonts/Gibson-Regular.ttf') format('truetype');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -17,8 +42,33 @@ body {
     font-family: 'Jameel Noori Nastaleeq', 'Noto Nastaliq Urdu', serif;
   }
   
+  .font-oup-nastaliq {
+    font-family: 'OUP Mehr Nastaliq', 'Noto Nastaliq Urdu', serif;
+  }
+  
+  .font-gibson-semibold {
+    font-family: 'Gibson', sans-serif;
+    font-weight: 600;
+  }
+  
+  .font-gibson {
+    font-family: 'Gibson Regular', sans-serif;
+    font-weight: 400;
+  }
+  
   .animate-slide-in-right {
     animation: slideInRight 0.4s ease-out;
+  }
+}
+
+@layer base {
+  [dir="rtl"],
+  .urdu-text {
+    font-family: 'OUP Mehr Nastaliq', 'Noto Nastaliq Urdu', serif;
+  }
+  
+  h1, h2, h3, h4, h5, h6 {
+    font-family: 'Gibson Regular', sans-serif;
   }
 }
 

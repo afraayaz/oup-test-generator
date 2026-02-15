@@ -181,7 +181,7 @@ export default function TeacherQuizzesPage() {
         <div className="max-w-7xl mx-auto">
           {/* Header */}
           <div className="mb-6">
-            <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">My Quizzes</h1>
+            <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 font-gibson-semibold">My Quizzes</h1>
             <p className="text-gray-600 mt-1">View and manage all your quizzes</p>
           </div>
 

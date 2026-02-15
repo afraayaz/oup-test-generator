@@ -43,7 +43,7 @@ function ContentCreatorCreateQuestionPageContent() {
       <Sidebar userRole="Content Creator" currentPage="create" open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
 
       {/* Main Content */}
-      <div className="flex-1 xl:ml-[256px] min-w-0 flex flex-col">
+      <div className="flex-1 lg:ml-[256px] min-w-0 flex flex-col">
         {/* Header with Toggle */}
         <div className="bg-white border-b border-gray-200 sticky top-0 z-10 flex-shrink-0">
           <div className="flex items-center justify-between px-4 sm:px-6 py-3 sm:py-4">
@@ -65,7 +65,7 @@ function ContentCreatorCreateQuestionPageContent() {
                 />
               </svg>
             </button>
-            <h1 className="text-lg sm:text-2xl font-bold text-[#1F46D8]">
+            <h1 className="text-lg sm:text-2xl font-bold text-[#1F46D8] font-gibson-semibold">
               {mode === 'create' ? 'Create Questions' : mode === 'bank' ? 'My Question Bank' : 'Create Interactive Quiz'}
             </h1>
             

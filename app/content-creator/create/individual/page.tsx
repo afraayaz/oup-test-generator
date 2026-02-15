@@ -170,7 +170,7 @@ function CreateIndividualQuestionPageContent() {
       <Sidebar userRole="Content Creator" currentPage="create" open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
 
       {/* Main Content */}
-      <div className="flex-1 xl:ml-[256px] min-w-0 flex flex-col">
+      <div className="flex-1 lg:ml-[256px] min-w-0 flex flex-col">
         {/* Header */}
         <div className="bg-white border-b border-gray-200 sticky top-0 z-10 flex-shrink-0">
           <div className="flex items-center justify-between px-4 sm:px-6 py-3 sm:py-4">
@@ -192,7 +192,7 @@ function CreateIndividualQuestionPageContent() {
                 />
               </svg>
             </button>
-            <h1 className="text-lg sm:text-2xl font-bold text-gray-900">Create Question</h1>
+            <h1 className="text-lg sm:text-2xl font-bold text-gray-900 font-gibson-semibold">Create Question</h1>
             <div className="w-10" />
           </div>
         </div>

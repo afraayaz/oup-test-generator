@@ -123,7 +123,7 @@ export default function SchoolAdminQBPage() {
                 <i className="ri-menu-line text-2xl"></i>
               </button>
               <div>
-                <h1 className="text-3xl font-bold text-gray-800">Question Bank</h1>
+                <h1 className="text-3xl font-bold text-gray-800 font-gibson-semibold">Question Bank</h1>
                 <p className="text-gray-600 text-sm mt-1">Manage and organize your school's questions</p>
               </div>
             </div>

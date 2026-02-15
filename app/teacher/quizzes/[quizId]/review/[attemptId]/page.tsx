@@ -163,7 +163,7 @@ export default function ReviewResultsPage() {
               <Link href={`/teacher/quizzes/${quizId}`}>
                 <button className="text-purple-600 hover:text-purple-700 text-sm font-medium mb-1">← Back to Quiz</button>
               </Link>
-              <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Review Result</h1>
+              <h1 className="text-xl sm:text-2xl font-bold text-gray-900 font-gibson-semibold">Review Result</h1>
               <p className="text-sm text-gray-500">Quiz: {review.quizTitle} | Student: {review.studentName}</p>
             </div>
           </div>

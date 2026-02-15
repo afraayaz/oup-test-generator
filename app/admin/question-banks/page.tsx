@@ -256,7 +256,7 @@ export default function AdminQuestionBanksPage() {
     <div className="flex min-h-screen bg-gray-50">
       <Sidebar userRole="Admin" currentPage="question-banks" open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
 
-      <div className="flex-1 xl:ml-[256px] min-w-0 flex flex-col">
+      <div className="flex-1 lg:ml-[256px] min-w-0 flex flex-col">
         {/* Header */}
         <div className="bg-white border-b border-gray-200 px-4 sm:px-6 lg:px-8 py-4 sticky top-0 z-10 flex-shrink-0">
           <div className="flex items-center justify-between gap-3">
@@ -269,7 +269,7 @@ export default function AdminQuestionBanksPage() {
                 <i className="ri-menu-line text-2xl"></i>
               </button>
               <div>
-                <h1 className="text-2xl font-bold text-gray-800">All Question Banks</h1>
+                <h1 className="text-2xl font-bold text-gray-800 font-gibson-semibold">All Question Banks</h1>
                 <p className="text-gray-600 text-sm">Monitor and manage all question banks</p>
               </div>
             </div>

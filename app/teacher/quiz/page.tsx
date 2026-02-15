@@ -1728,14 +1728,14 @@ const QuizGeneration = () => {
           .name-field { min-height: 12px; }
           .question { margin-bottom: ${paperFormat.questionMarginBottom}px; page-break-inside: avoid; }
           .question-number { margin-bottom: 10px; overflow: hidden; display: flex; justify-content: space-between; align-items: center; }
-          .question-number-urdu { font-family: 'Noto Nastaliq Urdu', serif; direction: rtl; text-align: right; font-weight: 700; font-size: 19px; }
+          .question-number-urdu { font-family: 'OUP Mehr Nastaliq', serif; direction: rtl; text-align: right; font-weight: 700; font-size: 19px; }
           .question-number-marks { font-family: 'Calibri', 'Arial', sans-serif; direction: ltr; text-align: right; font-weight: 600; font-size: 14px; }
           .question-number-marks-urdu { font-family: 'Calibri', 'Arial', sans-serif; direction: ltr; text-align: left; font-weight: 600; font-size: 14px; }
           .question-number-english { font-family: 'Calibri', 'Arial', sans-serif; direction: ltr; text-align: left; font-weight: 600; font-size: 19px; }
           .question-text { font-family: '${paperFormat.questionFontFamily}', Georgia, serif; font-size: ${paperFormat.questionFontSize}px; margin-bottom: 14px; font-weight: 500; color: #1a1a1a; line-height: ${paperFormat.questionLineSpacing}; }
           .options { margin-bottom: 12px; }
           .option { margin-bottom: 6px; font-size: ${paperFormat.optionFontSize}px; font-family: '${paperFormat.optionFontFamily}', Georgia, serif; color: #2c3e50; line-height: 1.6; }
-          .urdu { font-family: 'Noto Nastaliq Urdu', serif; direction: rtl; text-align: right; margin-right: 20px; }
+          .urdu { font-family: 'OUP Mehr Nastaliq', serif; direction: rtl; text-align: right; margin-right: 20px; }
           mark { background-color: #fef08a; padding: 2px 4px; border-radius: 2px; }
           b, strong { font-weight: bold; }
           i, em { font-style: italic; }
@@ -1916,12 +1916,12 @@ const QuizGeneration = () => {
           .info { font-size: 14px; color: #6b7280; margin-bottom: 5px; }
           .answer { margin-bottom: 20px; }
           .answer-number { margin-bottom: 8px; overflow: hidden; display: flex; justify-content: space-between; align-items: center; }
-          .answer-number-urdu { font-family: 'Noto Nastaliq Urdu', sans-serif; direction: rtl; text-align: right; font-weight: bold; font-size: 18px; }
+          .answer-number-urdu { font-family: 'OUP Mehr Nastaliq', sans-serif; direction: rtl; text-align: right; font-weight: bold; font-size: 18px; }
           .answer-number-marks { font-family: Arial, sans-serif; direction: ltr; text-align: right; font-weight: bold; }
           .answer-number-marks-urdu { font-family: Arial, sans-serif; direction: ltr; text-align: left; font-weight: bold; }
           .answer-number-english { font-family: Arial, sans-serif; direction: ltr; text-align: left; font-weight: bold; font-size: 18px; }
           .answer-text { font-size: 16px; margin-bottom: 12px; }
-          .urdu { font-family: 'Noto Nastaliq Urdu', sans-serif; direction: rtl; text-align: right; }
+          .urdu { font-family: 'OUP Mehr Nastaliq', sans-serif; direction: rtl; text-align: right; }
           mark { background-color: #fef08a; padding: 2px 4px; border-radius: 2px; }
           b, strong { font-weight: bold; }
           i, em { font-style: italic; }
@@ -2239,7 +2239,7 @@ const QuizGeneration = () => {
                                 new TextRun({ 
                                   text: `سوال نمبر ${toUrduNumber(i + 1)} :`, 
                                   size: 24, 
-                                  font: 'Noto Nastaliq Urdu',
+                                  font: 'OUP Mehr Nastaliq',
                                   bold: true 
                                 })
                               ],
@@ -2298,7 +2298,7 @@ const QuizGeneration = () => {
                     new TextRun({ 
                       text: q.question.isRTL ? `سوال نمبر ${toUrduNumber(i + 1)} :` : `Question ${i + 1}:`, 
                       size: 28, 
-                      font: q.question.isRTL ? 'Noto Nastaliq Urdu' : 'Calibri',
+                      font: q.question.isRTL ? 'OUP Mehr Nastaliq' : 'Calibri',
                       bold: true,
                       color: '1a1a1a'
                     })
@@ -2315,7 +2315,7 @@ const QuizGeneration = () => {
               ).map(line => new Paragraph({
                 children: parseFormattedText(
                   line || ' ', // Use space for empty lines to preserve line breaks
-                  q.question.isRTL ? 'Noto Nastaliq Urdu' : paperFormat.questionFontFamily,
+                  q.question.isRTL ? 'OUP Mehr Nastaliq' : paperFormat.questionFontFamily,
                   paperFormat.questionFontSize * 2, // Convert to half-points (Word uses half-points)
                   '2c3e50',
                   q.question.isRTL
@@ -2397,7 +2397,7 @@ const QuizGeneration = () => {
                       // Parse formatting for the line content
                       const textRuns = parseFormattedText(
                         line || ' ',
-                        q.question.isRTL ? 'Noto Nastaliq Urdu' : paperFormat.optionFontFamily,
+                        q.question.isRTL ? 'OUP Mehr Nastaliq' : paperFormat.optionFontFamily,
                         paperFormat.optionFontSize * 2, // Convert to half-points
                         '2c3e50',
                         q.question.isRTL
@@ -2408,7 +2408,7 @@ const QuizGeneration = () => {
                         new TextRun({ 
                           text: prefix,
                           size: paperFormat.optionFontSize * 2, 
-                          font: q.question.isRTL ? 'Noto Nastaliq Urdu' : paperFormat.optionFontFamily,
+                          font: q.question.isRTL ? 'OUP Mehr Nastaliq' : paperFormat.optionFontFamily,
                           color: '2c3e50'
                         }),
                         ...textRuns
@@ -2433,7 +2433,7 @@ const QuizGeneration = () => {
                       children: [new TextRun({ 
                         text: formattedOption, 
                         size: 26, 
-                        font: q.question.isRTL ? 'Noto Nastaliq Urdu' : 'Cambria',
+                        font: q.question.isRTL ? 'OUP Mehr Nastaliq' : 'Cambria',
                         color: '2c3e50'
                       })],
                       alignment: q.question.isRTL ? AlignmentType.RIGHT : AlignmentType.LEFT,
@@ -2447,7 +2447,7 @@ const QuizGeneration = () => {
                       children: [new TextRun({ 
                         text: q.question.isRTL ? 'نیچے اپنا جواب لکھیں۔' : 'Write your answer below.', 
                         size: 26, 
-                        font: q.question.isRTL ? 'Noto Nastaliq Urdu' : 'Cambria',
+                        font: q.question.isRTL ? 'OUP Mehr Nastaliq' : 'Cambria',
                         color: '2c3e50'
                       })],
                       alignment: q.question.isRTL ? AlignmentType.RIGHT : AlignmentType.LEFT,
@@ -2561,7 +2561,7 @@ const QuizGeneration = () => {
                   <i className="ri-menu-line text-2xl"></i>
                 </button>
                 <div>
-                  <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-900 mb-1 sm:mb-2">Generate Quiz</h1>
+                  <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-900 mb-1 sm:mb-2 font-gibson-semibold">Generate Quiz</h1>
                   <p className="text-sm sm:text-base text-gray-600">QB: <span className="font-semibold">{selectedQB ? (selectedQB === 'both' ? 'Both Sources' : selectedQB.charAt(0).toUpperCase() + selectedQB.slice(1)) : 'Not Selected'}</span> | Format: <span className="font-semibold">{quizFormat || 'Not Selected'}</span></p>
                 </div>
                 {selectedQB && (

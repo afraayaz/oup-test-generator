@@ -63,7 +63,7 @@ export default function ModeratorDashboard() {
             <i className="ri-menu-line text-2xl"></i>
           </button>
 
-          <h1 className="text-lg sm:text-xl lg:text-2xl font-bold text-blue-600">Content Moderator Dashboard</h1>
+          <h1 className="text-lg sm:text-xl lg:text-2xl font-bold text-blue-600 font-gibson-semibold">Content Moderator Dashboard</h1>
         </div>
 
         {/* Main Content */}

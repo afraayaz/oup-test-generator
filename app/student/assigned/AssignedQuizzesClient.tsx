@@ -123,7 +123,7 @@ export default function AssignedQuizzesClient({ initialQuizzes }: Props) {
                 </svg>
               </button>
               <div>
-                <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Assigned Quizzes</h1>
+                <h1 className="text-xl sm:text-2xl font-bold text-gray-900 font-gibson-semibold">Assigned Quizzes</h1>
                 <p className="text-sm text-gray-500">View and attempt your assigned online quizzes</p>
               </div>
             </div>

@@ -543,7 +543,7 @@ export default function TeacherDashboard() {
             >
               <FiMenu size={24} />
             </button>
-            <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-800">
+            <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-800 font-gibson-semibold">
               Teacher Dashboard
             </h1>
           </div>

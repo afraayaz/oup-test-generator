@@ -175,7 +175,7 @@ export default function TeacherQuestionBankPage() {
                 <i className="ri-menu-line text-2xl"></i>
               </button>
               <div>
-                <h1 className="text-2xl font-bold text-gray-800">School Question Bank</h1>
+                <h1 className="text-2xl font-bold text-gray-800 font-gibson-semibold">School Question Bank</h1>
                 <p className="text-gray-600 text-sm">Browse questions assigned to your subjects and grades</p>
               </div>
             </div>

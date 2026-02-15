@@ -881,7 +881,7 @@ export default function CreateInteractiveQuiz() {
               >
                 <i className="ri-menu-line text-2xl"></i>
               </button>
-              <h1 className="text-lg sm:text-xl lg:text-2xl font-bold text-gray-900">Create Interactive Quiz</h1>
+              <h1 className="text-lg sm:text-xl lg:text-2xl font-bold text-gray-900 font-gibson-semibold">Create Interactive Quiz</h1>
             </div>
             <div className="flex items-center gap-3">
               {showValidation && validationErrors.length > 0 && (

@@ -4,8 +4,8 @@ module.exports = {
   theme: {
     extend: {
       fontFamily: {
-        'noto-nastaliq': ['Noto Nastaliq Urdu', 'serif'],
-        'nastaleeq': ['Jameel Noori Nastaleeq', 'Noto Nastaliq Urdu', 'serif'],
+        'noto-nastaliq': ['OUP Mehr Nastaliq', 'Noto Nastaliq Urdu', 'serif'],
+        'nastaleeq': ['OUP Mehr Nastaliq', 'Jameel Noori Nastaleeq', 'Noto Nastaliq Urdu', 'serif'],
       },
     },
   },
