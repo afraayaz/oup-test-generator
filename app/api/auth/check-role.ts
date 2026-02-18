@@ -23,7 +23,6 @@ export async function POST(request: Request) {
     });
 
     if (!response.ok) {
-      console.log(`User document not found for ${uid}`);
       return NextResponse.json(
         { role: null, message: 'User not found in database' },
         { status: 200 }
@@ -38,7 +37,6 @@ export async function POST(request: Request) {
       { status: 200 }
     );
   } catch (error) {
-    console.error('Error checking user role:', error);
     return NextResponse.json(
       { error: 'Failed to check user role' },
       { status: 500 }

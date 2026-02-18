@@ -82,7 +82,6 @@ export default function AdminDashboard() {
 
         setLoading(false);
       } catch (error) {
-        console.error('Error fetching dashboard stats:', error);
         setLoading(false);
         // Keep showing static data if fetch fails
       }
@@ -170,7 +169,6 @@ export default function AdminDashboard() {
 
         setChartData(growthData);
       } catch (error) {
-        console.error('Error fetching platform growth data:', error);
       }
     };
 
@@ -210,7 +208,6 @@ export default function AdminDashboard() {
               bookwiseBreakdown
             };
           } catch (error) {
-            console.error(`Error fetching data for subject ${subject.name}:`, error);
             return {
               name: subject.name || subject,
               value: 0,
@@ -224,7 +221,6 @@ export default function AdminDashboard() {
 
         setContentPipelineData(subjectData.filter(s => s.value > 0 || s.questionsAvailable > 0));
       } catch (error) {
-        console.error('Error fetching subject-wise content:', error);
       }
     };
 
@@ -298,7 +294,6 @@ export default function AdminDashboard() {
 
         setRecentActivities(activities.slice(0, 8));
       } catch (error) {
-        console.error('Error fetching recent activities:', error);
       }
     };
 
@@ -326,11 +321,9 @@ export default function AdminDashboard() {
   ]);
 
   const handleApprove = (id: number) => {
-    console.log('Approved:', id);
   };
 
   const handleReject = (id: number) => {
-    console.log('Rejected:', id);
   };
 
   // Show loading while checking authentication

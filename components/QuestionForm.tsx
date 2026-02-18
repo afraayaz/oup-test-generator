@@ -95,9 +95,7 @@ export default function QuestionForm({
 
   // Initialize with defaults
   useEffect(() => {
-    console.log('📋 QuestionForm defaults:', { defaultGrade, defaultSubject, defaultBook });
     if (defaultGrade || defaultSubject || defaultBook) {
-      console.log('✅ Setting form defaults');
       setFormData((prev) => ({
         ...prev,
         grade: defaultGrade || "",
@@ -105,7 +103,6 @@ export default function QuestionForm({
         book: defaultBook || "",
       }));
     } else {
-      console.log('⚠️ No defaults provided');
     }
   }, [defaultGrade, defaultSubject, defaultBook, grades, subjects, submittedBooks]);
 
@@ -129,22 +126,12 @@ export default function QuestionForm({
         );
         
         if (!selectedBook || !selectedBook.id) {
-          console.warn('⚠️ Book not found or missing ID:', formData.book);
-          console.log('📚 Available books:', submittedBooks.map(b => ({ title: b.title, id: b.id, grade: b.grade })));
           setAvailableChapters([]);
           return;
         }
 
-        console.log('📚 Fetching chapters with:', {
-          bookId: selectedBook.id,
-          bookTitle: selectedBook.title,
-          bookGrade: selectedBook.grade,
-          subject: formData.subject
-        });
-
         // Call the chapters API - API will find subjectId from subject name
         const url = `/api/admin/chapters?subject=${encodeURIComponent(formData.subject)}&book=${encodeURIComponent(formData.book)}&bookId=${encodeURIComponent(selectedBook.id)}`;
-        console.log('📚 Fetching from:', url);
         
         const response = await fetch(url);
 
@@ -168,7 +155,6 @@ export default function QuestionForm({
           setAvailableChapters([]);
         }
       } catch (error) {
-        console.error('Error fetching chapters:', error);
         setAvailableChapters([]);
       } finally {
         setChaptersLoading(false);
@@ -380,17 +366,14 @@ export default function QuestionForm({
     try {
       // Upload image if one is selected
       if (imageFile && userId) {
-        console.log('📤 Starting image upload...', { fileName: imageFile.name, size: imageFile.size, userId });
         setImageUploading(true);
         setUploadProgress(0);
         try {
           const imageUrl = await uploadQuestionImage(imageFile, userId, (progress) => {
             setUploadProgress(progress);
           });
-          console.log('✅ Image uploaded successfully:', imageUrl);
           formData.imageUrl = imageUrl;
         } catch (error) {
-          console.error('❌ Image upload failed:', error);
           setImageUploading(false);
           setUploadProgress(0);
           const errorMessage = error instanceof Error ? error.message : "Failed to upload image. Please try again.";
@@ -400,7 +383,6 @@ export default function QuestionForm({
         setImageUploading(false);
         setUploadProgress(0);
       } else if (imageFile && !userId) {
-        console.warn('⚠️ Image file selected but no userId provided');
       }
 
       await onSubmit(formData);
@@ -412,13 +394,11 @@ export default function QuestionForm({
       
       setToast(null);
     } catch (error) {
-      console.error("Error in form submission:", error);
     }
   };
 
   const getAvailableBooks = () => {
     if (!submittedBooks || !formData.subject) {
-      console.log('📚 No books available - missing submittedBooks or subject');
       return [];
     }
     
@@ -428,13 +408,6 @@ export default function QuestionForm({
         const formSubject = formData.subject.toLowerCase().trim();
         const bookSubject = book.subject.toLowerCase().trim();
         return bookSubject === formSubject;
-      });
-      
-      console.log('📚 Filtering by subject only:', {
-        subject: formData.subject,
-        totalBooks: submittedBooks.length,
-        filteredBooks: filtered.length,
-        filtered: filtered.map(b => ({ title: b.title, grade: b.grade, subject: b.subject }))
       });
       
       return filtered;
@@ -450,12 +423,6 @@ export default function QuestionForm({
     const formGrade = normalizeGrade(formData.grade);
     const formSubject = formData.subject.toLowerCase().trim();
     
-    console.log('📚 Filtering books with:', { 
-      rawGrade: formData.grade, 
-      normalizedGrade: formGrade, 
-      subject: formSubject 
-    });
-    
     const filtered = submittedBooks.filter((book) => {
       const bookGrade = normalizeGrade(book.grade);
       const bookSubject = book.subject.toLowerCase().trim();
@@ -463,15 +430,7 @@ export default function QuestionForm({
       const gradeMatch = bookGrade === formGrade;
       const subjectMatch = bookSubject === formSubject;
       
-      console.log(`  Book: ${book.title} | Grade: "${book.grade}" (${bookGrade}) = ${gradeMatch} | Subject: "${book.subject}" = ${subjectMatch}`);
-      
       return gradeMatch && subjectMatch;
-    });
-    
-    console.log('📚 Filter result:', {
-      totalBooks: submittedBooks.length,
-      filteredBooks: filtered.length,
-      filtered: filtered.map(b => ({ title: b.title, grade: b.grade, subject: b.subject }))
     });
     
     return filtered;

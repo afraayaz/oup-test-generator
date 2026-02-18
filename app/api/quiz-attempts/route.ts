@@ -63,13 +63,6 @@ export async function POST(request: NextRequest) {
       let isCorrect = false;
       let attempted = false;
       
-      console.log(`[API] Processing question ${index}:`, {
-        type: item.questionType,
-        userAnswer,
-        correctAnswer: item.answer.value,
-        userAnswerType: typeof userAnswer,
-      });
-      
       // Determine if answer is correct based on question type
       if (item.questionType === 'multiple' || item.questionType === 'mcqs') {
         // Multiple choice - direct comparison
@@ -119,8 +112,6 @@ export async function POST(request: NextRequest) {
         attempted = false;
       }
 
-      console.log(`[API] Question ${index} result:`, { isCorrect, attempted });
-
       const cognitiveLevel = getQuestionCognitiveLevel(item);
 
       // Extract question text safely
@@ -142,13 +133,6 @@ export async function POST(request: NextRequest) {
       }
 
       if (index < 2) {
-        console.log(`[API] Question ${index}:`, {
-          cognitiveLevel,
-          questionType: item.questionType,
-          userAnswer,
-          correctAnswerValue: item.answer.value,
-          isCorrect,
-        });
       }
 
       return {
@@ -196,12 +180,6 @@ export async function POST(request: NextRequest) {
       );
     });
 
-    console.log('[API] Final Results:', {
-      totalQuestions: questionResults.length,
-      cognitiveBreakdown,
-      sample: questionResults.slice(0, 2),
-    });
-
     // Save to Firestore using SDK
     const attemptsRef = collection(db, 'quizAttempts');
     const attemptDoc = await addDoc(attemptsRef, {
@@ -234,7 +212,6 @@ export async function POST(request: NextRequest) {
       { status: 200 }
     );
   } catch (error) {
-    console.error('Error saving quiz attempt:', error);
     return NextResponse.json(
       { error: 'Failed to save quiz attempt', details: error instanceof Error ? error.message : 'Unknown error' },
       { status: 500 }

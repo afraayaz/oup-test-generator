@@ -54,7 +54,6 @@ async function getAssignedQuizzes(studentId: string) {
     const assignmentsResponse = await fetch(assignmentsUrl, { cache: 'no-store' });
     
     if (!assignmentsResponse.ok) {
-      console.error('Failed to fetch assignments:', assignmentsResponse.status);
       return [];
     }
     
@@ -141,7 +140,6 @@ async function getAssignedQuizzes(studentId: string) {
       })
       .filter((quiz: any) => quiz.quizFormat === 'Online');
   } catch (error) {
-    console.error('Error fetching assigned quizzes:', error);
     return [];
   }
 }

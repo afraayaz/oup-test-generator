@@ -68,12 +68,10 @@ export default function ReviewQueue() {
         setQuestions(data.questions || []);
         setUserSubjects(data.userSubjects || []);
       } else {
-        console.error('Failed to fetch questions');
         setQuestions([]);
         setConnectionError('Failed to load questions. Please refresh to try again.');
       }
     } catch (error: any) {
-      console.error('Error fetching questions:', error);
       setQuestions([]);
       
       if (error.name === 'AbortError') {
@@ -134,7 +132,6 @@ export default function ReviewQueue() {
         alert(error.error || 'Failed to process request');
       }
     } catch (error: any) {
-      console.error('Error processing action:', error);
       
       if (error.message?.includes('timeout')) {
         alert('Request timed out. This may be due to network connectivity issues. The action might still be processed - please refresh to check the status.');

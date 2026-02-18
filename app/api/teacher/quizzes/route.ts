@@ -31,7 +31,6 @@ export async function GET(request: NextRequest) {
           const attemptsSnapshot = await getDocs(attemptsQuery);
           studentAttempts = attemptsSnapshot.docs.length;
         } catch (error) {
-          console.log('Error fetching attempts:', error);
         }
 
         // Get quiz assignments count for online quizzes
@@ -43,7 +42,6 @@ export async function GET(request: NextRequest) {
             const assignmentsSnapshot = await getDocs(assignmentsQuery);
             totalAssignments = assignmentsSnapshot.docs.length;
           } catch (error) {
-            console.log('Error fetching assignments:', error);
           }
         }
 
@@ -71,7 +69,6 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ quizzes }, { status: 200 });
   } catch (error) {
-    console.error('Error fetching teacher quizzes:', error);
     return NextResponse.json(
       { error: 'Failed to fetch quizzes' },
       { status: 500 }

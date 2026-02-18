@@ -28,10 +28,6 @@ export async function GET(request: NextRequest) {
     // Log sample question with image for debugging
     const questionsWithImages = questions.filter(q => q.imageUrl);
     if (questionsWithImages.length > 0) {
-      console.log('[OUP-API] Questions with images:', questionsWithImages.length, 'Sample:', {
-        id: questionsWithImages[0].id,
-        imageUrl: questionsWithImages[0].imageUrl
-      });
     }
 
     // Apply filters
@@ -47,7 +43,6 @@ export async function GET(request: NextRequest) {
       total: questions.length
     });
   } catch (error) {
-    console.error('Error fetching OUP questions:', error);
     return NextResponse.json({ error: 'Failed to fetch questions' }, { status: 500 });
   }
 }
@@ -68,17 +63,6 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-
-    console.log("[OUP-Creator] Received request body:", {
-      questionText: body.questionText,
-      question: body.question,
-      type: body.type,
-      hasOptions: !!body.options,
-      optionsLength: (body.options || []).length,
-      optionsContent: body.options,
-      allFields: Object.keys(body),
-      keys: Object.keys(body)
-    });
 
     // Normalize grade to always have "Grade " prefix for consistent matching
     let normalizedGrade = body.grade || "";
@@ -162,15 +146,6 @@ export async function POST(request: NextRequest) {
     const docRef = await addDoc(targetCollection, questionData);
 
     // Log for debugging
-    console.log(`[OUP-Creator] Question stored:`, {
-      id: docRef.id,
-      type: normalizedType,
-      questionText: questionData.question,
-      questionField: !!questionData.question,
-      hasOptions: normalizedType === "multiple" && (questionData.options || []).length > 0,
-      optionsLength: (questionData.options || []).length,
-      storedFields: Object.keys(questionData)
-    });
 
     // Update OUP stats
     await updateOUPStats(body.subject, body.grade, body.type, body.difficulty);
@@ -182,7 +157,6 @@ export async function POST(request: NextRequest) {
       needsApproval: false
     });
   } catch (error) {
-    console.error('Error adding OUP question:', error);
     return NextResponse.json({ error: 'Failed to add question' }, { status: 500 });
   }
 }
@@ -214,6 +188,5 @@ async function updateOUPStats(subject: string, grade: string, type: string, diff
     // Use setDoc with merge: true to create or update the document
     await setDoc(statsRef, stats, { merge: true });
   } catch (error) {
-    console.error('Error updating OUP stats:', error);
   }
 }

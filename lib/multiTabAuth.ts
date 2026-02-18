@@ -43,7 +43,6 @@ export const getAllSessions = (): TabSession[] => {
     const data = localStorage.getItem(SESSIONS_KEY);
     return data ? JSON.parse(data) : [];
   } catch (e) {
-    console.error('Error reading sessions:', e);
     return [];
   }
 };
@@ -85,7 +84,6 @@ export const saveTabSession = (user: any): void => {
       oldValue: null,
     }));
   } catch (e) {
-    console.error('Error saving session:', e);
   }
 };
 
@@ -109,7 +107,6 @@ export const clearTabSession = (): void => {
   try {
     localStorage.setItem(SESSIONS_KEY, JSON.stringify(filteredSessions));
   } catch (e) {
-    console.error('Error clearing session:', e);
   }
 };
 

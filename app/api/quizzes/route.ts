@@ -74,7 +74,6 @@ export async function GET() {
     
     return NextResponse.json({ quizzes });
   } catch (error: any) {
-    console.error('API route error:', error);
     return NextResponse.json(
       { error: 'Failed to fetch quizzes', details: error.message },
       { status: 500 }

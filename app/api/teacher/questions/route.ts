@@ -70,7 +70,6 @@ export async function GET(request: NextRequest) {
       questions: allQuestions,
     });
   } catch (error) {
-    console.error("Error fetching teacher questions:", error);
     return NextResponse.json(
       { error: "Failed to fetch questions" },
       { status: 500 }
@@ -86,8 +85,6 @@ export async function POST(request: NextRequest) {
     const userRole = request.headers.get("x-user-role");
     const schoolId = request.headers.get("x-school-id");
     const schoolName = request.headers.get("x-school-name");
-
-    console.log('📝 Teacher question POST:', { userId, userName, userRole, schoolId, schoolName });
 
     if (!userId) {
       return NextResponse.json(
@@ -136,21 +133,6 @@ export async function POST(request: NextRequest) {
                                  'Medium';
     
     // Log the question being saved
-    console.log('📝 Saving question to database:', {
-      type: body.type,
-      subject: body.subject,
-      grade: body.grade,
-      normalizedGrade,
-      book: body.book,
-      chapter: body.chapter,
-      slo: body.slo,
-      difficulty: body.difficulty,
-      questionText: body.questionText ? body.questionText.substring(0, 50) : 'MISSING',
-      hasOptions: body.type === 'multiple' && body.options && body.options.length > 0,
-      hasCorrectAnswer: !!body.correctAnswer,
-      schoolId,
-      path: `questions/schools/${schoolId}`
-    });
     
     const questionDoc = await addDoc(questionsRef, {
       type: body.type,
@@ -204,12 +186,8 @@ export async function POST(request: NextRequest) {
           stats.questionsByType[q.type] = (stats.questionsByType[q.type] || 0) + 1;
           stats.questionsByDifficulty[q.difficulty || 'Medium'] = (stats.questionsByDifficulty[q.difficulty || 'Medium'] || 0) + 1;
         });
-
-        console.log('💾 Updating stats at:', 'question-bank-stats/schools/' + schoolId, 'Total Questions:', stats.totalQuestions);
         await setDoc(statsRef, stats, { merge: true });
-        console.log('✅ Stats updated successfully');
       } catch (statsError) {
-        console.error("❌ Error updating school stats:", statsError);
       }
     }
 
@@ -219,7 +197,6 @@ export async function POST(request: NextRequest) {
       message: "Question created successfully",
     });
   } catch (error) {
-    console.error("Error creating question:", error);
     return NextResponse.json(
       { error: "Failed to create question" },
       { status: 500 }

@@ -45,7 +45,6 @@ export async function GET(request: NextRequest) {
       total: questions.length
     });
   } catch (error) {
-    console.error('Error fetching school questions:', error);
     return NextResponse.json({ error: 'Failed to fetch questions' }, { status: 500 });
   }
 }
@@ -116,7 +115,6 @@ export async function POST(request: NextRequest) {
       message: 'Question added to school question bank successfully'
     });
   } catch (error) {
-    console.error('Error adding school question:', error);
     return NextResponse.json({ error: 'Failed to add question' }, { status: 500 });
   }
 }
@@ -156,6 +154,5 @@ async function updateSchoolStats(schoolId: string, subject: string, grade: strin
       });
     }
   } catch (error) {
-    console.error('Error updating school stats:', error);
   }
 }

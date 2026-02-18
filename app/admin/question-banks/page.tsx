@@ -58,11 +58,8 @@ export default function AdminQuestionBanksPage() {
       const allBanks: QuestionBankStats[] = [];
 
       // Fetch school QBs - RECALCULATE stats from actual questions (not cached)
-      console.log('🔍 Fetching school stats from actual questions...');
       const schoolStatsRef = collection(db, 'school-stats');
       const schoolSnapshot = await getDocs(schoolStatsRef);
-      
-      console.log('📊 Found school documents:', schoolSnapshot.docs.length);
       
       // For each school, recalculate stats from actual questions
       for (const schoolDoc of schoolSnapshot.docs) {
@@ -73,8 +70,6 @@ export default function AdminQuestionBanksPage() {
           // Fetch actual questions for this school
           const questionsRef = collection(db, 'questions', 'schools', schoolId);
           const questionsSnapshot = await getDocs(questionsRef);
-          
-          console.log(`📌 School: ${schoolId} - Found ${questionsSnapshot.size} actual questions`);
           
           // Recalculate stats from actual questions
           const stats: any = {
@@ -95,8 +90,6 @@ export default function AdminQuestionBanksPage() {
             const difficulty = q.difficulty || 'Medium';
             stats.questionsByDifficulty[difficulty] = (stats.questionsByDifficulty[difficulty] || 0) + 1;
           });
-
-          console.log(`✅ Recalculated stats for ${schoolId}:`, stats);
           
           allBanks.push({
             schoolId: schoolId,
@@ -109,7 +102,6 @@ export default function AdminQuestionBanksPage() {
             lastUpdated: schoolData.lastUpdated,
           });
         } catch (error) {
-          console.error(`Error recalculating stats for school ${schoolId}:`, error);
           // Fall back to cached stats if calculation fails
           allBanks.push({
             schoolId: schoolId,
@@ -126,13 +118,10 @@ export default function AdminQuestionBanksPage() {
 
       // Fetch OUP QB
       try {
-        console.log('🔍 Fetching OUP stats from: question-bank-stats/oup');
         const oupStatsRef = doc(db, 'question-bank-stats', 'oup');
         const oupStats = await getDoc(oupStatsRef);
-        console.log('📊 OUP stats found:', !!oupStats.exists());
         if (oupStats.exists()) {
           const oupData = oupStats.data();
-          console.log('📌 OUP bank:', oupData);
           allBanks.unshift({
             schoolId: 'oup',
             bankName: 'OUP Question Bank',
@@ -144,13 +133,9 @@ export default function AdminQuestionBanksPage() {
           });
         }
       } catch (oupError) {
-        console.error('Error fetching OUP stats:', oupError);
       }
-
-      console.log('✅ Total banks fetched:', allBanks.length);
       setAllQBs(allBanks);
     } catch (error) {
-      console.error('Error fetching QBs:', error);
     }
     setLoading(false);
   };
@@ -182,7 +167,6 @@ export default function AdminQuestionBanksPage() {
 
       setBankQuestions(questions);
     } catch (error) {
-      console.error('Error fetching bank questions:', error);
     }
     setDetailsLoading(false);
   };
@@ -235,7 +219,6 @@ export default function AdminQuestionBanksPage() {
 
       setBankQuestions(questions);
     } catch (error) {
-      console.error('Error fetching bank questions:', error);
     }
     setDetailsLoading(false);
   };

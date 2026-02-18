@@ -41,7 +41,6 @@ export async function GET(request: Request) {
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error('Firestore error:', errorText);
       return NextResponse.json({ attempts: [] });
     }
 
@@ -76,7 +75,6 @@ export async function GET(request: Request) {
 
     return NextResponse.json({ attempts: sortedAttempts });
   } catch (error) {
-    console.error('Error fetching quiz attempts:', error);
     return NextResponse.json({ attempts: [] });
   }
 }

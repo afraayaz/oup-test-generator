@@ -77,11 +77,9 @@ export default function QuestionCreationModePage({
 
   // Fetch all books from system (for content creators to see all books of their assigned subject)
   useEffect(() => {
-    console.log('🔄 QuestionCreationModePage mounted - starting system books fetch');
     const fetchSystemBooks = async () => {
       if (!user) return;
       
-      console.log('🔄 Fetching system books for CC assigned subjects...');
       try {
         // Extract unique subjects from assignedBooks
         const uniqueSubjects = new Set<string>();
@@ -94,10 +92,8 @@ export default function QuestionCreationModePage({
         }
         
         const userSubjects = Array.from(uniqueSubjects);
-        console.log('👤 CC assigned subjects (from books):', userSubjects);
         
         if (userSubjects.length === 0) {
-          console.log('⚠️ No subjects found in assignedBooks');
           return;
         }
         
@@ -109,7 +105,6 @@ export default function QuestionCreationModePage({
             if (booksResponse.ok) {
               const booksData = await booksResponse.json();
               const books = booksData.books || [];
-              console.log(`📚 Found ${books.length} books for ${subjectName}:`, books.map((b: any) => ({ id: b.id, title: b.title, grade: b.grade, subject: b.subject })));
               
               // Ensure each book has the subject field set
               const booksWithSubject = books.map((book: any) => ({
@@ -119,18 +114,13 @@ export default function QuestionCreationModePage({
               
               allBooks.push(...booksWithSubject);
             } else {
-              console.error(`❌ Failed to fetch books for ${subjectName}:`, booksResponse.status);
             }
           } catch (error) {
-            console.error(`Error fetching books for subject ${subjectName}:`, error);
           }
         }
         
-        console.log('✅ System books loaded:', allBooks.length, 'books');
-        console.log('📚 System books with subjects:', allBooks.map(b => ({ title: b.title, grade: b.grade, subject: b.subject })));
         setSystemBooks(allBooks);
       } catch (error) {
-        console.error('❌ Error fetching system books:', error);
       }
     };
 
@@ -166,7 +156,6 @@ export default function QuestionCreationModePage({
 
   // Fetch chapters when book is selected
   const fetchChaptersForBook = async (bookId: string, subject: string) => {
-    console.log('📖 Fetching chapters for book:', { bookId, subject });
     try {
       // First, find the subject ID for this book
       const subjectsResponse = await fetch(
@@ -174,7 +163,6 @@ export default function QuestionCreationModePage({
       );
       
       if (!subjectsResponse.ok) {
-        console.error('❌ Failed to fetch subjects for chapter lookup');
         return;
       }
       
@@ -186,13 +174,11 @@ export default function QuestionCreationModePage({
         const subjectName = subjectDoc.fields?.name?.stringValue || '';
         if (subjectName.toLowerCase() === subject.toLowerCase()) {
           foundSubjectId = subjectDoc.name.split('/').pop();
-          console.log('✅ Found subject ID:', foundSubjectId, 'for subject:', subject);
           break;
         }
       }
       
       if (!foundSubjectId) {
-        console.error('❌ No subject ID found for:', subject);
         return;
       }
       
@@ -200,19 +186,15 @@ export default function QuestionCreationModePage({
       
       // Now fetch chapters for this book
       const chaptersUrl = `/api/admin/books/chapters?bookId=${bookId}&subjectId=${foundSubjectId}`;
-      console.log('📖 Fetching chapters from:', chaptersUrl);
       const chaptersResponse = await fetch(chaptersUrl);
       
       if (chaptersResponse.ok) {
         const data = await chaptersResponse.json();
-        console.log('✅ Chapters fetched:', data.chapters?.length || 0, 'chapters');
         setChapters(data.chapters || []);
       } else {
-        console.error('❌ Failed to fetch chapters:', chaptersResponse.status);
         setChapters([]);
       }
     } catch (error) {
-      console.error('❌ Error fetching chapters:', error);
       setChapters([]);
     }
   };
@@ -226,7 +208,6 @@ export default function QuestionCreationModePage({
       // CONTENT CREATORS: Hard code grades 1-8
       if (userRole === "Content Creator") {
         const hardcodedGrades = ['1', '2', '3', '4', '5', '6', '7', '8'];
-        console.log('✅ Content Creator - Hard coded grades:', hardcodedGrades);
         return hardcodedGrades;
       }
       
@@ -235,7 +216,6 @@ export default function QuestionCreationModePage({
         const grades = user.subjectGradePairs
           .map((pair: any) => pair.grade)
           .filter((value: any, index: number, self: any) => self.indexOf(value) === index);
-        console.log('✅ Teacher - Grades from subjectGradePairs:', grades);
         return grades.sort();
       }
       
@@ -244,22 +224,14 @@ export default function QuestionCreationModePage({
         const grades = user.assignedBooks
           .map((book: any) => book.grade)
           .filter((value: any, index: number, self: any) => self.indexOf(value) === index);
-        console.log('✅ Teacher - Grades from assignedBooks:', grades);
         return grades.sort();
       }
       
       // Last resort: use assignedGrades if available
       if (user?.assignedGrades && user.assignedGrades.length > 0) {
-        console.log('✅ Teacher - Grades from assignedGrades:', user.assignedGrades);
         return [...user.assignedGrades].sort();
       }
       
-      console.log('⚠️ No grades found in user data:', {
-        userRole,
-        hasSubjectGradePairs: !!user?.subjectGradePairs?.length,
-        hasAssignedBooks: !!user?.assignedBooks?.length,
-        hasAssignedGrades: !!user?.assignedGrades?.length,
-      });
       return [];
     };
   }, [userRole, user?.subjectGradePairs, user?.assignedBooks, user?.assignedGrades]);
@@ -318,15 +290,6 @@ export default function QuestionCreationModePage({
         subjects = [...user.subjects];
       }
       
-      console.log("Debug getAvailableSubjects:", {
-        formGrade: formData.grade,
-        normalizedGrade: formData.grade ? (formData.grade.replace(/^(Grade|Class)\s+/i, '').trim()) : "none",
-        hasSubjectGradePairs: !!user?.subjectGradePairs?.length,
-        hasAssignedBooks: !!user?.assignedBooks?.length,
-        hasSubjects: !!user?.subjects?.length,
-        returnedSubjects: subjects
-      });
-      
       return subjects.sort();
     };
   }, [formData.grade, user?.subjectGradePairs, user?.assignedBooks, user?.subjects]);
@@ -344,78 +307,53 @@ export default function QuestionCreationModePage({
       
       // Must have at least a subject selected
       if (!formData.subject) {
-        console.log('📚 No subject selected');
         return [];
       }
       
-      console.log('📚 Checking books with:', {
-        userRole,
-        hasSubjectGradePairs: !!user?.subjectGradePairs,
-        subjectGradePairsLength: user?.subjectGradePairs?.length,
-        hasAssignedBooks: !!user?.assignedBooks,
-        assignedBooksLength: user?.assignedBooks?.length,
-        formSubject: formData.subject,
-        formGrade: formData.grade
-      });
-      
       // Try subjectGradePairs first
       if (user?.subjectGradePairs && user.subjectGradePairs.length > 0) {
-        console.log('📚 Using subjectGradePairs');
         const matchingPairs = user.subjectGradePairs.filter(
           (pair: any) => pair.subject === formData.subject
         );
         
-        console.log('📚 Matching pairs for subject:', matchingPairs.length);
         
         if (formData.grade) {
           // Grade is selected: show books for this grade + subject only
           const selectedGradeNormalized = normalizeGrade(formData.grade);
-          console.log('📚 Looking for grade:', selectedGradeNormalized);
           const matchingPair = matchingPairs.find(
             (pair: any) => {
               const pairGradeNormalized = normalizeGrade(pair.grade);
-              console.log(`  Pair grade: "${pair.grade}" (${pairGradeNormalized}) === ${selectedGradeNormalized}? ${pairGradeNormalized === selectedGradeNormalized}`);
               return pairGradeNormalized === selectedGradeNormalized;
             }
           );
           if (matchingPair && matchingPair.assignedBooks) {
             books = matchingPair.assignedBooks;
-            console.log('📚 Found books from matching pair:', books.length);
           }
         } else if (userRole === "Content Creator") {
           // CONTENT CREATORS ONLY: No grade selected, show all books for this subject across all grades
           books = matchingPairs.flatMap((pair: any) => pair.assignedBooks || []);
-          console.log('📚 Content Creator - showing all books for subject:', books.length);
         }
         // TEACHERS: require grade to be selected (books will be empty if grade not selected)
       } 
       // Fallback to assignedBooks
       else if (user?.assignedBooks && user.assignedBooks.length > 0) {
-        console.log('📚 Using assignedBooks fallback');
-        console.log('📚 systemBooks loaded?', systemBooks.length, 'books');
         
         // FOR CONTENT CREATORS: Use systemBooks to show ALL books of their assigned subjects
         let booksToSearch = user.assignedBooks;
         if (userRole === "Content Creator" && systemBooks.length > 0) {
-          console.log('📚 Content Creator - using systemBooks');
           // Get all subjects the CC is assigned to
           const assignedSubjects = [...new Set(user.assignedBooks.map((b: any) => b.subject))];
-          console.log('📚 Assigned subjects:', assignedSubjects);
-          console.log('📚 All systemBooks:', systemBooks.map(b => ({ title: b.title, subject: b.subject, grade: b.grade })));
           
           // Filter systemBooks to only show books of their assigned subjects (case-insensitive)
           booksToSearch = systemBooks.filter((book: any) => {
             const hasMatch = assignedSubjects.some((subj: any) => {
               const subjLower = subj.toString().trim().toLowerCase();
               const bookSubjLower = book.subject?.toString().trim().toLowerCase();
-              console.log(`  Comparing: "${subjLower}" === "${bookSubjLower}" ? ${subjLower === bookSubjLower}`);
               return subjLower === bookSubjLower;
             });
             return hasMatch;
           });
-          console.log('📚 System books for assigned subjects:', booksToSearch.length);
         } else {
-          console.log('📚 NOT using systemBooks - userRole:', userRole, 'systemBooks.length:', systemBooks.length);
         }
         
         const booksForSubject = booksToSearch.filter((book: any) => {
@@ -424,17 +362,13 @@ export default function QuestionCreationModePage({
           return bookSubject === selectedSubject;
         });
         
-        console.log('📚 Books matching subject:', booksForSubject.length);
-        console.log('📚 All books for subject:', booksForSubject.map((b: any) => ({ title: b.title, grade: b.grade })));
         
         if (formData.grade) {
           // Grade is selected: filter by both grade and subject
           const selectedGradeNormalized = normalizeGrade(formData.grade);
-          console.log('📚 Filtering by normalized grade:', selectedGradeNormalized);
           books = booksForSubject.filter((book: any) => {
             const bookGrade = normalizeGrade(book.grade.toString());
             const matches = bookGrade === selectedGradeNormalized;
-            console.log(`  Book: "${book.title}" | Grade: "${book.grade}" (normalized: "${bookGrade}") === "${selectedGradeNormalized}"? ${matches}`);
             return matches;
           });
         } else if (userRole === "Content Creator") {
@@ -448,14 +382,6 @@ export default function QuestionCreationModePage({
       const uniqueBooks = books.filter((book, index, self) => 
         index === self.findIndex(b => b.title === book.title)
       );
-      
-      console.log('📚 getAvailableBooks result:', {
-        userRole,
-        formGrade: formData.grade || 'not selected',
-        formSubject: formData.subject,
-        booksFound: uniqueBooks.length,
-        books: uniqueBooks.map(b => ({ title: b.title, grade: b.grade, subject: b.subject }))
-      });
       
       return uniqueBooks.sort((a, b) => a.title.localeCompare(b.title));
     };
@@ -495,15 +421,8 @@ export default function QuestionCreationModePage({
       }
       
       if (selectedBook) {
-        console.log('📚 Found book for bulk upload:', { 
-          title: selectedBook.title, 
-          id: selectedBook.id, 
-          grade: selectedBook.grade, 
-          subject: selectedBook.subject 
-        });
         fetchChaptersForBook(selectedBook.id, formData.subject);
       } else {
-        console.log('⚠️ No book found matching:', { title: book, subject: formData.subject, grade: formData.grade });
         setChapters([]);
       }
     } else {
@@ -646,8 +565,6 @@ export default function QuestionCreationModePage({
             setUploadMessage(
               `Error: Missing required columns 'Question', 'QuestionType', and 'Chapter'.\n\nFound columns: ${foundColumns || "none"}\n\nPlease ensure your file has headers in row 5 with column names like:\n'Question', 'QuestionType', 'Chapter', 'ChapterNo', 'OptionA', 'OptionB', 'OptionC', 'OptionD', 'CorrectAnswer', etc.`
             );
-            console.log("Column indices found:", columnIndices);
-            console.log("Header row:", headerRow);
             setIsUploading(false);
             return;
           }
@@ -751,18 +668,7 @@ export default function QuestionCreationModePage({
             
             // Log first few questions for debugging
             if (questions.length < 3) {
-              console.log(`📋 Bulk upload - Question ${i + 1}:`, {
-                type: questionObj.type,
-                subject: questionObj.subject,
-                grade: questionObj.grade,
-                book: questionObj.book,
-                chapter: questionObj.chapter,
-                slo: questionObj.slo,
-                difficulty: questionObj.difficulty,
-                questionText: questionObj.questionText.substring(0, 50),
-                options: questionObj.options.length,
-                correctAnswer: questionObj.correctAnswer
-              });
+              // Debug logging removed
             }
             
             questions.push(questionObj);
@@ -780,7 +686,6 @@ export default function QuestionCreationModePage({
 
           // Show warning if some rows had errors
           if (errors.length > 0) {
-            console.warn(`Skipped ${errors.length} rows with errors:`, errors);
           }
 
           // Upload each question to API
@@ -789,10 +694,6 @@ export default function QuestionCreationModePage({
           setTotalQuestions(questions.length);
           setUploadProgress(0);
 
-          console.log("📤 Starting bulk upload of", questions.length, "questions");
-          console.log("User object available:", user);
-          console.log("User keys:", Object.keys(user || {}));
-          console.log("First question sample:", questions[0]);
 
           for (let index = 0; index < questions.length; index++) {
             const question = questions[index];
@@ -805,7 +706,6 @@ export default function QuestionCreationModePage({
             await new Promise(resolve => setTimeout(resolve, 50));
             
             try {
-              console.log("📝 Sending question:", question);
               const response = await fetch(apiEndpoint, {
                 method: "POST",
                 headers: { 
@@ -827,15 +727,12 @@ export default function QuestionCreationModePage({
                 } catch (e) {
                   errorMsg = `HTTP ${response.status}: ${response.statusText}`;
                 }
-                console.warn(`❌ Upload failed for: "${question.questionText.substring(0, 50)}..." - ${errorMsg}`);
                 uploadErrors.push(`Q: "${question.questionText.substring(0, 50)}..." - ${errorMsg}`);
               } else {
-                console.log(`✅ Uploaded: "${question.questionText.substring(0, 50)}..."`);
                 successCount++;
               }
             } catch (uploadError) {
               const msg = uploadError instanceof Error ? uploadError.message : "Unknown error";
-              console.error(`❌ Error uploading: "${question.questionText.substring(0, 50)}..." - ${msg}`);
               uploadErrors.push(`Q: "${question.questionText.substring(0, 50)}..." - ${msg}`);
             }
           }

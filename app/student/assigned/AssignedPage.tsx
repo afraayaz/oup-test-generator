@@ -21,22 +21,17 @@ export default function AssignedPage() {
   useEffect(() => {
     const fetchAssignedQuizzes = async () => {
       if (!user?.uid) {
-        console.log('[ASSIGNED-PAGE] No user UID found');
         setLoading(false);
         return;
       }
-
-      console.log('[ASSIGNED-PAGE] Fetching quizzes for student UID:', user.uid);
 
       try {
         const response = await fetch(`/api/student/assigned-quizzes?studentId=${user.uid}`);
         if (response.ok) {
           const data = await response.json();
-          console.log('[ASSIGNED-PAGE] Received assignments:', data.assignments?.length);
           setQuizzes(data.assignments || []);
         }
       } catch (error) {
-        console.error('Error fetching assigned quizzes:', error);
       } finally {
         setLoading(false);
       }

@@ -21,7 +21,6 @@ export async function GET() {
     
     return NextResponse.json({ schools });
   } catch (error: any) {
-    console.error('API route error:', error);
     return NextResponse.json(
       { error: 'Failed to fetch schools', details: error.message },
       { status: 500 }
@@ -64,7 +63,6 @@ export async function POST(request: Request) {
       school: { id: docRef.id, ...schoolData } 
     });
   } catch (error: any) {
-    console.error('API route error:', error);
     return NextResponse.json(
       { error: 'Failed to create school', details: error.message },
       { status: 500 }

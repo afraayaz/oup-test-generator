@@ -135,7 +135,6 @@ export default function UsersClient({ initialUsers, schools, campuses }: Props) 
           setAvailableSubjects(subjectNames);
         }
       } catch (error) {
-        console.error('Error fetching subjects:', error);
       } finally {
         setLoadingSubjects(false);
       }
@@ -163,7 +162,6 @@ export default function UsersClient({ initialUsers, schools, campuses }: Props) 
         setAvailableBooks(prev => ({ ...prev, [subject]: data.books }));
       }
     } catch (error) {
-      console.error('Error fetching books:', error);
     } finally {
       setLoadingBooks(prev => ({ ...prev, [subject]: false }));
     }

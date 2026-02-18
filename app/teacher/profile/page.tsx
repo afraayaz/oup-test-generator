@@ -58,7 +58,6 @@ export default function TeacherProfile() {
   const savePersonalInfo = () => {
     setIsEditing(false);
     // Here you would typically save to backend
-    console.log('Saving personal info:', personalInfo);
   };
 
   const changePassword = () => {
@@ -71,7 +70,6 @@ export default function TeacherProfile() {
       return;
     }
     // Here you would typically update password via backend
-    console.log('Changing password');
     setShowPasswordModal(false);
     setPasswordData({ currentPassword: '', newPassword: '', confirmPassword: '' });
     alert('Password changed successfully!');

@@ -23,7 +23,6 @@ let isInitialized = false;
 // Initialize Firebase Admin SDK
 try {
   if (!admin.apps.length) {
-    console.log('🔍 Firebase Admin SDK initialization starting...');
     
     // Try to load from environment variables first
     let serviceAccount: admin.ServiceAccount | null = null;
@@ -34,9 +33,6 @@ try {
     const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
 
     if (privateKey && clientEmail) {
-      console.log('   ✓ Loading from environment variables');
-      console.log('   Project ID:', projectId);
-      console.log('   Client Email:', clientEmail);
       serviceAccount = {
         projectId,
         privateKey,
@@ -44,7 +40,6 @@ try {
       } as admin.ServiceAccount;
     } else {
       // Approach 2: Load from JSON file
-      console.log('   Attempting to load from service account JSON file...');
       const possiblePaths = [
         path.join(process.cwd(), 'quiz-app-ff0ab-firebase-adminsdk-fbsvc-e0fea7198d.json'),
         path.join(__dirname, '../quiz-app-ff0ab-firebase-adminsdk-fbsvc-e0fea7198d.json'),
@@ -52,7 +47,6 @@ try {
 
       for (const filePath of possiblePaths) {
         if (fs.existsSync(filePath)) {
-          console.log('   ✓ Found service account file at:', filePath);
           const fileContent = fs.readFileSync(filePath, 'utf8');
           serviceAccount = JSON.parse(fileContent) as admin.ServiceAccount;
           break;
@@ -66,21 +60,15 @@ try {
           credential: admin.credential.cert(serviceAccount),
         });
         isInitialized = true;
-        console.log('✅ Firebase Admin SDK initialized successfully');
       } catch (error: any) {
-        console.error('❌ Error initializing Firebase Admin SDK:', error.message);
-        console.error('   Details:', error);
         isInitialized = false;
       }
     } else {
-      console.warn('⚠️ Firebase Admin SDK credentials not found in environment variables or file');
     }
   } else {
-    console.log('ℹ️ Firebase Admin SDK already initialized');
     isInitialized = true;
   }
 } catch (error: any) {
-  console.error('❌ Firebase Admin SDK initialization error:', error.message);
   isInitialized = false;
 }
 
@@ -97,7 +85,6 @@ let useSecondaryDb = false;
 export async function initializeSecondaryFirebase() {
   try {
     if (process.env.FIREBASE_PROJECT_ID_2 && process.env.FIREBASE_PRIVATE_KEY_2 && process.env.FIREBASE_CLIENT_EMAIL_2) {
-      console.log('🔍 Initializing secondary Firebase Admin SDK...');
       const secondaryServiceAccount = {
         projectId: process.env.FIREBASE_PROJECT_ID_2,
         privateKey: process.env.FIREBASE_PRIVATE_KEY_2.replace(/\\n/g, '\n'),
@@ -107,12 +94,10 @@ export async function initializeSecondaryFirebase() {
       let secondaryApp;
       try {
         secondaryApp = admin.app('secondary');
-        console.log('ℹ️ Secondary Firebase app already exists, reusing it.');
       } catch (e) {
         secondaryApp = admin.initializeApp({
           credential: admin.credential.cert(secondaryServiceAccount),
         }, 'secondary');
-        console.log('✅ Secondary Firebase Admin SDK initialized');
       }
 
       secondaryDb = secondaryApp.firestore();
@@ -120,7 +105,6 @@ export async function initializeSecondaryFirebase() {
       return true;
     }
   } catch (error: any) {
-    console.warn('⚠️ Could not initialize secondary Firebase:', error.message);
   }
   return false;
 }
@@ -128,10 +112,8 @@ export async function initializeSecondaryFirebase() {
 // Wrapper to automatically fallback if primary quota is exceeded
 export async function getDb() {
   if (useSecondaryDb && secondaryDb) {
-    console.log('🔄 [FIREBASE] Using SECONDARY Firestore instance');
     return secondaryDb;
   }
-  console.log('🔄 [FIREBASE] Using PRIMARY Firestore instance');
   return db;
 }
 
@@ -147,18 +129,15 @@ export async function getAuth() {
 // Fallback handler - call this when you get a quota error
 export function switchToSecondaryFirebase() {
   if (secondaryDb) {
-    console.warn('⚠️ Switching to secondary Firebase account due to quota limit');
     useSecondaryDb = true;
     return true;
   } else {
-    console.error('❌ No secondary Firebase configured');
     return false;
   }
 }
 
 // Reset to primary Firebase
 export function resetToPrimaryFirebase() {
-  console.log('🔄 Resetting to primary Firebase account');
   useSecondaryDb = false;
 }
 
@@ -167,10 +146,8 @@ export async function deleteFirebaseUser(uid: string): Promise<boolean> {
   try {
     if (!auth) throw new Error('Firebase Admin SDK not initialized');
     await auth.deleteUser(uid);
-    console.log(`✅ Successfully deleted Firebase Auth user: ${uid}`);
     return true;
   } catch (error: any) {
-    console.error(`❌ Error deleting Firebase Auth user ${uid}:`, error.message);
     return false;
   }
 }
@@ -180,10 +157,8 @@ export async function setUserClaims(uid: string, claims: Record<string, any>): P
   try {
     if (!auth) throw new Error('Firebase Admin SDK not initialized');
     await auth.setCustomUserClaims(uid, claims);
-    console.log(`✅ Custom claims set for user ${uid}`);
     return true;
   } catch (error: any) {
-    console.error(`❌ Error setting custom claims for user ${uid}:`, error.message);
     return false;
   }
 }
@@ -203,14 +178,9 @@ export async function getUserByEmail(email: string) {
 }
 
 // Initialize secondary Firebase on app startup
-initializeSecondaryFirebase().catch(err => console.error('Failed to init secondary:', err));
 
 // Debug: Log initialization status
 if (typeof window === 'undefined') {
-  console.log('📋 Firebase Status:');
-  console.log('   Primary DB Initialized:', isInitialized);
-  console.log('   Secondary DB Available:', !!secondaryDb);
-  console.log('   Currently Using:', useSecondaryDb ? 'Secondary' : 'Primary');
 }
 
 // Global quota error handler wrapper
@@ -236,16 +206,13 @@ export async function withQuotaFallback<T>(
   } catch (error: any) {
     // If it's a quota error and we haven't switched yet, try secondary
     if (isQuotaError(error) && !useSecondaryDb && secondaryDb) {
-      console.warn('⚠️ Quota error detected, attempting fallback to secondary Firebase');
       switchToSecondaryFirebase();
       
       try {
         const backupDb = await getDb();
         const result = retryOperation ? await retryOperation(backupDb) : await operation(backupDb);
-        console.log('✅ Successfully completed operation on secondary Firebase');
         return result;
       } catch (retryError: any) {
-        console.error('❌ Secondary Firebase also failed:', retryError.message);
         // Reset to primary for next attempt
         resetToPrimaryFirebase();
         throw retryError;
@@ -271,21 +238,17 @@ export async function safeWrite<T>(
   try {
     const currentDb = await getDb();
     const result = await operation(currentDb);
-    console.log('✅ Write operation completed successfully');
     return result;
   } catch (error: any) {
     // If quota error and not already switched, try secondary
     if (isQuotaError(error) && !useSecondaryDb && secondaryDb) {
-      console.warn('⚠️ Primary quota exceeded! Switching to secondary Firebase for writes...');
       switchToSecondaryFirebase();
       
       try {
         const backupDb = await getDb();
         const result = await operation(backupDb);
-        console.log('✅ Write operation completed on secondary Firebase');
         return result;
       } catch (retryError: any) {
-        console.error('❌ Write failed on secondary too:', retryError.message);
         resetToPrimaryFirebase();
         throw retryError;
       }
@@ -308,18 +271,14 @@ export async function safeRead<T>(
 ): Promise<T> {
   try {
     const currentDb = await getDb();
-    console.log('🔍 [FIREBASE] Performing safeRead operation');
     return await operation(currentDb);
   } catch (error: any) {
     if (isQuotaError(error) && !useSecondaryDb && secondaryDb) {
-      console.warn('⚠️ Primary quota exceeded! Switching to secondary Firebase for reads...');
       switchToSecondaryFirebase();
       try {
         const backupDb = await getDb();
-        console.log('🔍 [FIREBASE] Retrying safeRead operation on SECONDARY');
         return await operation(backupDb);
       } catch (retryError: any) {
-        console.error('❌ Read failed on secondary too:', retryError.message);
         resetToPrimaryFirebase();
         throw retryError;
       }

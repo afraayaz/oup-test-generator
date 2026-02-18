@@ -44,11 +44,6 @@ export async function GET(request: NextRequest) {
         
         if (userDoc.exists) {
           const userData = userDoc.data();
-          console.log('User data for GET method:', {
-            userId,
-            userData: userData,
-            assignedBooks: userData?.assignedBooks
-          });
           
           // Try multiple possible data structures
           if (userData?.assignedBooks && Array.isArray(userData.assignedBooks)) {
@@ -60,8 +55,6 @@ export async function GET(request: NextRequest) {
           } else if (userData?.subject) {
             userSubjects = [userData.subject];
           }
-          
-          console.log('Extracted subjects for filtering:', userSubjects);
         }
 
         // Filter by content manager's assigned subjects
@@ -81,7 +74,6 @@ export async function GET(request: NextRequest) {
           userSubjects
         });
       } catch (error) {
-        console.error('Error fetching user data:', error);
         return NextResponse.json({
           success: true,
           questions: [], // Return empty if can't fetch user data
@@ -106,7 +98,6 @@ export async function GET(request: NextRequest) {
     }
 
   } catch (error) {
-    console.error('Error fetching approval queue:', error);
     return NextResponse.json({ error: 'Failed to fetch approval queue' }, { status: 500 });
   }
 }
@@ -152,43 +143,32 @@ export async function POST(request: NextRequest) {
 
     // Check if content manager has access to this subject
     try {
-      console.log('Checking authorization for userId:', userId);
       
       // First try to get user by document ID
       let userDoc = await adminDb.collection('users').doc(userId).get();
       let userData = null;
       
       if (!userDoc.exists) {
-        console.log('User not found by document ID, trying to query by uid field');
         // Try to query by uid field instead
         const userQuery = await adminDb.collection('users').where('uid', '==', userId).limit(1).get();
         if (!userQuery.empty) {
           userDoc = userQuery.docs[0];
           userData = userDoc.data();
-          console.log('Found user by uid field');
         } else {
           // Try to query by other possible fields
           const emailQuery = await adminDb.collection('users').where('email', '==', userName).limit(1).get();
           if (!emailQuery.empty) {
             userDoc = emailQuery.docs[0];
             userData = userDoc.data();
-            console.log('Found user by email field');
           }
         }
       } else {
         userData = userDoc.data();
-        console.log('Found user by document ID');
       }
       
       let userSubjects: string[] = [];
       
       if (userData) {
-        console.log('User data for authorization check:', {
-          userId,
-          userData: userData,
-          assignedBooks: userData?.assignedBooks,
-          questionSubject: questionData.subject
-        });
         
         // Try multiple possible data structures
         if (userData?.assignedBooks && Array.isArray(userData.assignedBooks)) {
@@ -200,10 +180,7 @@ export async function POST(request: NextRequest) {
         } else if (userData?.subject) {
           userSubjects = [userData.subject];
         }
-        
-        console.log('Extracted subjects:', userSubjects);
       } else {
-        console.log('User document does not exist for userId:', userId, 'and userName:', userName);
       }
 
       if (!userSubjects.includes(questionData.subject)) {
@@ -213,7 +190,6 @@ export async function POST(request: NextRequest) {
         );
       }
     } catch (error) {
-      console.error('Error fetching user data for authorization:', error);
       return NextResponse.json(
         { error: 'Failed to verify user permissions' },
         { status: 500 }
@@ -241,15 +217,12 @@ export async function POST(request: NextRequest) {
         try {
           await addDoc(questionBankRef, approvedQuestion);
           success = true;
-          console.log('[Approval] Successfully moved question to main bank');
         } catch (error: any) {
           retryCount++;
-          console.error(`[Approval] Attempt ${retryCount} failed:`, error?.message || error);
           
           if (retryCount < maxRetries) {
             // Wait before retrying (exponential backoff)
             const delay = Math.pow(2, retryCount) * 1000; // 2s, 4s, 8s
-            console.log(`[Approval] Retrying in ${delay}ms...`);
             await new Promise(resolve => setTimeout(resolve, delay));
           } else {
             throw new Error(`Failed to approve question after ${maxRetries} attempts: ${error?.message || error}`);
@@ -261,7 +234,6 @@ export async function POST(request: NextRequest) {
       try {
         await updateOUPStats(questionData.subject, questionData.grade, questionData.type, questionData.difficulty);
       } catch (error) {
-        console.error('[Approval] Failed to update stats (non-critical):', error);
       }
     } else {
       // Update question status to rejected with retry logic
@@ -279,14 +251,11 @@ export async function POST(request: NextRequest) {
             feedback: feedback || ''
           });
           success = true;
-          console.log('[Approval] Successfully updated question status to rejected');
         } catch (error: any) {
           retryCount++;
-          console.error(`[Approval] Rejection attempt ${retryCount} failed:`, error?.message || error);
           
           if (retryCount < maxRetries) {
             const delay = Math.pow(2, retryCount) * 1000; // 2s, 4s, 8s
-            console.log(`[Approval] Retrying rejection in ${delay}ms...`);
             await new Promise(resolve => setTimeout(resolve, delay));
           } else {
             throw new Error(`Failed to reject question after ${maxRetries} attempts: ${error?.message || error}`);
@@ -305,17 +274,13 @@ export async function POST(request: NextRequest) {
         try {
           await deleteDoc(doc(db, 'questions', 'approval_queue', 'items', questionId));
           success = true;
-          console.log('[Approval] Successfully removed question from approval queue');
         } catch (error: any) {
           retryCount++;
-          console.error(`[Approval] Delete attempt ${retryCount} failed:`, error?.message || error);
           
           if (retryCount < maxRetries) {
             const delay = Math.pow(2, retryCount) * 1000;
-            console.log(`[Approval] Retrying delete in ${delay}ms...`);
             await new Promise(resolve => setTimeout(resolve, delay));
           } else {
-            console.error(`Failed to remove from approval queue after ${maxRetries} attempts, but question was approved successfully`);
             // Don't throw error here as the approval was successful
           }
         }
@@ -328,7 +293,6 @@ export async function POST(request: NextRequest) {
       action
     });
   } catch (error) {
-    console.error('Error processing question approval:', error);
     return NextResponse.json({ error: 'Failed to process approval' }, { status: 500 });
   }
 }
@@ -338,8 +302,6 @@ async function updateOUPStats(subject: string, grade: string, type: string, diff
   try {
     // This should match the implementation in the main questions route
     // You may need to implement this based on your existing stats structure
-    console.log('Updating OUP stats for approved question:', { subject, grade, type, difficulty });
   } catch (error) {
-    console.error('Error updating OUP stats:', error);
   }
 }

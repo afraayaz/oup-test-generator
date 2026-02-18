@@ -27,10 +27,7 @@ function ContentCreatorCreateQuestionPageContent() {
 
   // Debug log
   // React.useEffect(() => {
-  //   console.log('📝 CC Create page - user:', {
-  //     name: user?.name,
-  //     assignedBooksLength: user?.assignedBooks?.length,
-  //   });
+  //
   // }, [user]);
 
   if (!user) {

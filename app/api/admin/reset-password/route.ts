@@ -104,12 +104,10 @@ export async function POST(request: Request) {
 
     if (!resetResponse.ok) {
       const errorData = await resetResponse.json();
-      console.error('Firebase password reset error:', errorData);
       throw new Error(errorData.error?.message || 'Failed to send password reset email');
     }
 
     const resetData = await resetResponse.json();
-    console.log('Password reset email sent:', resetData);
 
     return NextResponse.json({
       success: true,
@@ -117,7 +115,6 @@ export async function POST(request: Request) {
       email
     });
   } catch (error: any) {
-    console.error('Reset password API error:', error);
     return NextResponse.json(
       { error: error.message || 'Failed to reset password' },
       { status: 500 }

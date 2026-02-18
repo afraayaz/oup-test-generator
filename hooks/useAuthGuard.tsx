@@ -17,10 +17,8 @@ export function useAuthGuard() {
   useEffect(() => {
     // Listen to Firebase auth state changes
     const unsubscribe = onAuthStateChanged(auth, (authUser) => {
-      console.log('🔐 Auth Guard - User state:', !!authUser ? `${authUser.email}` : 'null');
       
       if (!authUser) {
-        console.log('🔐 Auth Guard - No authenticated user, clearing and redirecting to login');
         setIsAuthenticated(false);
         setIsLoading(false);
         
@@ -35,7 +33,6 @@ export function useAuthGuard() {
         
         return () => clearTimeout(redirectTimer);
       } else {
-        console.log('🔐 Auth Guard - User authenticated');
         setIsAuthenticated(true);
         setIsLoading(false);
       }

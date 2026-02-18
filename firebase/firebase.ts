@@ -16,10 +16,8 @@ const firebaseConfig = {
 let app: FirebaseApp;
 if (!getApps().length) {
   app = initializeApp(firebaseConfig);
-  console.log('✅ Firebase App initialized');
 } else {
   app = getApps()[0];
-  console.log('✅ Firebase App already initialized');
 }
 
 // ✅ Initialize Firestore with cache and fallback
@@ -39,8 +37,6 @@ const auth: Auth = getAuth(app);
 auth.setPersistence = auth.setPersistence || (() => Promise.resolve());
 
 // Log Auth initialization
-console.log('✅ Firebase Auth initialized for domain:', firebaseConfig.authDomain);
-console.log('✅ Project ID:', firebaseConfig.projectId);
 
 // ✅ Export instances
 export { app, db, auth };

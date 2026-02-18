@@ -44,7 +44,6 @@ export async function POST(request: Request) {
     } catch (error: any) {
       // If quota error and we haven't switched yet, try secondary
       if (isQuotaError(error)) {
-        console.warn('⚠️ Quota error in check-role, attempting secondary Firebase');
         switchToSecondaryFirebase();
         
         try {
@@ -59,10 +58,7 @@ export async function POST(request: Request) {
               userData = querySnapshot.docs[0].data();
             }
           }
-
-          console.log('✅ Successfully fetched user from secondary Firebase');
         } catch (retryError: any) {
-          console.error('❌ Secondary Firebase also failed:', retryError.message);
           resetToPrimaryFirebase();
           throw retryError;
         }
@@ -72,7 +68,6 @@ export async function POST(request: Request) {
     }
 
     if (!userData) {
-      console.log(`User document not found for uid: ${uid}, email: ${email}`);
       return NextResponse.json(
         { role: null, message: 'User not found in database' },
         { status: 200 }
@@ -85,7 +80,6 @@ export async function POST(request: Request) {
       { status: 200 }
     );
   } catch (error) {
-    console.error('Error checking user role:', error);
     return NextResponse.json(
       { error: 'Failed to check user role' },
       { status: 500 }

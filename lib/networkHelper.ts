@@ -12,7 +12,6 @@ export const isNetworkConnected = async (): Promise<boolean> => {
     });
     return true;
   } catch (error) {
-    console.error('❌ Network connectivity check failed:', error);
     return false;
   }
 };
@@ -26,10 +25,8 @@ export const checkFirebaseConnectivity = async (): Promise<boolean> => {
       body: JSON.stringify({ idToken: 'test' })
     });
     // We just need the network to respond, doesn't matter if it's an error
-    console.log('✅ Firebase connectivity check passed');
     return true;
   } catch (error) {
-    console.error('❌ Firebase connectivity check failed:', error);
     return false;
   }
 };
@@ -43,7 +40,6 @@ export const retryWithBackoff = async <T>(
   
   for (let attempt = 0; attempt < maxRetries; attempt++) {
     try {
-      console.log(`🔄 Attempt ${attempt + 1}/${maxRetries}`);
       return await fn();
     } catch (error: any) {
       lastError = error;
@@ -55,14 +51,12 @@ export const retryWithBackoff = async <T>(
       
       // Calculate exponential backoff delay
       const delayMs = initialDelayMs * Math.pow(2, attempt);
-      console.log(`⏳ Retry attempt ${attempt + 1} failed, waiting ${delayMs}ms before retry...`);
       
       // Wait before retrying
       await new Promise(resolve => setTimeout(resolve, delayMs));
     }
   }
   
-  console.error('❌ All retry attempts failed');
   throw lastError;
 };
 

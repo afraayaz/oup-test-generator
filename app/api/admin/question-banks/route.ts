@@ -46,7 +46,6 @@ export async function GET(request: NextRequest) {
       totalSchools: schoolQBs.length
     });
   } catch (error) {
-    console.error('Error fetching school QBs:', error);
     return NextResponse.json(
       { error: 'Failed to fetch question banks' },
       { status: 500 }

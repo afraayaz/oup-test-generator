@@ -59,7 +59,6 @@ async function fetchSchools() {
     const response = await fetch(`${FIRESTORE_URL}/schools`);
     
     if (!response.ok) {
-      console.error("❌ Error fetching schools:", response.status, await response.text());
       return [];
     }
     
@@ -68,11 +67,8 @@ async function fetchSchools() {
       id: doc.id,
       ...doc.data
     }));
-    
-    console.log("✅ Schools fetched:", schools.length);
     return schools;
   } catch (error: any) {
-    console.error("❌ Error fetching schools:", error.message, error.code);
     return [];
   }
 }
@@ -84,7 +80,6 @@ async function fetchCampuses() {
     const response = await fetch(`${FIRESTORE_URL}/campuses`);
     
     if (!response.ok) {
-      console.error("❌ Error fetching campuses:", response.status, await response.text());
       return [];
     }
     
@@ -93,11 +88,8 @@ async function fetchCampuses() {
       id: doc.id,
       ...doc.data
     }));
-    
-    console.log("✅ Campuses fetched:", campuses.length);
     return campuses;
   } catch (error: any) {
-    console.error("❌ Error fetching campuses:", error.message, error.code);
     return [];
   }
 }
@@ -109,7 +101,6 @@ async function fetchUsers() {
     const response = await fetch(`${FIRESTORE_URL}/users`);
     
     if (!response.ok) {
-      console.error("❌ Error fetching users:", response.status, await response.text());
       return [];
     }
     
@@ -118,11 +109,8 @@ async function fetchUsers() {
       id: doc.id,
       ...doc.data
     }));
-    
-    console.log("✅ Users fetched:", users.length);
     return users;
   } catch (error: any) {
-    console.error("❌ Error fetching users:", error.message, error.code);
     return [];
   }
 }

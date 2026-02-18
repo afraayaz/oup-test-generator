@@ -46,14 +46,10 @@ export default function LoginPage() {
 
         try {
             // Check network connectivity first
-            console.log('🔍 Checking network connectivity...');
             const hasNetwork = await isNetworkConnected();
             if (!hasNetwork) {
                 throw new Error('No internet connection. Please check your network and try again.');
             }
-            console.log('✅ Network connectivity confirmed');
-
-            console.log('🔐 Login attempt:', email);
             
             // Use retry mechanism for login
             const userCredential = await retryWithBackoff(
@@ -63,40 +59,30 @@ export default function LoginPage() {
             );
             
             const user = userCredential.user;
-            console.log('✓ Firebase sign in successful:', user.email, user.uid);
 
             let role = null;
 
             // First, try to get role from Firebase custom claims
-            console.log('🔍 Checking custom claims...');
             const idTokenResult = await user.getIdTokenResult(true);
             role = idTokenResult.claims.role as string;
-            console.log('Custom claims role:', role);
 
             // If no custom claim, try to check Firestore via API
             if (!role) {
-                console.log('📡 No custom claim found, checking Firestore via API...');
                 try {
                     const response = await fetch('/api/auth/check-role', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ uid: user.uid, email: user.email }),
                     });
-                    console.log('API check-role response status:', response.status);
                     
                     if (response.ok) {
                         const data = await response.json();
                         role = data.role;
-                        console.log('✓ Role from API:', role);
                     } else {
-                        console.error('API error response:', await response.text());
                     }
                 } catch (error) {
-                    console.error('Error checking role via API:', error);
                 }
             }
-
-            console.log('📍 Final role determined:', role);
 
             // Redirect user based on their role
             const roleMap: { [key: string]: string } = {
@@ -121,24 +107,17 @@ export default function LoginPage() {
             // If we found a role, redirect accordingly
             if (role) {
                 const redirectPath = roleMap[role];
-                console.log('🔀 Redirecting to:', redirectPath);
                 setIsLoading(true); // Keep loading true during redirect
                 router.replace(redirectPath);
-                console.log('✓ Router replace called');
                 return; // Exit early after redirect
             } else {
-                console.warn('⚠️ No role found, defaulting to admin dashboard');
                 // No role found - default to admin dashboard
                 // The dashboard layout will check permissions and redirect if needed
                 setIsLoading(true); // Keep loading true during redirect
                 router.replace('/admin/dashboard');
-                console.log('✓ Router replace to admin dashboard called');
                 return; // Exit early after redirect
             }
         } catch (error: any) {
-            console.error('❌ Login error:', error);
-            console.error('Error message:', error.message);
-            console.error('Error code:', error.code);
             
             // Use helper function to get appropriate error message
             let userMessage = getNetworkErrorMessage(error);

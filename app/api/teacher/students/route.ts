@@ -38,11 +38,8 @@ export async function GET(request: NextRequest) {
       };
     });
 
-    console.log(`[FETCH-STUDENTS] Found ${students.length} students for grade ${grade}:`, students.map(s => ({ name: s.name, id: s.id })));
-
     return NextResponse.json({ students }, { status: 200 });
   } catch (error) {
-    console.error('Error fetching students:', error);
     return NextResponse.json(
       { error: 'Failed to fetch students' },
       { status: 500 }

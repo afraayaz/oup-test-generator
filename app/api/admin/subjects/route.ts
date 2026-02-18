@@ -37,11 +37,9 @@ export async function GET() {
 
     return NextResponse.json({ subjects });
   } catch (error: any) {
-    console.error('Error fetching subjects:', error);
     
     // Check for quota error
     if (error.message?.includes('quota') || error.code === 'RESOURCE_EXHAUSTED' || error.message?.includes('quota')) {
-      console.warn('⚠️ Primary Firebase quota exceeded, switching to secondary');
       switchToSecondaryFirebase();
       
       try {
@@ -64,11 +62,8 @@ export async function GET() {
             };
           })
         );
-
-        console.log('✅ Successfully fetched from secondary Firebase');
         return NextResponse.json({ subjects });
       } catch (retryError) {
-        console.error('❌ Secondary Firebase also failed:', retryError);
         return NextResponse.json(
           { error: 'Firebase quota exceeded and backup unavailable' },
           { status: 503 }
@@ -109,7 +104,6 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ subject: createdSubject });
   } catch (error) {
-    console.error('Error creating subject:', error);
     return NextResponse.json(
       { error: 'Failed to create subject' },
       { status: 500 }
@@ -142,7 +136,6 @@ export async function PUT(request: NextRequest) {
 
     return NextResponse.json({ subject: updatedSubject });
   } catch (error) {
-    console.error('Error updating subject:', error);
     return NextResponse.json(
       { error: 'Failed to update subject' },
       { status: 500 }
@@ -174,7 +167,6 @@ export async function DELETE(request: NextRequest) {
 
     return NextResponse.json({ message: 'Subject deleted successfully' });
   } catch (error) {
-    console.error('Error deleting subject:', error);
     return NextResponse.json(
       { error: 'Failed to delete subject' },
       { status: 500 }

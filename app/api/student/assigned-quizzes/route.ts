@@ -19,7 +19,6 @@ export async function GET(request: NextRequest) {
     const q = query(assignmentsRef, where('studentId', '==', studentId));
 
     const snapshot = await getDocs(q);
-    console.log(`[ASSIGNED-QUIZZES] Found ${snapshot.docs.length} assignments for student ${studentId}`);
     
     // Fetch full quiz data for each assignment
     const assignments = await Promise.all(
@@ -34,7 +33,6 @@ export async function GET(request: NextRequest) {
           const attemptsSnapshot = await getDocs(attemptsQuery);
           attemptCount = attemptsSnapshot.docs.length;
         } catch (error) {
-          console.log('Error checking attempts:', error);
         }
         
         // Fetch the actual quiz document by ID
@@ -90,7 +88,6 @@ export async function GET(request: NextRequest) {
             };
           }
         } catch (quizError) {
-          console.error('Error fetching quiz:', quizError);
           return {
             id: assignmentData.quizId,
             title: assignmentData.quizTitle,
@@ -118,7 +115,6 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ assignments }, { status: 200 });
   } catch (error) {
-    console.error('Error fetching assigned quizzes:', error);
     return NextResponse.json(
       { error: 'Failed to fetch assigned quizzes' },
       { status: 500 }

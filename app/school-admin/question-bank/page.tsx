@@ -43,7 +43,6 @@ export default function SchoolAdminQBPage() {
       }));
       setQuestions(allQuestions);
     } catch (error) {
-      console.error('Error fetching questions:', error);
     }
     setLoading(false);
   };
@@ -60,7 +59,6 @@ export default function SchoolAdminQBPage() {
       setSelectedQuestion(null);
       fetchSchoolQuestions();
     } catch (error) {
-      console.error('Error deleting question:', error);
       alert('Error deleting question');
     }
   };

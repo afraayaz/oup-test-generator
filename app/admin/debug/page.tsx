@@ -15,14 +15,12 @@ export default function FirestoreDebugPage() {
   useEffect(() => {
     async function fetchAllUsers() {
       try {
-        console.log('🔍 Fetching all users from Firestore...');
         const response = await fetch(
           `https://firestore.googleapis.com/v1/projects/quiz-app-ff0ab/databases/(default)/documents/users`
         );
 
         if (response.ok) {
           const data = await response.json();
-          console.log('🔍 Raw Firestore response:', data);
           
           if (data.documents) {
             const formattedUsers = data.documents.map((doc: any) => {
@@ -38,7 +36,6 @@ export default function FirestoreDebugPage() {
           setError(`Failed to fetch users: ${response.status}`);
         }
       } catch (err) {
-        console.error('Error fetching users:', err);
         setError(err instanceof Error ? err.message : 'Unknown error');
       } finally {
         setLoading(false);

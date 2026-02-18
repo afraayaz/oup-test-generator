@@ -82,7 +82,6 @@ async function fetchUsers(schoolId?: string): Promise<{ users: UserData[], avail
     );
     
     if (!response.ok) {
-      console.error('Failed to fetch users:', response.status, response.statusText);
       return { users: [], availableSchools: [] };
     }
     
@@ -125,7 +124,6 @@ async function fetchUsers(schoolId?: string): Promise<{ users: UserData[], avail
     
     return { users: filteredUsers, availableSchools };
   } catch (error) {
-    console.error('Error fetching users:', error);
     return { users: [], availableSchools: [] };
   }
 }

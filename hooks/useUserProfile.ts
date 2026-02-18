@@ -18,7 +18,7 @@ export interface UserProfile {
   subjectGradePairs?: { id: string; subject: string; grade: string; assignedBooks: { id: string; title: string; subject: string; grade: string; chapters: number }[] }[];
 }
 
-export function useUserProfile() {
+export function useUserProfile(): { user: UserProfile | null; loading: boolean; error: string | null } {
   const [user, setUser] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -31,11 +31,9 @@ export function useUserProfile() {
       // Check cache first - only refresh if > 5 minutes old or forced
       const now = Date.now();
       if (!forceRefresh && (now - lastFetchTime) < CACHE_DURATION && user) {
-        console.log('✅ Using cached user profile (age:', Math.round((now - lastFetchTime) / 1000), 'seconds)');
         return true;
       }
       
-      console.log('🔄 Refreshing user profile for:', authUser.email);
       
       // Query by email field instead of fetching all users - this is MUCH more efficient
       const usersResponse = await fetch(
@@ -64,7 +62,6 @@ export function useUserProfile() {
         const userDoc = usersData[0]?.document;
 
         if (userDoc) {
-          console.log('✅ Updated user doc found, parsing...');
           
           // Parse subjects array
           let subjects: string[] = [];
@@ -72,7 +69,6 @@ export function useUserProfile() {
             subjects = userDoc.fields.subjects.arrayValue.values.map((value: any) => 
               value.stringValue || ''
             ).filter(Boolean);
-            console.log('✅ Updated subjects:', subjects);
           }
 
           // Parse assignedGrades array
@@ -81,7 +77,6 @@ export function useUserProfile() {
             assignedGrades = userDoc.fields.assignedGrades.arrayValue.values.map((value: any) => 
               value.stringValue || ''
             ).filter(Boolean);
-            console.log('✅ Updated assignedGrades:', assignedGrades);
           }
           
           // Parse assignedBooks array
@@ -97,20 +92,15 @@ export function useUserProfile() {
               };
               return book;
             }).filter((book: any) => book.id);
-            console.log('✅ Updated assignedBooks:', assignedBooks);
           }
 
           // Parse subjectGradePairs array - TRY TO PARSE FROM DATABASE FIRST
           let subjectGradePairs: { id: string; subject: string; grade: string; assignedBooks: { id: string; title: string; subject: string; grade: string; chapters: number }[] }[] = [];
           
-          console.log('🔍 Checking if subjectGradePairs exists in database...');
-          console.log('  userDoc.fields?.subjectGradePairs:', userDoc.fields?.subjectGradePairs);
           
           if (userDoc.fields?.subjectGradePairs?.arrayValue?.values && userDoc.fields.subjectGradePairs.arrayValue.values.length > 0) {
-            console.log('✅ Found subjectGradePairs in database! Parsing...');
             try {
               subjectGradePairs = userDoc.fields.subjectGradePairs.arrayValue.values.map((pairValue: any, idx: number) => {
-                console.log(`  Parsing pair ${idx}:`, pairValue);
                 
                 // Parse books in this pair
                 const pairBooks = (pairValue.mapValue?.fields?.assignedBooks?.arrayValue?.values || []).map((bookValue: any) => {
@@ -130,21 +120,14 @@ export function useUserProfile() {
                   assignedBooks: pairBooks
                 };
                 
-                console.log(`    ✅ Parsed pair: subject="${pair.subject}", grade="${pair.grade}", books=${pair.assignedBooks.length}`);
                 return pair;
               });
-              console.log('✅ Successfully parsed subjectGradePairs from database:', subjectGradePairs);
             } catch (err) {
-              console.error('❌ Error parsing subjectGradePairs:', err);
             }
           }
           
           // Fallback: If we couldn't parse from database, rebuild from subjects/grades/books
           if (subjectGradePairs.length === 0) {
-            console.log('🔧 No valid subjectGradePairs from database. Rebuilding from subjects/grades/books...');
-            console.log('  subjects:', subjects);
-            console.log('  assignedGrades:', assignedGrades);
-            console.log('  assignedBooks:', assignedBooks);
             
             if (subjects.length > 0 && assignedGrades.length > 0) {
               // Create one pair per subject-grade combination
@@ -159,7 +142,6 @@ export function useUserProfile() {
                   return bookGrade === gradeNum;
                 });
                 
-                console.log(`  Pair ${idx}: subject="${subject}", grade="${normalizedGrade}", books=${booksForThisGrade.length}`);
                 
                 return {
                   id: `${subject.toLowerCase()}-${grade.replace('Grade ', '').trim()}-${Date.now()}`,
@@ -171,9 +153,7 @@ export function useUserProfile() {
                   }))
                 };
               });
-              console.log('✅ Rebuilt subjectGradePairs:', subjectGradePairs);
             } else {
-              console.log('⚠️ Not enough data to build subjectGradePairs. subjects:', subjects.length, 'grades:', assignedGrades.length);
             }
           }
 
@@ -192,18 +172,6 @@ export function useUserProfile() {
             subjectGradePairs: subjectGradePairs && subjectGradePairs.length > 0 ? subjectGradePairs : [],
           };
           
-          console.log('🎓 Creating userProfile with:', {
-            name: userProfile.name,
-            email: userProfile.email,
-            role: userProfile.role,
-            subjectGradePairsLength: subjectGradePairs.length,
-            subjectGradePairs: subjectGradePairs,
-            assignedBooksLength: assignedBooks.length,
-            subjects: subjects,
-            assignedGrades: assignedGrades
-          });
-          console.log('✅ Updated user profile:', userProfile);
-          console.log('🔥 About to call setUser with:', userProfile);
           setUser(userProfile);
           saveTabSession(userProfile);
           setLastFetchTime(Date.now());
@@ -212,7 +180,6 @@ export function useUserProfile() {
       }
       return false;
     } catch (err) {
-      console.error('❌ Error refreshing user profile:', err);
       return false;
     }
   };
@@ -229,7 +196,6 @@ export function useUserProfile() {
             setUser(currentTabSession.user);
           }
         } catch (err) {
-          console.error('Error processing storage change:', err);
         }
       }
     };
@@ -239,7 +205,6 @@ export function useUserProfile() {
     // Handle visibility change - refresh when tab becomes visible
     const handleVisibilityChange = async () => {
       if (document.visibilityState === 'visible' && auth.currentUser) {
-        console.log('👁️ Page became visible - refreshing user profile...');
         await refreshUserProfile(auth.currentUser);
       }
     };
@@ -248,14 +213,9 @@ export function useUserProfile() {
 
     // Listen to Firebase Auth
     const unsubscribe = onAuthStateChanged(auth, async (authUser) => {
-      console.log('🔥 Firebase Auth State Changed:', authUser);
-      console.log('🔥 Auth User Email:', authUser?.email);
-      console.log('🔥 Auth User UID:', authUser?.uid);
-      console.log('🔥 Auth User exists:', !!authUser);
       
       try {
         if (!authUser) {
-          console.log('🔥 No auth user, clearing session');
           setUser(null);
           clearTabSession();
           setLoading(false);
@@ -266,15 +226,12 @@ export function useUserProfile() {
         const success = await refreshUserProfile(authUser);
         
         if (!success) {
-          console.log('🔥 No matching user document found for email:', authUser.email);
           setUser(null);
           setError('User account not found in database');
         }
       } catch (err) {
-        console.error('🔥 Error fetching user profile:', err);
         setError(err instanceof Error ? err.message : 'Failed to fetch profile');
       } finally {
-        console.log('🔥 Setting loading to false');
         setLoading(false);
       }
     });

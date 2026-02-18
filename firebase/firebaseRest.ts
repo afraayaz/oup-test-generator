@@ -79,7 +79,6 @@ export async function getCollection(collectionName: string): Promise<{ id: strin
     
     return data.documents.map(parseDocument);
   } catch (error) {
-    console.error('Firestore REST API error:', error);
     throw error;
   }
 }
@@ -138,7 +137,6 @@ export async function getCollectionWithFilter(
       .filter((result: any) => result.document)
       .map((result: any) => parseDocument(result.document));
   } catch (error) {
-    console.error('Firestore REST query error:', error);
     throw error;
   }
 }
@@ -161,7 +159,6 @@ export async function getDocument(collectionName: string, docId: string): Promis
     const doc: FirestoreDocument = await response.json();
     return parseDocument(doc);
   } catch (error) {
-    console.error('Firestore REST API error:', error);
     throw error;
   }
 }

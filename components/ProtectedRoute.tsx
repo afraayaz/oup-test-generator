@@ -19,10 +19,8 @@ export function ProtectedRoute({ children, allowedRoles, userRole }: ProtectedRo
   useEffect(() => {
     // Listen to Firebase auth state
     const unsubscribe = onAuthStateChanged(auth, (authUser) => {
-      console.log('🔐 ProtectedRoute - Auth state changed:', !!authUser);
       
       if (!authUser) {
-        console.log('🔐 ProtectedRoute - No user, redirecting to login');
         setIsAuthorized(false);
         setIsLoading(false);
         // Redirect to login after a short delay
@@ -32,14 +30,12 @@ export function ProtectedRoute({ children, allowedRoles, userRole }: ProtectedRo
       } else {
         // User is logged in, check role if needed
         if (allowedRoles && userRole && !allowedRoles.includes(userRole)) {
-          console.log('🔐 ProtectedRoute - User role not allowed:', userRole);
           setIsAuthorized(false);
           setIsLoading(false);
           setTimeout(() => {
             router.push('/login');
           }, 100);
         } else {
-          console.log('🔐 ProtectedRoute - User authorized');
           setIsAuthorized(true);
           setIsLoading(false);
         }

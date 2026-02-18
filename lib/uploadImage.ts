@@ -14,10 +14,8 @@ export async function uploadQuestionImage(
     // Access the environment variable - Next.js inlines this at build time
     const apiKey = process.env.NEXT_PUBLIC_IMGBB_API_KEY || '';
     
-    console.log('🔑 ImgBB API Key present:', !!apiKey, 'Length:', apiKey?.length || 0);
     
     if (!apiKey) {
-      console.error('❌ ImgBB API key is missing!');
       throw new Error('ImgBB API key is not configured. Please add NEXT_PUBLIC_IMGBB_API_KEY to your .env.local file.');
     }
 
@@ -35,7 +33,6 @@ export async function uploadQuestionImage(
         if (e.lengthComputable && onProgress) {
           const progress = Math.round((e.loaded / e.total) * 100);
           onProgress(progress);
-          console.log(`Upload is ${progress}% done`);
         }
       });
       
@@ -45,18 +42,14 @@ export async function uploadQuestionImage(
           try {
             const response = JSON.parse(xhr.responseText);
             if (response.success && response.data && response.data.url) {
-              console.log('✅ Image uploaded successfully to ImgBB:', response.data.url);
               resolve(response.data.url);
             } else {
-              console.error('❌ ImgBB response:', xhr.responseText);
               reject(new Error('Invalid response from ImgBB'));
             }
           } catch (error) {
-            console.error('❌ Failed to parse response:', xhr.responseText);
             reject(new Error('Failed to parse ImgBB response'));
           }
         } else {
-          console.error('❌ Upload failed with status:', xhr.status, 'Response:', xhr.responseText);
           reject(new Error(`Upload failed with status: ${xhr.status}`));
         }
       });
@@ -75,7 +68,6 @@ export async function uploadQuestionImage(
       xhr.send(formData);
     });
   } catch (error) {
-    console.error('❌ Error uploading image:', error);
     throw new Error('Failed to upload image. Please try again.');
   }
 }

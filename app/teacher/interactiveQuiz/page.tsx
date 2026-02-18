@@ -423,16 +423,8 @@ export default function CreateInteractiveQuiz() {
   // Fetch grades and subjects from user profile
   useEffect(() => {
     if (!user) {
-      console.log('⏳ User profile still loading...');
       return;
     }
-
-    console.log('📊 User profile loaded:', {
-      hasSubjectGradePairs: !!user?.subjectGradePairs?.length,
-      hasAssignedBooks: !!user?.assignedBooks?.length,
-      subjectGradePairsCount: user?.subjectGradePairs?.length || 0,
-      assignedBooksCount: user?.assignedBooks?.length || 0,
-    });
 
     // Extract grades from user's subjectGradePairs or assignedBooks
     let availableGrades: string[] = [];
@@ -460,8 +452,6 @@ export default function CreateInteractiveQuiz() {
       Object.keys(gradeSubjectSet).forEach(grade => {
         gradeSubjectMapping[grade] = Array.from(gradeSubjectSet[grade]).sort();
       });
-
-      console.log('✅ Grades from subjectGradePairs:', availableGrades, 'Mapping:', gradeSubjectMapping);
     } else if (user?.assignedBooks && user.assignedBooks.length > 0) {
       // Fallback: extract from assignedBooks
       const gradeSet = new Set<string>();
@@ -484,8 +474,6 @@ export default function CreateInteractiveQuiz() {
       Object.keys(gradeSubjectSet).forEach(grade => {
         gradeSubjectMapping[grade] = Array.from(gradeSubjectSet[grade]).sort();
       });
-
-      console.log('✅ Grades from assignedBooks:', availableGrades, 'Mapping:', gradeSubjectMapping);
     }
 
     setGrades(availableGrades);
@@ -495,7 +483,6 @@ export default function CreateInteractiveQuiz() {
     if (!quizMeta.grade && availableGrades.length > 0) {
       const firstGrade = availableGrades[0];
       setQuizMeta(prev => ({ ...prev, grade: firstGrade }));
-      console.log('✅ Auto-selected first grade:', firstGrade);
     }
   }, [user]);
 
@@ -503,7 +490,6 @@ export default function CreateInteractiveQuiz() {
   useEffect(() => {
     if (quizMeta.grade && gradeSubjectMap[quizMeta.grade]) {
       setSubjects(gradeSubjectMap[quizMeta.grade]);
-      console.log('📌 Updated subjects for grade', quizMeta.grade, ':', gradeSubjectMap[quizMeta.grade]);
     } else {
       setSubjects([]);
     }
@@ -512,11 +498,9 @@ export default function CreateInteractiveQuiz() {
   // Build books map from user's subjectGradePairs
   useEffect(() => {
     if (!user?.subjectGradePairs || user.subjectGradePairs.length === 0) {
-      console.log('⚠️ No subjectGradePairs found, trying assignedBooks...');
       
       // Fallback to assignedBooks if subjectGradePairs is empty
       if (!user?.assignedBooks || user.assignedBooks.length === 0) {
-        console.log('⚠️ No assigned books found');
         setBooks({});
         return;
       }
@@ -544,8 +528,6 @@ export default function CreateInteractiveQuiz() {
           booksArray[grade][subject] = Array.from(booksMap[grade][subject]).sort();
         });
       });
-
-      console.log('📚 Books map from assignedBooks:', booksArray, 'IDs:', titleToIdMap);
       setBooks(booksArray);
       setBookIdMap(titleToIdMap);
       return;
@@ -582,8 +564,6 @@ export default function CreateInteractiveQuiz() {
         booksArray[grade][subject] = Array.from(booksMap[grade][subject]).sort();
       });
     });
-
-    console.log('📚 Books map from subjectGradePairs:', booksArray, 'IDs:', titleToIdMap);
     setBooks(booksArray);
     setBookIdMap(titleToIdMap);
   }, [user?.subjectGradePairs, user?.assignedBooks]);
@@ -595,7 +575,6 @@ export default function CreateInteractiveQuiz() {
         const questionList = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         setExistingQuestions(questionList);
       } catch (error) {
-        console.error('Error fetching questions:', error);
       }
     };
     fetchExistingQuestions();
@@ -612,7 +591,6 @@ export default function CreateInteractiveQuiz() {
       const bookId = bookIdMap[quizMeta.book];
       
       if (!bookId) {
-        console.error('Book ID not found for:', quizMeta.book);
         setAvailableChapters([]);
         return;
       }
@@ -623,13 +601,11 @@ export default function CreateInteractiveQuiz() {
       );
 
       if (!response.ok) {
-        console.error('Failed to fetch chapters:', response.statusText);
         setAvailableChapters([]);
         return;
       }
 
       const data = await response.json();
-      console.log('📚 Chapters API response:', data);
       const chapters = (data.chapters || []).map((ch: string) => {
         // Remove quotes if present
         let cleaned = ch.trim();
@@ -638,10 +614,8 @@ export default function CreateInteractiveQuiz() {
         }
         return cleaned;
       });
-      console.log('📖 Chapters to display:', chapters);
       setAvailableChapters(chapters);
     } catch (error) {
-      console.error('Error fetching chapters:', error);
       setAvailableChapters([]);
     }
   }, [quizMeta.book, quizMeta.subject, bookIdMap]);
@@ -851,7 +825,6 @@ export default function CreateInteractiveQuiz() {
         const questionList = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         setExistingQuestions(questionList);
       } catch (error) {
-        console.error('Error saving questions:', error);
         alert('Failed to save questions. Please try again.');
       } finally {
         setIsSaving(false);

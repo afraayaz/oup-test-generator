@@ -118,7 +118,6 @@ export default function SchoolAdminDashboard() {
         { id: 1, type: 'quiz', title: 'No activity', description: 'Start creating questions', time: 'Just now' }
       ]);
     } catch (error) {
-      console.error('Error fetching dashboard data:', error);
     }
   };
 
@@ -166,7 +165,6 @@ export default function SchoolAdminDashboard() {
         studentGrowth: totalStudents > 0 ? Math.min(30, Math.floor((totalStudents / 400) * 15)) : 0
       });
     } catch (error) {
-      console.error('Error fetching school stats:', error);
     }
     setLoading(false);
   };

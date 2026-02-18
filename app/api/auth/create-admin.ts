@@ -80,7 +80,6 @@ export async function POST(request: Request) {
       { status: 201 }
     );
   } catch (error) {
-    console.error('Error creating admin:', error);
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }

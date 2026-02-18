@@ -325,45 +325,25 @@ const QuizGeneration = () => {
   
   if (subjectGradePairs.length > 0) {
     // Teachers with subjectGradePairs
-    uniqueGrades = [...new Set(subjectGradePairs.map(p => normalizeGrade(p.grade)))];
-    uniqueSubjects = [...new Set(subjectGradePairs.map(p => p.subject))];
+    uniqueGrades = [...new Set(subjectGradePairs.map((p: any) => normalizeGrade(p.grade)))] as string[];
+    uniqueSubjects = [...new Set(subjectGradePairs.map((p: any) => p.subject))] as string[];
   } else {
     // Fallback to assignedBooks
-    uniqueSubjects = [...new Set(assignedBooks.map(b => b.subject))];
-    uniqueGrades = [...new Set(assignedBooks.map(b => normalizeGrade(b.grade)))];
+    uniqueSubjects = [...new Set(assignedBooks.map((b: any) => b.subject))] as string[];
+    uniqueGrades = [...new Set(assignedBooks.map((b: any) => normalizeGrade(b.grade)))] as string[];
   }
-  
-  console.log(`📋 Initial unique subjects (from school books): ${uniqueSubjects.join(', ') || '(none)'}`);
-  console.log(`📋 Initial unique grades (from school books): ${uniqueGrades.join(', ') || '(none)'}`);
   
   // If 'both' is selected, also include OUP subjects and grades
   if (selectedQB === 'both' && questions.length > 0) {
-    console.log(`🔄 Merging OUP subjects and grades for 'both' mode...`);
     const oupSubjects = [...new Set(questions.map(q => q.subject).filter(Boolean))];
     const oupGrades = [...new Set(questions.map(q => (q.grade || q.class || '').toString()).filter(Boolean))];
     
-    console.log(`📋 OUP subjects found: ${oupSubjects.join(', ') || '(none)'}`);
-    console.log(`📋 OUP grades found: ${oupGrades.join(', ') || '(none)'}`);
-    
     uniqueSubjects = [...new Set([...uniqueSubjects, ...oupSubjects])];
     uniqueGrades = [...new Set([...uniqueGrades, ...oupGrades])];
-    
-    console.log(`✓ Merged unique subjects: ${uniqueSubjects.join(', ')}`);
-    console.log(`✓ Merged unique grades: ${uniqueGrades.join(', ')}`);
   }
 
   // Debug logging
   useEffect(() => {
-    console.log('📚 User Profile Data:', {
-      grades,
-      subjects,
-      assignedBooks: assignedBooks.length,
-      assignedBooksData: assignedBooks,
-      uniqueSubjects,
-      uniqueGrades,
-      selectedQB,
-      questionsCount: questions.length
-    });
   }, [grades, subjects, assignedBooks, selectedQB, questions]);
   
   // Build books object from assignedBooks/subjectGradePairs and OUP questions
@@ -379,8 +359,8 @@ const QuizGeneration = () => {
       if (subjectGradePairs.length > 0) {
         // Use subjectGradePairs for Teachers
         books[String(grade)][subject] = subjectGradePairs
-          .filter(p => normalizeGrade(p.grade) === grade && p.subject === subject)
-          .flatMap(p => p.assignedBooks || [])
+          .filter((p: any) => normalizeGrade(p.grade) === grade && p.subject === subject)
+          .flatMap((p: any) => p.assignedBooks || [])
           .map((book: any) => {
             const bookObj = typeof book === 'string' ? { title: book } : book;
             if (bookObj && typeof bookObj === 'object' && 'id' in bookObj && 'title' in bookObj) {
@@ -397,7 +377,7 @@ const QuizGeneration = () => {
       } else {
         // Fallback to assignedBooks
         books[String(grade)][subject] = assignedBooks
-          .filter(book => {
+          .filter((book: any) => {
             const normalizedBookGrade = normalizeGrade(book.grade);
             return normalizedBookGrade === grade && book.subject === subject;
           })
@@ -420,7 +400,6 @@ const QuizGeneration = () => {
   
   // Add OUP books if 'both' is selected
   if (selectedQB === 'both' && questions.length > 0) {
-    console.log('📖 Adding OUP books to selection...');
     questions.forEach(q => {
       const qGrade = (q.grade || q.class || '').toString();
       const qSubject = q.subject || '';
@@ -435,13 +414,10 @@ const QuizGeneration = () => {
         }
         if (!books[qGrade][qSubject].includes(qBook)) {
           books[qGrade][qSubject].push(qBook);
-          console.log(`✓ Added OUP book: ${qBook} (Grade ${qGrade}, ${qSubject})`);
         }
       }
     });
   }
-  
-  console.log('📚 Final books object:', books);
 
   const quizTypes = ['Weekly', 'Monthly', 'Half Yearly', 'Final Exam', 'Other'];
   const maxQuestions = 200;
@@ -463,7 +439,6 @@ const QuizGeneration = () => {
           setAvailableStudents(data.students || []);
         }
       } catch (error) {
-        console.error('Error fetching students:', error);
         setAvailableStudents([]);
       }
     };
@@ -475,43 +450,32 @@ const QuizGeneration = () => {
     const fetchQuestions = async () => {
       try {
         if (!user?.schoolId) return;
-        
-        console.log(`🔄 Fetching questions for QB: ${selectedQB}`);
         let allQuestions: any[] = [];
         
         // Fetch from school questions if QB is 'school' or 'both'
         if (selectedQB === 'school' || selectedQB === 'both') {
           try {
-            console.log(`📚 Fetching school questions from questions/schools/${user.schoolId}...`);
             const schoolQuestionsRef = collection(db, 'questions', 'schools', user.schoolId);
             const snapshot = await getDocs(schoolQuestionsRef);
             const questionList = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-            console.log(`✓ Found ${questionList.length} school questions`);
             allQuestions = [...allQuestions, ...questionList];
           } catch (error) {
-            console.error('Error fetching school questions:', error);
           }
         }
         
         // Fetch from OUP questions if QB is 'oup' or 'both'
         if (selectedQB === 'oup' || selectedQB === 'both') {
           try {
-            console.log(`📚 Fetching OUP questions from questions/oup/items...`);
             const oupQuestionsRef = collection(db, 'questions', 'oup', 'items');
             const snapshot = await getDocs(oupQuestionsRef);
             const questionList = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-            console.log(`✓ Found ${questionList.length} OUP questions`);
             allQuestions = [...allQuestions, ...questionList];
           } catch (error) {
-            console.error('Error fetching OUP questions:', error);
           }
         }
-        
-        console.log(`📊 Total questions after fetch: ${allQuestions.length}`);
         setHasQuestionType(allQuestions.some(q => q.type || q.questionType));
         setQuestions(allQuestions);
       } catch (error) {
-        console.error('Fetch error:', error);
         const errorMessage = error instanceof Error ? error.message : String(error);
         alert('Failed to fetch questions: ' + errorMessage);
       }
@@ -533,11 +497,9 @@ const QuizGeneration = () => {
   // Chapters are consistent across all accounts, SLOs vary based on QB source and available questions
   useEffect(() => {
     const fetchChaptersAndSLOs = async () => {
-      console.log('🔍 fetchChaptersAndSLOs triggered with:', { selectedSubject, selectedBook, selectedGrade });
       
       // Reset if missing subject/book (chapters need these)
       if (!selectedSubject || !selectedBook) {
-        console.log('⚠️ Missing subject or book, resetting chapters');
         setIsLoadingChapters(false);
         setAvailableChapters([]);
         setAvailableSLOs([]);
@@ -552,7 +514,6 @@ const QuizGeneration = () => {
         const bookId = bookIdMap[bookKey];
         const subjectId = subjectIdMap[selectedSubject];
         const url = `/api/admin/chapters?subject=${encodeURIComponent(selectedSubject)}&book=${encodeURIComponent(selectedBook)}&bookId=${encodeURIComponent(bookId || '')}&subjectId=${encodeURIComponent(subjectId || '')}`;
-        console.log('🌐 Calling chapters API:', url, { selectedSubject, selectedBook, selectedGrade, normalizedGrade, bookKey, subjectId, bookId });
         
         const chaptersResponse = await fetch(url);
         const chaptersData = await chaptersResponse.json();
@@ -567,30 +528,16 @@ const QuizGeneration = () => {
           return cleaned;
         });
 
-        console.log('📚 Chapters API Response:', {
-          status: chaptersResponse.status,
-          selectedBook,
-          selectedSubject,
-          chaptersCount: chapters.length,
-          chapters,
-          chaptersDebug: chapters.map((c: string) => `"${c}"`),
-          source: chaptersData.source,
-          foundSubjectId: chaptersData.subjectId,
-          error: chaptersData.error
-        });
-
         setAvailableChapters(chapters);
         setIsLoadingChapters(false);
         
         // Save the numeric subject ID that was found
         if (chaptersData.subjectId) {
           setFoundSubjectId(chaptersData.subjectId);
-          console.log('✅ Saved subject ID:', chaptersData.subjectId);
         }
 
         // Now fetch SLOs based on selected QB source and chapters (only if questions are loaded)
         if (!selectedGrade || questions.length === 0) {
-          console.log('ℹ️ Skipping SLO fetch - missing grade or no questions loaded');
           setAvailableSLOs([]);
           setSelectedChapters([]);
           setSelectedSLOs([]);
@@ -626,19 +573,12 @@ const QuizGeneration = () => {
 
         const slos = Array.from(slosSet).sort();
 
-        console.log('✅ SLOs for QB source:', {
-          selectedQB,
-          slos,
-          sloCount: slos.length
-        });
-
         setAvailableSLOs(slos);
         
         // Reset selected chapters and SLOs when filters change
         setSelectedChapters([]);
         setSelectedSLOs([]);
       } catch (error) {
-        console.error('❌ Error fetching chapters and SLOs:', error);
         setIsLoadingChapters(false);
         setAvailableChapters([]);
         setAvailableSLOs([]);
@@ -701,8 +641,6 @@ const QuizGeneration = () => {
   const getAvailableSLOs = useCallback(() => {
     if (!selectedGrade || !selectedSubject || !selectedBook || selectedChapters.length === 0) return [];
     
-    console.log('🔎 Getting available SLOs for:', { selectedGrade, selectedSubject, selectedBook, selectedChapters, foundSubjectId });
-    
     // Filter questions by selected chapters to get SLOs
     const slos = new Set<string>();
     const selectedGradeNormalized = String(selectedGrade).replace(/^(Grade|Class)\s+/i, '').trim().toLowerCase();
@@ -714,8 +652,6 @@ const QuizGeneration = () => {
     const bookKey = `${selectedSubject}-${normalizedGradeForKey}-${selectedBook}`;
     const numericSubjectId = foundSubjectId || subjectIdMap[selectedSubject] || selectedSubject;
     const numericBookId = (bookIdMap[bookKey] || selectedBook) as string;
-    
-    console.log('📌 Using IDs:', { numericSubjectId, numericBookId, bookKey, selectedSubject, selectedBook, foundSubjectId });
     
     let matchedCount = 0;
     let failedGrade = 0, failedSubject = 0, failedBook = 0, failedChapter = 0, failedNoSLO = 0;
@@ -749,18 +685,10 @@ const QuizGeneration = () => {
       if (gradeMatch && subjectMatch && bookMatch) {
         if (!chapterMatch) {
           if (failedChapter < 3) {
-            console.log('❌ SLO Search - Chapter mismatch:', { 
-              qChapter, 
-              selectedChapters: selectedChapters.slice(0, 3),
-              qSLO,
-              hasChapter: !!qChapter,
-              hasSLO: !!qSLO
-            });
           }
           failedChapter++;
         } else if (!qSLO) {
           if (failedNoSLO < 3) {
-            console.log('⚠️ SLO Search - Question has no SLO:', { qChapter, qSubject, qBook, qGrade: qGradeNormalized });
           }
           failedNoSLO++;
         }
@@ -771,24 +699,12 @@ const QuizGeneration = () => {
       if (!bookMatch) failedBook++;
       
       if (gradeMatch && subjectMatch && bookMatch && chapterMatch && qSLO) {
-        console.log('✅ SLO Match found:', { qChapter, qSLO, qSubject, qBook, numericSubjectId, numericBookId });
         slos.add(qSLO);
         matchedCount++;
       }
     });
     
-    console.log('📊 SLO Search Summary:', {
-      totalQuestions: questions.length,
-      matched: matchedCount,
-      failedGrade,
-      failedSubject,
-      failedBook,
-      failedChapter,
-      failedNoSLO
-    });
-    
     const sloArray = Array.from(slos).sort();
-    console.log(`✅ Available SLOs (${sloArray.length}):`, sloArray);
     return sloArray;
   }, [questions, selectedGrade, selectedSubject, selectedBook, selectedChapters, bookIdMap, subjectIdMap, foundSubjectId]);
 
@@ -914,13 +830,6 @@ const QuizGeneration = () => {
         if (selectedChapters.length > 0 && qChapter) {
           const isChapterMatch = selectedChapters.includes(qChapter);
           if (!isChapterMatch && type === 'multiple') {
-            console.log('❌ Chapter mismatch:', {
-              qChapter: `"${qChapter}"`,
-              selectedChapters,
-              selectedChaptersDebug: selectedChapters.map(c => `"${c}"`),
-              isIncluded: isChapterMatch,
-              selectedCount: selectedChapters.length
-            });
           }
         }
         
@@ -958,31 +867,13 @@ const QuizGeneration = () => {
           typesForSelectedCombo.get(key)!.add(qType);
         }
       });
-      
-      console.log('====== QUIZ SEARCH DEBUG ======');
-      console.log('SELECTED:');
-      console.log('  grade:', selectedGrade, '=> normalized:', selectedGradeNormalized);
-      console.log('  subject:', selectedSubjectLower);
-      console.log('  book:', selectedBookLower);
-      console.log('SAMPLE QUESTION FROM DB:');
-      console.log('  grade_raw:', sampleQuestionData?.grade_raw, '=> normalized:', sampleQuestionData?.grade_norm);
-      console.log('  subject:', sampleQuestionData?.subject);
-      console.log('  book:', sampleQuestionData?.book);
-      console.log('  type:', sampleQuestionData?.type, '=> normalized:', sampleQuestionData?.type_norm);
-      console.log('ALL TYPES FOUND FOR SELECTED COMBO (raw -> normalized):');
       if (typesForSelectedCombo.size === 0) {
-        console.log('  (NO TYPES FOUND - checking if questions have type field...)');
+        // No types found
       } else {
         typesForSelectedCombo.forEach((rawTypes, normalized) => {
-          console.log(`  ${normalized}: [${Array.from(rawTypes).join(', ')}]`);
+          // Types found
         });
       }
-      console.log('ALL GRADE|SUBJECT|BOOK COMBOS IN DATABASE:');
-      Array.from(allGradeSubjectBookCombos).forEach(combo => console.log('  ', combo));
-      console.log('RESULTS:');
-      console.log('  total_questions:', totalQuestions);
-      console.log('  matched_for_type_"' + type + '":', matchCount);
-      console.log('==============================');
     }
     
     return matchCount;
@@ -1014,25 +905,7 @@ const QuizGeneration = () => {
     });
 
     if (debugQuestionsForCombo.length > 0 && process.env.NODE_ENV === 'development') {
-      console.log('📊 DEBUG: Questions found for grade/subject/book:', {
-        grade: selectedGrade,
-        subject: selectedSubject,
-        book: selectedBook,
-        totalFound: debugQuestionsForCombo.length,
-        types: [...new Set(debugQuestionsForCombo.map(q => {
-          const raw = q.type || q.questionType || 'UNKNOWN';
-          const normalized = normalizeQuestionType((raw || '').toLowerCase());
-          return `${raw} -> ${normalized}`;
-        }))],
-        sampleQuestion: {
-          type: debugQuestionsForCombo[0].type,
-          questionType: debugQuestionsForCombo[0].questionType,
-          difficulty: debugQuestionsForCombo[0].difficulty,
-          chapter: debugQuestionsForCombo[0].chapter,
-          slo: debugQuestionsForCombo[0].slo,
-          questionText: (debugQuestionsForCombo[0].questionText || '').substring(0, 50),
-        },
-      });
+      // Debug info available
     }
 
     Object.entries(questionConfig).forEach(([type, config]) => {
@@ -1103,33 +976,14 @@ const QuizGeneration = () => {
         
         // Log questions that don't match to help debug
         if (!allMatch && type === 'multiple' && q.questionText && q.questionText.substring(0, 50)) {
-          console.log(`❌ Question excluded: "${q.questionText.substring(0, 50)}..."`, {
-            gradeMatch,
-            subjectMatch,
-            bookMatch,
-            typeMatch,
-            difficultyMatch,
-            chapterMatch,
-            sloMatch,
-            qChapter,
-            selectedChapters,
-            qSLO,
-            selectedSLOs,
-          });
         }
 
         return gradeMatch && subjectMatch && bookMatch && chapterMatch && sloMatch && typeMatch && difficultyMatch;
       });
 
       if (process.env.NODE_ENV === 'development') {
-        console.log(`📊 Questions of type "${type}": ${typeQuestions.length} available`);
         if (typeQuestions.length === 0 && debugQuestionsForCombo.length > 0) {
-          console.log(`⚠️  No ${type} questions found even though grade/subject/book combo has ${debugQuestionsForCombo.length} questions total`);
-          console.log('Available types in this combo:', [...new Set(debugQuestionsForCombo.map(q => {
-            const raw = q.type || q.questionType;
-            const normalized = normalizeQuestionType((raw || '').toLowerCase());
-            return `${raw}=>${normalized}`;
-          }))]);
+          // Debug: log available types
         }
       }
 
@@ -1327,7 +1181,6 @@ const QuizGeneration = () => {
       setShowConfirmModal(false);
       alert(`Quiz '${quizTitle}' created with ${questions.length} questions. Configure settings and assign to students if needed.`);
     } catch (error) {
-      console.error('Error saving quiz:', error);
       const errorMsg = error instanceof Error ? error.message : String(error);
       alert('Error saving quiz: ' + errorMsg);
     } finally {
@@ -1488,7 +1341,6 @@ const QuizGeneration = () => {
             })
           });
         } catch (assignError) {
-          console.warn('Warning: Assignment failed:', assignError);
           // Don't block the save if assignment fails
         }
       }
@@ -1520,15 +1372,12 @@ const QuizGeneration = () => {
       });
       
       if (!response.ok) {
-        console.error('API response not OK:', response.status, response.statusText);
         throw new Error(`API returned ${response.status}: ${response.statusText}`);
       }
       
       const data = await response.json();
-      console.log('📋 Fetched questions for replacement:', { totalFetched: data?.questions?.length || 0, currentQuestionType: currentQuestion.type, currentQuestionGrade: currentQuestion.grade, currentQuestionSubject: currentQuestion.subject });
       
       if (!data.questions || !Array.isArray(data.questions)) {
-        console.error('Invalid response format:', data);
         throw new Error('Invalid response format from API');
       }
       
@@ -1551,8 +1400,6 @@ const QuizGeneration = () => {
         return false;
       });
       
-      console.log('📌 Filtered replacement questions:', { count: filteredQuestions.length, type: normalizeQuestionType(currentQuestion.type.toLowerCase()), grade: currentQuestion.grade, subject: currentQuestion.subject });
-      
       if (filteredQuestions.length === 0) {
         alert(`No replacement questions found for type: ${currentQuestion.type}, Grade: ${currentQuestion.grade}, Subject: ${currentQuestion.subject}`);
       } else {
@@ -1561,7 +1408,6 @@ const QuizGeneration = () => {
         replaceQuestion(randomReplacement, index);
       }
     } catch (error) {
-      console.error('Error fetching replacement questions:', error);
       alert('Error fetching replacement questions: ' + (error instanceof Error ? error.message : String(error)));
     } finally {
       setReplaceLoading(prev => ({ ...prev, [index]: false }));
@@ -2048,7 +1894,6 @@ const QuizGeneration = () => {
           const arrayBuffer = await blob.arrayBuffer();
           return new Uint8Array(arrayBuffer);
         } catch (error) {
-          console.error('Error fetching image:', error);
           return null;
         }
       };
@@ -2480,7 +2325,6 @@ const QuizGeneration = () => {
       downloadBlob(blob, `${generatedQuiz.title}.docx`);
       alert('Quiz Word document downloaded!');
     } catch (error) {
-      console.error('Error generating Word document:', error);
       alert('Error generating Word document: ' + (error instanceof Error ? error.message : String(error)));
     }
   };
@@ -2690,22 +2534,22 @@ const QuizGeneration = () => {
                             // Use subjectGradePairs for Teachers
                             const normalizedSelectedGrade = normalizeGrade(selectedGrade);
                             return subjectGradePairs
-                              .filter(p => normalizeGrade(p.grade) === normalizedSelectedGrade)
-                              .map(p => p.subject)
-                              .filter((v, i, a) => a.indexOf(v) === i)
-                              .map(subject => (
+                              .filter((p: any) => normalizeGrade(p.grade) === normalizedSelectedGrade)
+                              .map((p: any) => p.subject)
+                              .filter((v: any, i: any, a: any) => a.indexOf(v) === i)
+                              .map((subject: any) => (
                                 <option key={subject} value={subject}>{subject}</option>
                               ));
                           } else {
                             // Fallback to assignedBooks
                             return assignedBooks
-                              .filter(b => {
+                              .filter((b: any) => {
                                 const normalizedBookGrade = normalizeGrade(b.grade);
                                 return normalizedBookGrade === selectedGrade;
                               })
-                              .map(b => b.subject)
-                              .filter((v, i, a) => a.indexOf(v) === i)
-                              .map(subject => (
+                              .map((b: any) => b.subject)
+                              .filter((v: any, i: any, a: any) => a.indexOf(v) === i)
+                              .map((subject: any) => (
                                 <option key={subject} value={subject}>{subject}</option>
                               ));
                           }
@@ -2729,14 +2573,6 @@ const QuizGeneration = () => {
                         {(() => {
                           // Use the pre-built books object to get books for selected grade and subject
                           const availableBooks = books[String(selectedGrade)]?.[selectedSubject] || [];
-                          console.log('📖 Book Selection Debug:', {
-                            selectedGrade,
-                            selectedSubject,
-                            availableBooksLength: availableBooks.length,
-                            availableBooks,
-                            bookIdMap,
-                            booksObject: books
-                          });
                           return availableBooks.map(bookObj => {
                             const bookTitle = typeof bookObj === 'string' ? bookObj : bookObj.title;
                             return (

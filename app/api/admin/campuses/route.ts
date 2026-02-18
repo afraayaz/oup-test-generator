@@ -112,7 +112,6 @@ export async function GET(request: Request) {
     
     return NextResponse.json({ campuses });
   } catch (error: any) {
-    console.error('API route error:', error);
     return NextResponse.json(
       { error: 'Failed to fetch campuses', details: error.message },
       { status: 500 }
@@ -181,7 +180,6 @@ export async function POST(request: Request) {
       campus: { id: parsed.id, ...parsed.data } 
     });
   } catch (error: any) {
-    console.error('API route error:', error);
     return NextResponse.json(
       { error: 'Failed to create campus', details: error.message },
       { status: 500 }

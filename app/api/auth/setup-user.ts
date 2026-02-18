@@ -35,7 +35,6 @@ export async function POST(request: Request) {
 
     if (!response.ok) {
       const errorData = await response.json();
-      console.error('Firestore error:', errorData);
       return NextResponse.json(
         { error: `Failed to create user record: ${errorData.error?.message || 'Unknown error'}` },
         { status: response.status }
@@ -53,7 +52,6 @@ export async function POST(request: Request) {
       { status: 201 }
     );
   } catch (error: any) {
-    console.error('Error creating user record:', error);
     return NextResponse.json(
       { error: error.message || 'Failed to create user record' },
       { status: 500 }

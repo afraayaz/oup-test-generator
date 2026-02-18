@@ -96,18 +96,11 @@ function QuizAttemptPageContent() {
           // Allow quizzes without quizFormat (legacy) or with quizFormat === 'Online'
           // Only reject if explicitly set to 'Offline'
           if (quizData && quizData.quizFormat !== 'Offline') {
-            console.log('📋 Quiz loaded:', {
-              title: quizData.title,
-              totalItems: quizData.items?.length,
-              firstItemCognitiveLevel: quizData.items?.[0]?.cognitiveLevel,
-              firstItemFields: Object.keys(quizData.items?.[0] || {}),
-            });
             setQuiz(quizData);
             setTimeRemaining((quizData.timeLimitMinutes || 30) * 60);
           }
         }
       } catch (error) {
-        console.error('Error fetching quiz:', error);
       } finally {
         setLoading(false);
       }
@@ -311,16 +304,11 @@ function QuizAttemptPageContent() {
       
       if (response.ok) {
         const data = await response.json();
-        console.log('✅ Quiz submission response:', data);
-        console.log('📊 Question Results:', data.questionResults);
-        console.log('📈 Cognitive Breakdown:', data.cognitiveBreakdown);
         setResultsData(data);
       } else {
         const errorData = await response.json();
-        console.error('❌ Quiz submission error:', errorData);
       }
     } catch (error) {
-      console.error('Error saving quiz attempt:', error);
     }
   };
 
@@ -711,7 +699,6 @@ function QuizAttemptPageContent() {
               <div className="absolute top-4 left-4 right-4 flex items-center justify-between">
                 <button
                   onClick={() => {
-                    console.log('📂 Opening breakdown modal, questionResults:', questionResults);
                     setShowBreakdownModal(true);
                   }}
                   className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition font-medium flex items-center gap-2"
@@ -822,44 +809,41 @@ function QuizAttemptPageContent() {
             {/* Question Breakdown Modal */}
             {showBreakdownModal && (
               <>
-                {console.log('🎬 Modal is rendering, showBreakdownModal:', showBreakdownModal, 'questionResults:', questionResults)}
-                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 lg:ml-64">
-                <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[90vh] overflow-hidden flex flex-col">
-                  {/* Modal Header */}
-                  <div className="bg-gradient-to-r from-purple-600 to-purple-700 text-white p-3 sm:p-4">
-                    <div className="flex items-start justify-between mb-2">
-                      <div className="flex-1">
-                        <h2 className="text-lg sm:text-xl font-bold">Question Breakdown</h2>
-                        <p className="text-purple-100 mt-0.5 text-xs sm:text-sm">{questionResults.length} questions</p>
-                      </div>
-                      <button
-                        onClick={() => setShowBreakdownModal(false)}
-                        className="text-white hover:bg-white hover:bg-opacity-20 rounded-full p-2 transition flex-shrink-0 ml-2"
-                      >
-                        <i className="ri-close-line text-xl"></i>
-                      </button>
-                    </div>
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-2 sm:p-4">
+                  <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col">
                     
-                    {/* Cognitive Level Performance in Modal */}
-                    {resultsData?.cognitiveBreakdown && (
-                      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-1.5 mt-2 pt-2.5 border-t border-purple-400">
-                        {Object.entries(resultsData.cognitiveBreakdown).map(([level, data]: [string, any]) => {
-                          const percentage = data.percentage;
-                          const performanceColor = percentage >= 80 ? 'text-green-300' : percentage >= 60 ? 'text-yellow-300' : 'text-red-300';
-                          return (
-                            <div key={level} className="text-xs">
-                              <p className="font-semibold text-purple-100 truncate">{level}</p>
-                              <p className={`text-base font-bold ${performanceColor}`}>{percentage}%</p>
-                              <p className="text-purple-100 text-2xs">{data.correct}/{data.total}</p>
-                              {data.questionIndices && data.questionIndices.length > 0 && (
-                                <p className="text-purple-100 text-2xs mt-0.5 truncate">Q: {data.questionIndices.map((idx: number) => idx + 1).join(',')}</p>
-                              )}
-                            </div>
-                          );
-                        })}
+                    {/* Modal Header with Cognitive Breakdown */}
+                    <div className="bg-gradient-to-r from-purple-600 to-blue-600 text-white p-3 sm:p-6 rounded-t-2xl">
+                      <div className="flex justify-between items-center mb-3 sm:mb-4">
+                        <h3 className="text-lg sm:text-xl font-bold">Detailed Results</h3>
+                        <button
+                          onClick={() => setShowBreakdownModal(false)}
+                          className="text-white hover:text-gray-200 transition"
+                        >
+                          <i className="ri-close-line text-2xl"></i>
+                        </button>
                       </div>
-                    )}
-                  </div>
+                      
+                      {/* Cognitive Level Breakdown Grid */}
+                      {resultsData?.cognitiveBreakdown && Object.keys(resultsData.cognitiveBreakdown).length > 0 && (
+                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2 sm:gap-3">
+                          {Object.entries(resultsData.cognitiveBreakdown).map(([level, data]: [string, any]) => {
+                            const percentage = data.percentage;
+                            const performanceColor = percentage >= 80 ? 'text-green-300' : percentage >= 60 ? 'text-yellow-300' : 'text-red-300';
+                            return (
+                              <div key={level} className="text-xs">
+                                <p className="font-semibold text-purple-100 truncate">{level}</p>
+                                <p className={`text-base font-bold ${performanceColor}`}>{percentage}%</p>
+                                <p className="text-purple-100 text-2xs">{data.correct}/{data.total}</p>
+                                {data.questionIndices && data.questionIndices.length > 0 && (
+                                  <p className="text-purple-100 text-2xs mt-0.5 truncate">Q: {data.questionIndices.map((idx: number) => idx + 1).join(',')}</p>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
 
                   {/* Modal Body - Scrollable */}
                   <div className="overflow-y-auto flex-1 p-4 sm:p-6 space-y-3 sm:space-y-4">

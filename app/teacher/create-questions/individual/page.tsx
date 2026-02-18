@@ -93,7 +93,6 @@ function TeacherCreateIndividualQuestionPageContent() {
       
       setTimeout(() => setSuccessMessage(""), 5000); // Show message for 5 seconds
     } catch (error) {
-      console.error("Error creating question:", error);
       setSuccessMessage("❌ Failed to create question. Please try again.");
       window.scrollTo({ top: 0, behavior: 'smooth' });
     } finally {

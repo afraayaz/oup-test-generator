@@ -63,8 +63,8 @@ export default function BulkUploadPage({
       return [];
     }
     const grades = user.assignedBooks
-      .map((book) => book.grade)
-      .filter((value, index, self) => self.indexOf(value) === index);
+      .map((book: any) => book.grade)
+      .filter((value: any, index: any, self: any) => self.indexOf(value) === index);
     return grades.sort();
   };
 
@@ -89,7 +89,7 @@ export default function BulkUploadPage({
       return [];
     }
     return user.assignedBooks.filter(
-      (book) => (!formData.grade || book.grade === formData.grade) && 
+      (book: any) => (!formData.grade || book.grade === formData.grade) && 
                  (!formData.subject || book.subject === formData.subject)
     );
   };
@@ -256,7 +256,6 @@ export default function BulkUploadPage({
         });
       } catch (error) {
         setToast({ type: "error", message: "Error reading file" });
-        console.error(error);
       }
     };
 
@@ -311,16 +310,6 @@ export default function BulkUploadPage({
         if (row.questionType === "MCQ") {
           options = [row.optionA || "", row.optionB || "", row.optionC || "", row.optionD || ""];
           
-          // Log to debug what we're finding
-          console.log(`[BulkUpload] MCQ Row data:`, {
-            optionA: row.optionA,
-            optionB: row.optionB,
-            optionC: row.optionC,
-            optionD: row.optionD,
-            allRowKeys: Object.keys(row),
-            allRowData: row
-          });
-          
           // Handle correctAnswer that can be:
           // 1. Single letter (A, B, C, D) - map to option text
           // 2. Multiple options comma-separated (sparrow, egg) - use as-is
@@ -372,11 +361,6 @@ export default function BulkUploadPage({
           slo: row.slo || "",
         };
 
-        // Log what we're sending
-        if (questionType === "multiple") {
-          console.log(`[BulkUpload] Sending MCQ with options:`, { options, correctAnswer });
-        }
-
         const response = await fetch(apiEndpoint, {
           method: "POST",
           headers: {
@@ -399,7 +383,6 @@ export default function BulkUploadPage({
         // Update progress after response is received
         setUploadProgress(((i + 1) / total) * 100);
       } catch (error) {
-        console.error(error);
         // Still update progress even on error
         setUploadProgress(((i + 1) / total) * 100);
       }
@@ -508,7 +491,7 @@ export default function BulkUploadPage({
                         className="w-full px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 min-h-[44px]"
                       >
                         <option value="">Select Grade</option>
-                        {getAvailableGrades().map((grade) => (
+                        {getAvailableGrades().map((grade: any) => (
                           <option key={grade} value={grade}>
                             {grade}
                           </option>
@@ -551,7 +534,7 @@ export default function BulkUploadPage({
                           className="w-full px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 min-h-[44px]"
                         >
                           <option value="">Select Book</option>
-                          {getAvailableBooks().map((book) => (
+                          {getAvailableBooks().map((book: any) => (
                             <option key={book.id} value={book.title}>
                               {book.title}
                             </option>

@@ -87,7 +87,6 @@ export default function CreateQuizPage() {
               }
             });
           } catch (err) {
-            console.log('Note: Could not fetch OUP questions');
           }
         }
 
@@ -103,7 +102,6 @@ export default function CreateQuizPage() {
               }
             });
           } catch (err) {
-            console.log('Note: Could not fetch school questions');
           }
         }
 
@@ -115,7 +113,6 @@ export default function CreateQuizPage() {
 
         setChapters(chaptersList);
       } catch (error) {
-        console.error('Error loading chapters:', error);
         setChapters([]);
       }
     };
@@ -174,7 +171,6 @@ export default function CreateQuizPage() {
 
       setAllQuestions(questions);
     } catch (error) {
-      console.error('Error fetching questions:', error);
     }
     setLoading(false);
   };
@@ -228,7 +224,6 @@ export default function CreateQuizPage() {
         <div className="flex-1 lg:ml-64">
           {/* Header */}
           <div className="bg-white border-b border-gray-200 px-4 sm:px-6 lg:px-8 py-4">
-            <div className="flex items-center gap-3">
             <div className="flex items-center gap-3">
               <button
                 onClick={() => setSidebarOpen(true)}

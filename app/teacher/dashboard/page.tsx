@@ -293,7 +293,6 @@ export default function TeacherDashboard() {
           setAssignedQuizzes(onlineWithAssignments);
         }
       } catch (error) {
-        console.error('Error fetching quiz data:', error);
       } finally {
         setLoadingQuizzes(false);
       }
@@ -304,21 +303,11 @@ export default function TeacherDashboard() {
 
   // Fetch question counts for all assigned books
   useEffect(() => {
-    console.log('🔍 useEffect triggered - Checking conditions...');
-    console.log('📚 user?.assignedBooks:', user?.assignedBooks);
-    console.log('👨‍🏫 user?.subjectGradePairs:', user?.subjectGradePairs);
-    console.log('🏫 user?.schoolId:', user?.schoolId);
-    console.log('✅ assignedBooks length:', user?.assignedBooks?.length);
-    console.log('✅ subjectGradePairs length:', user?.subjectGradePairs?.length);
     
     // Early return if missing required data
     if (!user?.assignedBooks || user.assignedBooks.length === 0 || !user?.schoolId) {
-      console.log('❌ Early return: Missing assignedBooks or schoolId');
       return;
     }
-    
-    console.log('✅ Starting to fetch question counts for', user.assignedBooks.length, 'books');
-    console.log('📋 Assigned Books:', JSON.stringify(user.assignedBooks, null, 2));
     setLoadingQuestions(true);
     const fetchQuestionCounts = async () => {
       try {
@@ -330,7 +319,6 @@ export default function TeacherDashboard() {
           next: { revalidate: 600 } // Cache for 10 minutes
         });
         const oupData = oupResponse.ok ? await oupResponse.json() : { documents: [] };
-        console.log('📡 OUP Response OK:', oupResponse.ok, 'Documents:', oupData.documents?.length || 0);
         
         // Fetch School questions with pageSize limit
         const schoolUrl = `https://firestore.googleapis.com/v1/projects/quiz-app-ff0ab/databases/(default)/documents/questions/schools/${user.schoolId}?pageSize=1000`;
@@ -338,7 +326,6 @@ export default function TeacherDashboard() {
           next: { revalidate: 600 } // Cache for 10 minutes
         });
         const schoolData = schoolResponse.ok ? await schoolResponse.json() : { documents: [] };
-        console.log('📡 School Response OK:', schoolResponse.ok, 'Documents:', schoolData.documents?.length || 0);
         
         // Helper to parse Firestore values
         const parseFirestoreValue = (value: any): any => {
@@ -360,78 +347,49 @@ export default function TeacherDashboard() {
         // Parse OUP questions and group by book+subject+grade
         const oupQuestions = oupData.documents || [];
         const oupByBook: { [key: string]: number } = {};
-        console.log('🔍 Total OUP Documents:', oupQuestions.length);
         oupQuestions.forEach((doc: any, idx: number) => {
           const rawBook = doc.fields?.book;
           const rawSubject = doc.fields?.subject;
           const rawGrade = doc.fields?.grade;
           
-          console.log(`📄 OUP Doc ${idx}:`, {
-            book: rawBook,
-            subject: rawSubject,
-            grade: rawGrade
-          });
-          
           const book = parseFirestoreValue(rawBook);
           const subject = parseFirestoreValue(rawSubject);
           const grade = String(parseFirestoreValue(rawGrade) || '').replace('Grade ', '').trim();
           
-          console.log(`  Parsed: book="${book}", subject="${subject}", grade="${grade}"`);
-          
           if (book && subject && grade) {
             const key = `${book.toLowerCase()}-${subject.toLowerCase()}-${grade}`;
             oupByBook[key] = (oupByBook[key] || 0) + 1;
-            console.log(`✅ OUP Question: book="${book}", subject="${subject}", grade="${grade}" → key="${key}"`);
           } else {
-            console.log(`⚠️ OUP Question skipped (missing fields): book="${book}", subject="${subject}", grade="${grade}"`);
           }
         });
-        console.log('📊 OUP Questions by Book:', oupByBook);
         
         // Parse School questions and group by book+subject+grade
         const schoolQuestions = schoolData.documents || [];
         const schoolByBook: { [key: string]: number } = {};
-        console.log('🔍 Total School Documents:', schoolQuestions.length);
         schoolQuestions.forEach((doc: any, idx: number) => {
           const rawBook = doc.fields?.book;
           const rawSubject = doc.fields?.subject;
           const rawGrade = doc.fields?.grade;
           
-          console.log(`📄 School Doc ${idx}:`, {
-            book: rawBook,
-            subject: rawSubject,
-            grade: rawGrade
-          });
-          
           const book = parseFirestoreValue(rawBook);
           const subject = parseFirestoreValue(rawSubject);
           const grade = String(parseFirestoreValue(rawGrade) || '').replace('Grade ', '').trim();
           
-          console.log(`  Parsed: book="${book}", subject="${subject}", grade="${grade}"`);
-          
           if (book && subject && grade) {
             const key = `${book.toLowerCase()}-${subject.toLowerCase()}-${grade}`;
             schoolByBook[key] = (schoolByBook[key] || 0) + 1;
-            console.log(`✅ School Question: book="${book}", subject="${subject}", grade="${grade}" → key="${key}"`);
           } else {
-            console.log(`⚠️ School Question skipped (missing fields): book="${book}", subject="${subject}", grade="${grade}"`);
           }
         });
-        console.log('📊 School Questions by Book:', schoolByBook);
         
         // Build counts object for each book in subjectGradePairs
         // This ensures we have the subject information
-        console.log('👨‍🏫 Teacher SubjectGradePairs:', user.subjectGradePairs);
-        console.log('👨‍🏫 Teacher Subjects:', user.subjects);
-        console.log('👨‍🏫 Teacher AssignedGrades:', user.assignedGrades);
-        console.log('👨‍🏫 Teacher AssignedBooks:', user.assignedBooks);
         
         // REVERSE MATCHING: If subjects aren't available, extract them from the questions!
         // For each assigned book, find what subject(s) have questions for that book-grade combo
-        console.log('🔄 Attempting reverse matching - finding subjects from questions...');
         
         if (user.assignedBooks && user.assignedBooks.length > 0) {
-          user.assignedBooks.forEach(book => {
+          user.assignedBooks.forEach((book: any) => {
             const bookTitle = book.title.toLowerCase();
             const bookGrade = book.grade.replace('Grade ', '').trim();
             
@@ -444,7 +402,6 @@ export default function TeacherDashboard() {
             );
             
             const allMatchingKeys = [...matchingOupKeys, ...matchingSchoolKeys];
-            console.log(`  Book "${book.title}" Grade ${book.grade}:`, { matchingOupKeys, matchingSchoolKeys, allMatchingKeys });
             
             // Extract subject from matching keys (format: "book-subject-grade")
             if (allMatchingKeys.length > 0) {
@@ -455,28 +412,19 @@ export default function TeacherDashboard() {
               const oupCount = matchingOupKeys.reduce((sum, key) => sum + (oupByBook[key] || 0), 0);
               const schoolCount = matchingSchoolKeys.reduce((sum, key) => sum + (schoolByBook[key] || 0), 0);
               
-              console.log(`    ✅ Found matching key "${firstKey}", extracted subject: "${subject}", OUP: ${oupCount}, School: ${schoolCount}`);
-              
               counts[book.id] = {
                 oup: oupCount,
                 school: schoolCount,
                 total: oupCount + schoolCount
               };
             } else {
-              console.log(`    ❌ No matching questions found for book "${book.title}" Grade ${book.grade}`);
               counts[book.id] = { oup: 0, school: 0, total: 0 };
             }
           });
         }
         
-        console.log('📚 Reverse matching complete, final counts:', counts);
-        console.log('🎯 Final OUP by Book Keys:', Object.keys(oupByBook));
-        console.log('🎯 Final School by Book Keys:', Object.keys(schoolByBook));
-        
         setQuestionCounts(counts);
-        console.log('✅ Question counts fetched:', counts);
       } catch (error) {
-        console.error('❌ Error fetching question counts:', error);
       } finally {
         setLoadingQuestions(false);
       }
@@ -494,7 +442,7 @@ export default function TeacherDashboard() {
   };
 
   // Group books by Subject and Grade
-  const groupedBooks = user?.assignedBooks?.reduce((acc, book) => {
+  const groupedBooks = user?.assignedBooks?.reduce((acc: any, book: any) => {
     const groupKey = `${book.subject}-${book.grade}`;
     if (!acc[groupKey]) {
       acc[groupKey] = {
@@ -525,10 +473,6 @@ export default function TeacherDashboard() {
   }
 
   // Debug logging
-  console.log('🎯 Teacher Dashboard - User:', user);
-  console.log('🎯 Teacher Dashboard - Assigned Books:', user?.assignedBooks);
-  console.log('🎯 Teacher Dashboard - Assigned Books Type:', typeof user?.assignedBooks);
-  console.log('🎯 Teacher Dashboard - Assigned Books Length:', user?.assignedBooks?.length);
 
   return (
     <div className="flex min-h-screen bg-[#F9FAFB]">
@@ -597,7 +541,7 @@ export default function TeacherDashboard() {
             </div>
             <div className="space-y-3">
               {user?.assignedBooks && user.assignedBooks.length > 0 ? (
-                Object.entries(groupedBooks).map(([groupKey, group]) => (
+                Object.entries(groupedBooks).map(([groupKey, group]: [string, any]) => (
                   <BookGroupSection
                     key={groupKey}
                     groupTitle={`${group.subject} - ${group.grade.toString().replace(/^Grade\s/, 'Grade ')}`}

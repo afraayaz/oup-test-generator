@@ -24,11 +24,6 @@ function TeacherCreateQuestionPageContent() {
 
   // Debug log
   React.useEffect(() => {
-    console.log('👨‍🏫 Create Questions page - user:', {
-      name: user?.name,
-      subjectGradePairs: user?.subjectGradePairs,
-      subjectGradePairsLength: user?.subjectGradePairs?.length,
-    });
   }, [user]);
 
   if (!user) {

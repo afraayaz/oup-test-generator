@@ -45,7 +45,6 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ books });
   } catch (error) {
-    console.error('Error fetching books by subject:', error);
     return NextResponse.json(
       { error: 'Failed to fetch books' },
       { status: 500 }

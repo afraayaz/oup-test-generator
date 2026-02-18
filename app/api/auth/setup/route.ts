@@ -42,7 +42,6 @@ export async function POST(request: Request) {
       { status: 201 }
     );
   } catch (error: any) {
-    console.error('Error creating user record:', error);
     return NextResponse.json(
       { error: error.message || 'Failed to create user record' },
       { status: 500 }

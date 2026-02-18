@@ -38,10 +38,8 @@ function CreateIndividualQuestionPageContent() {
         }
         
         const userSubjects = Array.from(uniqueSubjects);
-        console.log('👤 CC assigned subjects (from books):', userSubjects);
         
         if (userSubjects.length === 0) {
-          console.log('⚠️ No subjects found in assignedBooks');
           return;
         }
         
@@ -50,7 +48,6 @@ function CreateIndividualQuestionPageContent() {
           const response = await fetch(`/api/admin/books-by-subject?subject=${encodeURIComponent(subjectName)}`);
           const data = await response.json();
           const books = data.books || [];
-          console.log(`📚 Fetched books for ${subjectName}:`, books.length);
           
           // Ensure each book has the subject field set
           return books.map((book: any) => ({
@@ -61,12 +58,8 @@ function CreateIndividualQuestionPageContent() {
         
         const booksArrays = await Promise.all(allBooksPromises);
         const allBooks = booksArrays.flat();
-        
-        console.log('📚 Total systemBooks for CC:', allBooks.length);
-        console.log('📚 SystemBooks with subjects:', allBooks.map(b => ({ title: b.title, subject: b.subject, grade: b.grade })));
         setSystemBooks(allBooks);
       } catch (error) {
-        console.error('❌ Error fetching system books:', error);
       }
     };
     
@@ -85,8 +78,6 @@ function CreateIndividualQuestionPageContent() {
     const booksSource = user?.role === 'content_creator' && systemBooks.length > 0 
       ? systemBooks 
       : (user?.assignedBooks || []);
-
-    console.log('📖 Books source for form:', user?.role === 'content_creator' ? 'systemBooks' : 'assignedBooks', booksSource.length);
 
     booksSource.forEach((book: any) => {
       grades.add(book.grade);
@@ -108,7 +99,6 @@ function CreateIndividualQuestionPageContent() {
   }, [user?.assignedBooks, user?.role, systemBooks]);
 
   const handleQuestionSubmit = async (questionData: QuestionFormData) => {
-    console.log('🎯 Submit called with userId:', user?.uid, 'User object:', user);
     
     if (!user || !user.uid) {
       alert("Please wait for user profile to load");
@@ -116,11 +106,6 @@ function CreateIndividualQuestionPageContent() {
     }
     setLoading(true);
     try {
-      console.log('[CreateQuestion] Submitting question data:', {
-        questionText: questionData.questionText,
-        allFields: Object.keys(questionData),
-        fullData: questionData
-      });
 
       const response = await fetch("/api/oup-creator/questions", {
         method: "POST",
@@ -148,7 +133,6 @@ function CreateIndividualQuestionPageContent() {
       
       setTimeout(() => setSuccessMessage(""), 5000); // Show message for 5 seconds
     } catch (error) {
-      console.error("Error creating question:", error);
       setSuccessMessage("❌ Failed to create question. Please try again.");
       window.scrollTo({ top: 0, behavior: 'smooth' });
     } finally {

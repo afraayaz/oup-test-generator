@@ -81,7 +81,6 @@ export default function ContentMonitoring() {
       }
     } catch (error) {
       setSubjectsError('Failed to load subjects');
-      console.error('Error fetching subjects:', error);
     } finally {
       setSubjectsLoading(false);
     }
@@ -234,7 +233,6 @@ export default function ContentMonitoring() {
         }
       } catch (error) {
         alert('Failed to create subject. Please try again.');
-        console.error('Error creating subject:', error);
       }
     }
   };
@@ -282,7 +280,6 @@ export default function ContentMonitoring() {
         }
       } catch (error) {
         alert('Failed to add book. Please try again.');
-        console.error('Error adding book:', error);
       }
     }
   };
@@ -302,7 +299,6 @@ export default function ContentMonitoring() {
         }
       } catch (error) {
         alert('Failed to delete subject. Please try again.');
-        console.error('Error deleting subject:', error);
       }
     }
   };
@@ -332,18 +328,11 @@ export default function ContentMonitoring() {
         }
       } catch (error) {
         alert('Failed to delete book. Please try again.');
-        console.error('Error deleting book:', error);
       }
     }
   };
 
   const handleManageChapters = async (book: any, subject: any) => {
-    console.log('📚 [Manage Chapters] Opening for book:', {
-      bookId: book.id,
-      bookTitle: book.title,
-      subjectId: subject.id,
-      subjectName: subject.name
-    });
     
     setSelectedBook(book);
     setSelectedBookSubjectId(subject.id);
@@ -351,16 +340,13 @@ export default function ContentMonitoring() {
     // Fetch existing chapters
     try {
       const url = `/api/admin/books/chapters?bookId=${book.id}&subjectId=${subject.id}`;
-      console.log('📚 [Manage Chapters] Fetching from:', url);
       
       const response = await fetch(url);
       if (response.ok) {
         const data = await response.json();
-        console.log('📚 [Manage Chapters] Received chapters:', data.chapters?.length || 0);
         setExistingChapters(data.chapters || []);
       }
     } catch (error) {
-      console.error('Error fetching chapters:', error);
       setExistingChapters([]);
     }
     
@@ -412,7 +398,6 @@ export default function ContentMonitoring() {
         }
       } catch (error) {
         alert('Failed to update subject. Please try again.');
-        console.error('Error updating subject:', error);
       }
     }
   };
@@ -467,7 +452,6 @@ export default function ContentMonitoring() {
         }
       } catch (error) {
         alert('Failed to update book. Please try again.');
-        console.error('Error updating book:', error);
       }
     }
   };

@@ -134,25 +134,14 @@ export default function ContentCreatorDashboard() {
     try {
       setLoading(true);
       
-      console.log('🔍 Fetching dashboard data for user:', user.uid);
-      
       // Fetch all questions created by this content creator
       // Note: API stores as 'createdBy', not 'createdById'
       const questionsRef = collection(db, 'questions', 'oup', 'items');
       const q = query(questionsRef, where('createdBy', '==', user.uid));
       const snapshot = await getDocs(q);
       
-      console.log('📊 Found questions:', snapshot.size);
-      
       const questions = snapshot.docs.map(doc => {
         const data = doc.data();
-        console.log('Question data:', {
-          id: doc.id,
-          createdById: data.createdById,
-          createdBy: data.createdBy,
-          subject: data.subject,
-          questionText: data.questionText?.substring(0, 50)
-        });
         return {
           id: doc.id,
           ...data
@@ -278,7 +267,6 @@ export default function ContentCreatorDashboard() {
       setHasFetched(true);
 
     } catch (error) {
-      console.error('Error fetching dashboard data:', error);
     } finally {
       setLoading(false);
     }
@@ -322,7 +310,7 @@ export default function ContentCreatorDashboard() {
             {user && (
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 bg-[#1F46D8] rounded-full flex items-center justify-center text-white text-sm font-bold">
-                  {(user.name || 'U').split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()}
+                  {(user.name || 'U').split(' ').map((n: any) => n[0]).join('').substring(0, 2).toUpperCase()}
                 </div>
                 <div className="hidden md:block">
                   <p className="text-sm font-bold text-[#0A0A0A]">{user.name || 'User'}</p>

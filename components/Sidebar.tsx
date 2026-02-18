@@ -244,7 +244,6 @@ export default function Sidebar({
     try {
       // Sign out from Firebase
       await signOut(auth);
-      console.log("✓ Signed out from Firebase");
       
       // Clear any session storage
       sessionStorage.removeItem('tab_id');
@@ -253,7 +252,6 @@ export default function Sidebar({
       // Redirect to login
       router.push("/login");
     } catch (error) {
-      console.error("Error signing out:", error);
       // Still redirect even if sign out fails
       router.push("/login");
     }
@@ -356,7 +354,7 @@ export default function Sidebar({
             <div className="bg-white/10 rounded-xl p-3 mb-3">
               <div className="flex items-center space-x-2">
                 <div className="w-10 h-10 bg-[#1F46D8] rounded-full flex items-center justify-center text-white text-xs font-semibold flex-shrink-0">
-                  {(user.name || 'U').split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()}
+                  {(user.name || 'U').split(' ').map((n: any) => n[0]).join('').substring(0, 2).toUpperCase()}
                 </div>
                 <div className="min-w-0 flex-1">
                   <p className="text-sm font-semibold text-[#FFFFFF] truncate">{user.name || 'User'}</p>

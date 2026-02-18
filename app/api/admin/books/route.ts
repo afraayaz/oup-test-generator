@@ -35,7 +35,6 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ book: { id: docRef.id, ...bookData } });
   } catch (error) {
-    console.error('Error creating book:', error);
     return NextResponse.json(
       { error: 'Failed to create book' },
       { status: 500 }
@@ -67,7 +66,6 @@ export async function PUT(request: NextRequest) {
 
     return NextResponse.json({ book: { id: bookId, ...bookData } });
   } catch (error) {
-    console.error('Error updating book:', error);
     return NextResponse.json(
       { error: 'Failed to update book' },
       { status: 500 }
@@ -92,7 +90,6 @@ export async function DELETE(request: NextRequest) {
 
     return NextResponse.json({ message: 'Book deleted successfully' });
   } catch (error) {
-    console.error('Error deleting book:', error);
     return NextResponse.json(
       { error: 'Failed to delete book' },
       { status: 500 }

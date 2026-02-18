@@ -12,19 +12,15 @@ export default function TestFirebasePage() {
     const testQuery = async () => {
       try {
         setStatus('Getting Firestore instance...');
-        console.log('Test page: Got db instance');
         setStatus('Fetching documents...');
         
         const ref = collection(db, 'questions');
-        console.log('Test page: Collection ref created, fetching...');
         
         const snapshot = await getDocs(ref);
-        console.log('Test page: Query completed, count:', snapshot.size);
         
         setCount(snapshot.size);
         setStatus('Query completed successfully!');
       } catch (err: any) {
-        console.error('Test page error:', err);
         setStatus('Error: ' + err.message);
       }
     };

@@ -40,7 +40,6 @@ export default function TeacherQuizzesPage() {
           setQuizzes(data.quizzes || []);
         }
       } catch (error) {
-        console.error('Error fetching quizzes:', error);
       } finally {
         setLoading(false);
       }
@@ -74,7 +73,6 @@ export default function TeacherQuizzesPage() {
         alert(`Error deleting quiz: ${errorData.error || 'Unknown error'}`);
       }
     } catch (error) {
-      console.error('Error deleting quiz:', error);
       alert('Error deleting quiz');
     } finally {
       setDeletingQuizId(null);
@@ -128,7 +126,6 @@ export default function TeacherQuizzesPage() {
         alert(`Failed to delete ${results.length - successfulDeletes} quiz${results.length - successfulDeletes > 1 ? 'es' : ''}`);
       }
     } catch (error) {
-      console.error('Error deleting quizzes:', error);
       alert('Error deleting quizzes');
     } finally {
       setIsDeletingBulk(false);

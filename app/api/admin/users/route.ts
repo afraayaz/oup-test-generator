@@ -41,7 +41,6 @@ export async function GET(request: Request) {
     
     return NextResponse.json({ users });
   } catch (error: any) {
-    console.error('API route error:', error);
     return NextResponse.json(
       { error: 'Failed to fetch users', details: error.message },
       { status: 500 }
@@ -178,7 +177,6 @@ export async function POST(request: Request) {
       user: { id: docRef.id, ...userData } 
     });
   } catch (error: any) {
-    console.error('API route error:', error);
     return NextResponse.json(
       { error: 'Failed to create user', details: error.message },
       { status: 500 }
@@ -217,7 +215,6 @@ export async function PUT(request: Request) {
       user: { id: updatedDoc.id, ...updatedDoc.data() } 
     });
   } catch (error: any) {
-    console.error('API route error:', error);
     return NextResponse.json(
       { error: 'Failed to update user', details: error.message },
       { status: 500 }
@@ -288,7 +285,6 @@ export async function DELETE(request: Request) {
       }
     });
   } catch (error: any) {
-    console.error('API route error:', error);
     return NextResponse.json(
       { error: 'Failed to delete user', details: error.message },
       { status: 500 }

@@ -165,7 +165,6 @@ export default function StudentDashboardPage() {
         setStats(calculatedStats);
         setHasFetched(true);
       } catch (error) {
-        console.error('Error fetching student data:', error);
       } finally {
         setIsLoading(false);
       }

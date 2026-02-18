@@ -142,31 +142,7 @@ export default function QuestionBank({
 
       setQuestions(allUserQuestions);
       
-      // Debug logging
-      console.log('[QuestionBank] Fetched questions:', {
-        total: allUserQuestions.length,
-        withImages: allUserQuestions.filter(q => q.imageUrl).length,
-        sampleQuestion: allUserQuestions[0] ? {
-          id: allUserQuestions[0].id,
-          allFields: Object.keys(allUserQuestions[0]),
-          imageUrl: allUserQuestions[0].imageUrl,
-          question: allUserQuestions[0].question,
-          questionText: allUserQuestions[0].questionText,
-          text: allUserQuestions[0].text,
-          content: allUserQuestions[0].content,
-          subject: allUserQuestions[0].subject,
-          isFromApprovalQueue: allUserQuestions[0].isFromApprovalQueue
-        } : null,
-        allQuestionFields: allUserQuestions.slice(0, 3).map(q => ({
-          id: q.id,
-          fields: Object.keys(q),
-          imageUrl: q.imageUrl,
-          questionField: q.question,
-          questionTextField: q.questionText
-        }))
-      });
     } catch (error) {
-      console.error("Error fetching questions:", error);
     } finally {
       setLoading(false);
     }
@@ -230,7 +206,6 @@ export default function QuestionBank({
         alert(`Error updating question: ${result.error}`);
       }
     } catch (error) {
-      console.error("Error updating question:", error);
       alert("Failed to update question");
     } finally {
       setIsSaving(false);
@@ -266,7 +241,6 @@ export default function QuestionBank({
         alert("Failed to delete question");
       }
     } catch (error) {
-      console.error("Error deleting question:", error);
       alert("Failed to delete question");
     }
   };
@@ -315,7 +289,6 @@ export default function QuestionBank({
         alert(`All ${successful.length} questions deleted successfully!`);
       }
     } catch (error) {
-      console.error("Error in delete all:", error);
       alert("Failed to delete questions. Please try again.");
     } finally {
       setIsDeleting(false);
@@ -386,7 +359,6 @@ export default function QuestionBank({
         alert(`All ${successful.length} questions deleted successfully!`);
       }
     } catch (error) {
-      console.error("Error in bulk delete:", error);
       alert("Failed to delete questions. Please try again.");
     } finally {
       setIsDeleting(false);

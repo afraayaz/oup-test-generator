@@ -55,11 +55,9 @@ export default function MyQuestions() {
         const data = await response.json();
         setQuestions(data.questions || []);
       } else {
-        console.error('Failed to fetch questions');
         setQuestions([]);
       }
     } catch (error) {
-      console.error('Error fetching questions:', error);
       setQuestions([]);
     }
     setLoading(false);

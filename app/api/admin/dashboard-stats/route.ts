@@ -73,11 +73,9 @@ export async function GET() {
       quizzes,
     });
   } catch (error: any) {
-    console.error('Dashboard stats error:', error);
     
     // Check for quota error
     if (error.message?.includes('quota') || error.code === 'RESOURCE_EXHAUSTED') {
-      console.warn('⚠️ Primary Firebase quota exceeded, switching to secondary');
       switchToSecondaryFirebase();
       
       try {
@@ -102,8 +100,6 @@ export async function GET() {
         const teacherCount = users.filter((u: any) => u.role === 'teacher').length;
         const adminCount = users.filter((u: any) => u.role === 'school_admin').length;
         const activeSchools = schools.filter((s: any) => s.status === 'Active').length;
-        
-        console.log('✅ Successfully fetched from secondary Firebase');
         return NextResponse.json({
           stats: {
             totalUsers,
@@ -122,7 +118,6 @@ export async function GET() {
           quizzes,
         });
       } catch (retryError) {
-        console.error('❌ Secondary Firebase also failed:', retryError);
         return NextResponse.json(
           { error: 'Firebase quota exceeded and backup unavailable' },
           { status: 503 }
