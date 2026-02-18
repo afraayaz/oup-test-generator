@@ -69,18 +69,34 @@ export default function LoginPage() {
             // If no custom claim, try to check Firestore via API
             if (!role) {
                 try {
+                    console.log('🔍 No custom claims found, checking Firestore for role...');
                     const response = await fetch('/api/auth/check-role', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ uid: user.uid, email: user.email }),
                     });
                     
+                    console.log('📡 API Response status:', response.status, response.ok);
+                    
                     if (response.ok) {
                         const data = await response.json();
+                        console.log('📦 API Response data:', data);
                         role = data.role;
+                        console.log('✅ Role from API:', role);
+                    } else if (response.status === 503) {
+                        // Both databases have quota exceeded
+                        const errorData = await response.json();
+                        console.error('⚠️ Service unavailable:', errorData);
+                        if (errorData.quotaExceeded) {
+                            throw new Error('Our database is temporarily at capacity. Please try again in a few hours or contact support@oup.com.pk');
+                        }
                     } else {
+                        const errorData = await response.json();
+                        console.error('❌ API returned error:', errorData);
                     }
                 } catch (error) {
+                    console.error('❌ Error calling check-role API:', error);
+                    // Silent fail - will try default fallback
                 }
             }
 
@@ -111,11 +127,10 @@ export default function LoginPage() {
                 router.replace(redirectPath);
                 return; // Exit early after redirect
             } else {
-                // No role found - default to admin dashboard
-                // The dashboard layout will check permissions and redirect if needed
-                setIsLoading(true); // Keep loading true during redirect
-                router.replace('/admin/dashboard');
-                return; // Exit early after redirect
+                // No role found - show error instead of defaulting to admin
+                setError('❌ Unable to verify your account role. Please contact your administrator.');
+                setIsLoading(false);
+                return;
             }
         } catch (error: any) {
             

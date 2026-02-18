@@ -85,6 +85,10 @@ let useSecondaryDb = false;
 export async function initializeSecondaryFirebase() {
   try {
     if (process.env.FIREBASE_PROJECT_ID_2 && process.env.FIREBASE_PRIVATE_KEY_2 && process.env.FIREBASE_CLIENT_EMAIL_2) {
+      console.log('🔍 Initializing secondary Firebase...');
+      console.log('   Primary Project ID:', process.env.FIREBASE_PROJECT_ID);
+      console.log('   Secondary Project ID:', process.env.FIREBASE_PROJECT_ID_2);
+      
       const secondaryServiceAccount = {
         projectId: process.env.FIREBASE_PROJECT_ID_2,
         privateKey: process.env.FIREBASE_PRIVATE_KEY_2.replace(/\\n/g, '\n'),
@@ -94,26 +98,45 @@ export async function initializeSecondaryFirebase() {
       let secondaryApp;
       try {
         secondaryApp = admin.app('secondary');
+        console.log('✅ Secondary Firebase app already exists');
       } catch (e) {
         secondaryApp = admin.initializeApp({
           credential: admin.credential.cert(secondaryServiceAccount),
         }, 'secondary');
+        console.log('✅ Secondary Firebase app initialized');
       }
 
       secondaryDb = secondaryApp.firestore();
       secondaryAuth = secondaryApp.auth();
+      console.log('✅ Secondary Firestore and Auth initialized');
       return true;
+    } else {
+      console.log('⚠️ Secondary Firebase credentials not found in environment');
     }
   } catch (error: any) {
+    console.error('❌ Failed to initialize secondary Firebase:', error.message);
   }
   return false;
+}
+
+// Auto-initialize secondary Firebase on module load
+if (isInitialized) {
+  initializeSecondaryFirebase().then((success) => {
+    if (success) {
+      console.log('✅ Secondary Firebase ready for quota fallback');
+    }
+  }).catch((error) => {
+    console.error('❌ Secondary Firebase initialization error:', error);
+  });
 }
 
 // Wrapper to automatically fallback if primary quota is exceeded
 export async function getDb() {
   if (useSecondaryDb && secondaryDb) {
+    console.log('🔄 Using SECONDARY database (Project: ' + process.env.FIREBASE_PROJECT_ID_2 + ')');
     return secondaryDb;
   }
+  console.log('🔄 Using PRIMARY database (Project: ' + process.env.FIREBASE_PROJECT_ID + ')');
   return db;
 }
 
@@ -128,10 +151,15 @@ export async function getAuth() {
 
 // Fallback handler - call this when you get a quota error
 export function switchToSecondaryFirebase() {
+  console.log('🔀 switchToSecondaryFirebase() called');
+  console.log('   Secondary DB exists?', !!secondaryDb);
+  console.log('   Secondary Project ID:', process.env.FIREBASE_PROJECT_ID_2);
   if (secondaryDb) {
     useSecondaryDb = true;
+    console.log('✅ Switched to secondary database');
     return true;
   } else {
+    console.log('❌ Cannot switch - secondary database not initialized');
     return false;
   }
 }

@@ -66,12 +66,6 @@ export default function Sidebar({
       icon: "ri-database-line",
       href: "/admin/question-banks",
     },
-    {
-      id: "profile",
-      label: "Profile & Settings",
-      icon: "ri-settings-line",
-      href: "/admin/profile",
-    },
   ];
 
   const teacherMenuItems = [
