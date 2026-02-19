@@ -99,12 +99,12 @@ export default function Sidebar({
       icon: "ri-file-list-3-line",
       href: "/teacher/interactiveQuiz",
     },
-    {
-      id: "profile",
-      label: "Profile",
-      icon: "ri-user-line",
-      href: "/teacher/profile",
-    },
+    // {
+    //   id: "profile",
+    //   label: "Profile",
+    //   icon: "ri-user-line",
+    //   href: "/teacher/profile",
+    // },
   ];
 
   const studentMenuItems = [
