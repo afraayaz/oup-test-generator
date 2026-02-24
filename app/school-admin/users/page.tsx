@@ -141,9 +141,77 @@ export default async function UsersPage({ searchParams }: PageProps) {
   
   const { users, availableSchools } = await fetchUsers(requestedSchoolId);
   
-  const students = users.filter(u => u.role === 'student');
-  const teachers = users.filter(u => u.role === 'teacher');
-  const contentManagers = users.filter(u => 
+  // Static data for demonstration
+  const staticUsers: UserData[] = [
+    {
+      id: 'static-student-1',
+      name: 'Ali Khan',
+      email: 'ali.khan@example.com',
+      role: 'student',
+      schoolId: 'demo-school',
+      schoolName: 'Demo School System',
+      campusId: 'main-campus',
+      campusName: 'Main Campus',
+      grade: '10',
+      class: '10',
+      section: 'A',
+      rollNumber: 'S-1001',
+      status: 'active',
+      createdAt: new Date().toISOString(),
+    },
+    {
+      id: 'static-student-2',
+      name: 'Fatima Ahmed',
+      email: 'fatima.ahmed@example.com',
+      role: 'student',
+      schoolId: 'demo-school',
+      schoolName: 'Demo School System',
+      campusId: 'main-campus',
+      campusName: 'Main Campus',
+      grade: '9',
+      class: '9',
+      section: 'B',
+      rollNumber: 'S-1002',
+      status: 'inactive',
+      createdAt: new Date().toISOString(),
+    },
+    {
+      id: 'static-teacher-1',
+      name: 'Mr. Kamran Akmal',
+      email: 'kamran.akmal@example.com',
+      role: 'teacher',
+      schoolId: 'demo-school',
+      schoolName: 'Demo School System',
+      campusId: 'main-campus',
+      campusName: 'Main Campus',
+      subjects: ['Mathematics', 'Physics'],
+      assignedClasses: ['10-A', '9-B'],
+      assignedGrades: ['9', '10'],
+      phone: '+92-300-1234567',
+      status: 'active',
+      createdAt: new Date().toISOString(),
+    },
+    {
+      id: 'static-manager-1',
+      name: 'Zainab Bibi',
+      email: 'zainab.bibi@example.com',
+      role: 'content_manager',
+      schoolId: 'demo-school',
+      schoolName: 'Demo School System',
+      campusId: 'main-campus',
+      campusName: 'Main Campus',
+      phone: '+92-333-7654321',
+      status: 'active',
+      createdAt: new Date().toISOString(),
+      createdBy: 'System',
+    }
+  ];
+
+  const allUsers = [...users, ...staticUsers];
+
+  const students = allUsers.filter(u => u.role === 'student');
+  const teachers = allUsers.filter(u => u.role === 'teacher');
+  const contentManagers = allUsers.filter(u => 
     u.role === 'content_manager' || 
     u.role === 'content-manager' as unknown ||
     u.role === 'contentManager' as unknown
