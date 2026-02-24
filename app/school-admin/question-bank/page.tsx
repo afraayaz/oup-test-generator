@@ -5,6 +5,48 @@ import { useUserProfile } from '@/hooks/useUserProfile';
 import { db } from '@/firebase/firebase';
 import { collection, getDocs, deleteDoc, doc } from 'firebase/firestore';
 
+const staticQuestionData = [
+    {
+        id: 'static-q-1',
+        subject: 'Science',
+        grade: 'Grade 5',
+        book: 'Science World 5',
+        chapter: 'Chapter 1: The Human Body',
+        difficulty: 'easy',
+        createdByName: 'Static Teacher',
+        questionText: 'Which organ pumps blood throughout the body?',
+        type: 'mcq',
+        options: ['Lungs', 'Heart', 'Brain', 'Stomach'],
+        correctAnswer: '1',
+    },
+    {
+        id: 'static-q-2',
+        subject: 'Mathematics',
+        grade: 'Grade 5',
+        book: 'Maths Pro 5',
+        chapter: 'Chapter 4: Geometry',
+        difficulty: 'medium',
+        createdByName: 'Demo Admin',
+        questionText: 'How many sides does a hexagon have?',
+        type: 'mcq',
+        options: ['5', '6', '7', '8'],
+        correctAnswer: '1',
+    },
+    {
+        id: 'static-q-3',
+        subject: 'English',
+        grade: 'Grade 4',
+        book: 'English Grammar',
+        chapter: 'Chapter 2: Nouns',
+        difficulty: 'hard',
+        createdByName: 'Static Teacher',
+        questionText: 'Which of the following is a collective noun?',
+        type: 'mcq',
+        options: ['Dog', 'House', 'Flock', 'Running'],
+        correctAnswer: '2',
+    },
+];
+
 export default function SchoolAdminQBPage() {
   const { user } = useUserProfile();
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -28,6 +70,10 @@ export default function SchoolAdminQBPage() {
   useEffect(() => {
     if (user?.schoolId) {
       fetchSchoolQuestions();
+    } else {
+      // For demonstration, load static data if no user/school is found
+      setQuestions(staticQuestionData);
+      setLoading(false);
     }
   }, [user?.schoolId]);
 
@@ -41,8 +87,10 @@ export default function SchoolAdminQBPage() {
         id: doc.id,
         ...doc.data()
       }));
-      setQuestions(allQuestions);
+      setQuestions([...allQuestions, ...staticQuestionData]);
     } catch (error) {
+      // If fetching fails, still show the static data for UI preview
+      setQuestions(staticQuestionData);
     }
     setLoading(false);
   };
