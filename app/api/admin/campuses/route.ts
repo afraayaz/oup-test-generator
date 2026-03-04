@@ -1,188 +1,210 @@
-import { NextResponse } from 'next/server';
+import { NextResponse } from "next/server";
+import { db, getDb, switchToSecondaryFirebase, resetToPrimaryFirebase } from "@/lib/firebaseAdmin";
+import { pgPool } from "@/lib/postgres";
 
-const PROJECT_ID = 'quiz-app-ff0ab';
-const FIRESTORE_URL = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/(default)/documents`;
+export const dynamic = "force-dynamic";
 
-interface FirestoreValue {
-  stringValue?: string;
-  integerValue?: string;
-  doubleValue?: number;
-  booleanValue?: boolean;
-  timestampValue?: string;
-  arrayValue?: { values?: FirestoreValue[] };
-  mapValue?: { fields?: Record<string, FirestoreValue> };
-  nullValue?: null;
-}
+async function resolveSchoolPk(schoolId: string): Promise<number | null> {
+  if (!schoolId) return null;
+  if (/^\d+$/.test(schoolId)) return Number(schoolId);
 
-interface FirestoreDocument {
-  name: string;
-  fields?: Record<string, FirestoreValue>;
-}
-
-function parseFirestoreValue(value: FirestoreValue): any {
-  if (value.stringValue !== undefined) return value.stringValue;
-  if (value.integerValue !== undefined) return parseInt(value.integerValue);
-  if (value.doubleValue !== undefined) return parseFloat(String(value.doubleValue));
-  if (value.booleanValue !== undefined) return value.booleanValue;
-  if (value.nullValue !== undefined) return null;
-  if (value.timestampValue !== undefined) return value.timestampValue;
-  if (value.arrayValue !== undefined) {
-    return (value.arrayValue.values || []).map(parseFirestoreValue);
+  // If caller passed Firebase school id, try mapping through schools.firebase_id
+  try {
+    const byFirebase = await pgPool.query(
+      `SELECT id FROM schools WHERE firebase_id = $1 LIMIT 1`,
+      [schoolId]
+    );
+    if (byFirebase.rowCount) return Number(byFirebase.rows[0].id);
+  } catch {
+    // ignore if firebase_id column is not present
   }
-  if (value.mapValue !== undefined) {
-    const result: Record<string, any> = {};
-    for (const [key, val] of Object.entries(value.mapValue.fields || {})) {
-      result[key] = parseFirestoreValue(val);
-    }
-    return result;
-  }
+
   return null;
 }
 
-function parseDocument(doc: FirestoreDocument): { id: string; data: Record<string, any> } {
-  const pathParts = doc.name.split('/');
-  const id = pathParts[pathParts.length - 1];
-  
-  const data: Record<string, any> = {};
-  for (const [key, value] of Object.entries(doc.fields || {})) {
-    data[key] = parseFirestoreValue(value);
-  }
-  
-  return { id, data };
-}
-
-function toFirestoreValue(value: any): FirestoreValue {
-  if (value === null || value === undefined) {
-    return { nullValue: null };
-  }
-  if (typeof value === 'string') {
-    return { stringValue: value };
-  }
-  if (typeof value === 'number') {
-    if (Number.isInteger(value)) {
-      return { integerValue: String(value) };
-    }
-    return { doubleValue: value };
-  }
-  if (typeof value === 'boolean') {
-    return { booleanValue: value };
-  }
-  if (Array.isArray(value)) {
-    return { arrayValue: { values: value.map(toFirestoreValue) } };
-  }
-  if (typeof value === 'object') {
-    const fields: Record<string, FirestoreValue> = {};
-    for (const [k, v] of Object.entries(value)) {
-      fields[k] = toFirestoreValue(v);
-    }
-    return { mapValue: { fields } };
-  }
-  return { nullValue: null };
-}
-
 export async function GET(request: Request) {
+  const { searchParams } = new URL(request.url);
+  const schoolId = searchParams.get("schoolId");
+
+  // 1) Primary: PostgreSQL
   try {
-    const { searchParams } = new URL(request.url);
-    const schoolId = searchParams.get('schoolId');
-    
-    const response = await fetch(`${FIRESTORE_URL}/campuses`);
-    
-    if (!response.ok) {
-      const errorText = await response.text();
+    const values: any[] = [];
+    const where: string[] = [];
+
+    if (schoolId) {
+      const schoolPk = await resolveSchoolPk(schoolId);
+      values.push(schoolId);
+      where.push(`COALESCE(c.firebase_school_id, '') = $${values.length}`);
+
+      if (schoolPk !== null) {
+        values.push(schoolPk);
+        where.push(`c.school_id = $${values.length}`);
+      }
+    }
+
+    const res = await pgPool.query(
+      `
+        SELECT
+          c.id::text AS id,
+          c.name,
+          COALESCE(c.address, '') AS address,
+          COALESCE(c.city, '') AS city,
+          COALESCE(c.status, 'Active') AS status,
+          COALESCE(c.firebase_school_id, c.school_id::text, '') AS "schoolId",
+          COALESCE(c.school_name, s.name, '') AS "schoolName",
+          c.created_at AS "createdAt",
+          c.updated_at AS "updatedAt"
+        FROM campuses c
+        LEFT JOIN schools s ON s.id = c.school_id
+        ${where.length ? `WHERE (${where.join(" OR ")})` : ""}
+        ORDER BY c.created_at DESC NULLS LAST, c.id DESC
+        LIMIT 1000
+      `,
+      values
+    );
+
+    return NextResponse.json({ campuses: res.rows, source: "postgres" });
+  } catch (pgError: any) {
+    // 2) Fallback: Firebase primary/secondary
+    try {
+      if (!process.env.FIREBASE_PRIVATE_KEY || !process.env.FIREBASE_CLIENT_EMAIL) {
+        return NextResponse.json(
+          { error: "PostgreSQL failed and Firebase not configured", details: pgError?.message },
+          { status: 503 }
+        );
+      }
+
+      const primaryDb = await getDb();
+      const snapshot = await primaryDb.collection("campuses").get();
+      let campuses = snapshot.docs.map((doc: any) => ({ id: doc.id, ...doc.data() }));
+      if (schoolId) campuses = campuses.filter((c: any) => c.schoolId === schoolId);
+      resetToPrimaryFirebase();
+      return NextResponse.json({ campuses, source: "firebase_fallback_primary" });
+    } catch (firebaseError: any) {
+      if (firebaseError?.message?.includes("quota") || firebaseError?.code === "RESOURCE_EXHAUSTED") {
+        try {
+          switchToSecondaryFirebase();
+          const backupDb = await getDb();
+          const snapshot = await backupDb.collection("campuses").get();
+          let campuses = snapshot.docs.map((doc: any) => ({ id: doc.id, ...doc.data() }));
+          if (schoolId) campuses = campuses.filter((c: any) => c.schoolId === schoolId);
+          resetToPrimaryFirebase();
+          return NextResponse.json({ campuses, source: "firebase_fallback_secondary" });
+        } catch (secondaryError: any) {
+          resetToPrimaryFirebase();
+          return NextResponse.json(
+            {
+              error: "Failed to fetch campuses",
+              details: {
+                postgres: pgError?.message,
+                firebasePrimary: firebaseError?.message,
+                firebaseSecondary: secondaryError?.message,
+              },
+            },
+            { status: 500 }
+          );
+        }
+      }
+
       return NextResponse.json(
-        { error: `Firestore error: ${response.status}`, details: errorText },
-        { status: response.status }
+        {
+          error: "Failed to fetch campuses",
+          details: { postgres: pgError?.message, firebasePrimary: firebaseError?.message },
+        },
+        { status: 500 }
       );
     }
-    
-    const data = await response.json();
-    
-    if (!data.documents) {
-      return NextResponse.json({ campuses: [] });
-    }
-    
-    let campuses = data.documents.map(parseDocument).map((doc: { id: string; data: Record<string, any> }) => ({
-      id: doc.id,
-      ...doc.data
-    }));
-    
-    if (schoolId) {
-      campuses = campuses.filter((campus: any) => campus.schoolId === schoolId);
-    }
-    
-    return NextResponse.json({ campuses });
-  } catch (error: any) {
-    return NextResponse.json(
-      { error: 'Failed to fetch campuses', details: error.message },
-      { status: 500 }
-    );
   }
 }
 
 export async function POST(request: Request) {
+  const body = await request.json();
+  const { name, schoolId, schoolName, address, city } = body;
+
+  if (!name || !schoolId) {
+    return NextResponse.json({ error: "Campus name and school are required" }, { status: 400 });
+  }
+
+  // 1) Primary write: PostgreSQL
   try {
-    const body = await request.json();
-    const { name, schoolId, schoolName, address, city } = body;
-    
-    if (!name || !schoolId) {
-      return NextResponse.json(
-        { error: 'Campus name and school are required' },
-        { status: 400 }
-      );
-    }
-    
-    const campusData = {
-      name,
-      schoolId,
-      schoolName: schoolName || '',
-      address: address || '',
-      city: city || '',
-      status: 'Active',
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      totalUsers: 0,
-      totalStudents: 0,
-      totalTeachers: 0,
-      totalSchoolAdmins: 0,
-      totalContentManagers: 0
-    };
-    
-    const fields: Record<string, FirestoreValue> = {};
-    for (const [key, value] of Object.entries(campusData)) {
-      fields[key] = toFirestoreValue(value);
+    const schoolPk = await resolveSchoolPk(String(schoolId));
+    const insert = await pgPool.query(
+      `
+        INSERT INTO campuses (
+          name, school_id, firebase_school_id, school_name, address, city, status,
+          total_users, total_students, total_teachers, total_school_admins, total_content_managers,
+          created_at, updated_at
+        )
+        VALUES ($1,$2,$3,$4,$5,$6,'Active',0,0,0,0,0,NOW(),NOW())
+        RETURNING
+          id::text AS id,
+          name,
+          COALESCE(address, '') AS address,
+          COALESCE(city, '') AS city,
+          COALESCE(status, 'Active') AS status,
+          COALESCE(firebase_school_id, school_id::text, '') AS "schoolId",
+          COALESCE(school_name, '') AS "schoolName",
+          created_at AS "createdAt",
+          updated_at AS "updatedAt"
+      `,
+      [name, schoolPk, String(schoolId), schoolName || "", address || "", city || ""]
+    );
+
+    // Best effort dual-write to Firebase
+    try {
+      await db.collection("campuses").add({
+        name,
+        schoolId: String(schoolId),
+        schoolName: schoolName || "",
+        address: address || "",
+        city: city || "",
+        status: "Active",
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        totalUsers: 0,
+        totalStudents: 0,
+        totalTeachers: 0,
+        totalSchoolAdmins: 0,
+        totalContentManagers: 0,
+      });
+    } catch {
+      // ignore Firebase write failure while PostgreSQL is primary
     }
 
-    // Get Authorization header from request
-    const authHeader = request.headers.get('authorization');
-    
-    const response = await fetch(`${FIRESTORE_URL}/campuses`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        ...(authHeader ? { 'Authorization': authHeader } : {}),
-      },
-      body: JSON.stringify({ fields }),
-    });
-    
-    if (!response.ok) {
-      const errorText = await response.text();
+    return NextResponse.json({ success: true, campus: insert.rows[0], source: "postgres" });
+  } catch (pgError: any) {
+    // 2) Fallback write: Firebase
+    try {
+      const campusData = {
+        name,
+        schoolId: String(schoolId),
+        schoolName: schoolName || "",
+        address: address || "",
+        city: city || "",
+        status: "Active",
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        totalUsers: 0,
+        totalStudents: 0,
+        totalTeachers: 0,
+        totalSchoolAdmins: 0,
+        totalContentManagers: 0,
+      };
+
+      const docRef = await db.collection("campuses").add(campusData);
+      return NextResponse.json({
+        success: true,
+        campus: { id: docRef.id, ...campusData },
+        source: "firebase_fallback",
+      });
+    } catch (firebaseError: any) {
       return NextResponse.json(
-        { error: `Firestore error: ${response.status}`, details: errorText },
-        { status: response.status }
+        {
+          error: "Failed to create campus",
+          details: { postgres: pgError?.message, firebase: firebaseError?.message },
+        },
+        { status: 500 }
       );
     }
-    
-    const createdDoc = await response.json();
-    const parsed = parseDocument(createdDoc);
-    
-    return NextResponse.json({ 
-      success: true, 
-      campus: { id: parsed.id, ...parsed.data } 
-    });
-  } catch (error: any) {
-    return NextResponse.json(
-      { error: 'Failed to create campus', details: error.message },
-      { status: 500 }
-    );
   }
 }

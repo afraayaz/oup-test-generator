@@ -1,7 +1,7 @@
 "use client";
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { db } from '@/firebase/firebase';
-import { collection, getDocs, addDoc, serverTimestamp, Timestamp, query, where } from 'firebase/firestore';
+import { collection, getDocs, query, where } from 'firebase/firestore';
 import Sidebar from '@/components/Sidebar';
 import { useUserProfile } from '@/hooks/useUserProfile';
 import { v4 as uuidv4 } from 'uuid';
@@ -318,20 +318,70 @@ const QuizGeneration = () => {
   const normalizeGrade = (grade: string): string => {
     return String(grade).replace(/^(Grade|Class)\s+/i, '').trim();
   };
+
+  const normalizeGradeToken = (value: unknown): string => {
+    return String(value || '').replace(/^(Grade|Class)\s*/i, '').trim().toLowerCase();
+  };
+
+  const normalizeToken = (value: unknown): string => {
+    return String(value || '').trim().toLowerCase();
+  };
+
+  const getSubjectTokens = (subject: string, numericSubjectId?: string | number | null): Set<string> => {
+    const tokens = new Set<string>();
+    const base = normalizeToken(subject);
+    if (base) tokens.add(base);
+
+    const numeric = normalizeToken(numericSubjectId);
+    if (numeric) tokens.add(numeric);
+
+    if (base === 'science') tokens.add('general science');
+    if (base === 'general science') tokens.add('science');
+
+    return tokens;
+  };
   
-  // Extract unique subjects and grades - prefer subjectGradePairs for Teachers
-  let uniqueSubjects: string[] = [];
-  let uniqueGrades: string[] = [];
-  
-  if (subjectGradePairs.length > 0) {
-    // Teachers with subjectGradePairs
-    uniqueGrades = [...new Set(subjectGradePairs.map((p: any) => normalizeGrade(p.grade)))] as string[];
-    uniqueSubjects = [...new Set(subjectGradePairs.map((p: any) => p.subject))] as string[];
-  } else {
-    // Fallback to assignedBooks
-    uniqueSubjects = [...new Set(assignedBooks.map((b: any) => b.subject))] as string[];
-    uniqueGrades = [...new Set(assignedBooks.map((b: any) => normalizeGrade(b.grade)))] as string[];
-  }
+  // Build normalized maps from ALL teacher assignment sources
+  const gradeSet = new Set<string>();
+  const subjectSet = new Set<string>();
+  const subjectsByGrade: { [grade: string]: Set<string> } = {};
+
+  const addGradeSubject = (rawGrade: any, rawSubject?: any) => {
+    const normalizedGrade = normalizeGrade(String(rawGrade || ''));
+    const normalizedSubject = String(rawSubject || '').trim();
+    if (!normalizedGrade) return;
+
+    gradeSet.add(normalizedGrade);
+    if (!subjectsByGrade[normalizedGrade]) {
+      subjectsByGrade[normalizedGrade] = new Set<string>();
+    }
+
+    if (normalizedSubject) {
+      subjectSet.add(normalizedSubject);
+      subjectsByGrade[normalizedGrade].add(normalizedSubject);
+    }
+  };
+
+  grades.forEach((grade: any) => addGradeSubject(grade));
+  subjects.forEach((subject: any) => {
+    const s = String(subject || '').trim();
+    if (s) subjectSet.add(s);
+  });
+
+  subjectGradePairs.forEach((pair: any) => {
+    addGradeSubject(pair?.grade, pair?.subject);
+    (pair?.assignedBooks || []).forEach((book: any) => {
+      const b = typeof book === 'string' ? { title: book } : book;
+      addGradeSubject(b?.grade || pair?.grade, b?.subject || pair?.subject);
+    });
+  });
+
+  assignedBooks.forEach((book: any) => {
+    addGradeSubject(book?.grade, book?.subject);
+  });
+
+  let uniqueSubjects: string[] = Array.from(subjectSet);
+  let uniqueGrades: string[] = Array.from(gradeSet);
   
   // If 'both' is selected, also include OUP subjects and grades
   if (selectedQB === 'both' && questions.length > 0) {
@@ -351,51 +401,63 @@ const QuizGeneration = () => {
   const books: { [grade: string]: { [subject: string]: any[] } } = {};
   const bookIdMap: { [bookTitle: string]: string } = {}; // Map book title to its ID
   const subjectIdMap: { [subjectName: string]: string } = {}; // Map subject name to its ID
-  
-  // Add school books
-  uniqueGrades.forEach(grade => {
-    books[String(grade)] = {};
-    uniqueSubjects.forEach(subject => {
-      if (subjectGradePairs.length > 0) {
-        // Use subjectGradePairs for Teachers
-        books[String(grade)][subject] = subjectGradePairs
-          .filter((p: any) => normalizeGrade(p.grade) === grade && p.subject === subject)
-          .flatMap((p: any) => p.assignedBooks || [])
-          .map((book: any) => {
-            const bookObj = typeof book === 'string' ? { title: book } : book;
-            if (bookObj && typeof bookObj === 'object' && 'id' in bookObj && 'title' in bookObj) {
-              // Use composite key: subject-grade-title to handle same book name across different grades
-              const bookKey = `${subject}-${grade}-${bookObj.title}`;
-              bookIdMap[bookKey] = bookObj.id as string;
-            }
-            // Track subject ID if available
-            if (bookObj && typeof bookObj === 'object' && 'subjectId' in bookObj) {
-              subjectIdMap[subject] = bookObj.subjectId as string;
-            }
-            return bookObj;
-          });
-      } else {
-        // Fallback to assignedBooks
-        books[String(grade)][subject] = assignedBooks
-          .filter((book: any) => {
-            const normalizedBookGrade = normalizeGrade(book.grade);
-            return normalizedBookGrade === grade && book.subject === subject;
-          })
-          .map((book: any) => {
-            if (book && typeof book === 'object' && 'id' in book && 'title' in book) {
-              // Use composite key: subject-grade-title to handle same book name across different grades
-              const normalizedBookGrade = normalizeGrade(book.grade);
-              const bookKey = `${book.subject}-${normalizedBookGrade}-${book.title}`;
-              bookIdMap[bookKey] = book.id;
-            }
-            // Track subject ID if available
-            if (book && typeof book === 'object' && 'subjectId' in book) {
-              subjectIdMap[subject] = book.subjectId;
-            }
-            return book;
-          });
-      }
+
+  const ensureBookBucket = (grade: string, subject: string) => {
+    if (!books[grade]) books[grade] = {};
+    if (!books[grade][subject]) books[grade][subject] = [];
+  };
+
+  const pushBook = (grade: string, subject: string, book: any) => {
+    ensureBookBucket(grade, subject);
+    const bookObj = typeof book === 'string' ? { title: book } : book;
+    const title = String(bookObj?.title || '').trim();
+    if (!title) return;
+
+    const exists = books[grade][subject].some((existing: any) => {
+      const existingTitle = typeof existing === 'string' ? existing : existing?.title;
+      return String(existingTitle || '').trim().toLowerCase() === title.toLowerCase();
     });
+
+    if (!exists) {
+      books[grade][subject].push(bookObj);
+    }
+
+    if (bookObj && typeof bookObj === 'object' && 'id' in bookObj) {
+      const bookKey = `${subject}-${grade}-${title}`;
+      bookIdMap[bookKey] = String(bookObj.id);
+    }
+    if (bookObj && typeof bookObj === 'object' && 'subjectId' in bookObj && bookObj.subjectId) {
+      subjectIdMap[subject] = String(bookObj.subjectId);
+    }
+  };
+  
+  // Initialize books structure for available grade-subject combinations
+  uniqueGrades.forEach(grade => {
+    books[String(grade)] = books[String(grade)] || {};
+    const gradeSubjects = subjectsByGrade[String(grade)] ? Array.from(subjectsByGrade[String(grade)]) : uniqueSubjects;
+    gradeSubjects.forEach(subject => {
+      ensureBookBucket(String(grade), subject);
+    });
+  });
+
+  // Add books from subjectGradePairs
+  subjectGradePairs.forEach((pair: any) => {
+    const pairGrade = normalizeGrade(pair?.grade);
+    const pairSubject = String(pair?.subject || '').trim();
+    if (!pairGrade || !pairSubject) return;
+
+    ensureBookBucket(pairGrade, pairSubject);
+    (pair?.assignedBooks || []).forEach((book: any) => {
+      pushBook(pairGrade, pairSubject, book);
+    });
+  });
+
+  // Add books from assignedBooks (union, deduplicated)
+  assignedBooks.forEach((book: any) => {
+    const grade = normalizeGrade(book?.grade);
+    const subject = String(book?.subject || '').trim();
+    if (!grade || !subject) return;
+    pushBook(grade, subject, book);
   });
   
   // Add OUP books if 'both' is selected
@@ -449,30 +511,38 @@ const QuizGeneration = () => {
   useEffect(() => {
     const fetchQuestions = async () => {
       try {
-        if (!user?.schoolId) return;
-        let allQuestions: any[] = [];
-        
-        // Fetch from school questions if QB is 'school' or 'both'
-        if (selectedQB === 'school' || selectedQB === 'both') {
-          try {
-            const schoolQuestionsRef = collection(db, 'questions', 'schools', user.schoolId);
-            const snapshot = await getDocs(schoolQuestionsRef);
-            const questionList = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-            allQuestions = [...allQuestions, ...questionList];
-          } catch (error) {
-          }
+        if (!user?.uid || !selectedQB) return;
+
+        const params = new URLSearchParams({ qb: selectedQB });
+        if (selectedGrade) params.set('grade', selectedGrade);
+        if (selectedSubject) params.set('subject', selectedSubject);
+        if (selectedBook) params.set('book', selectedBook);
+
+        const response = await fetch(`/api/teacher/questions?${params.toString()}`, {
+          method: "GET",
+          headers: {
+            "x-user-id": user.uid || "",
+            "x-user-email": user.email || "",
+            "x-user-role": String(user.role || "teacher").toLowerCase(),
+            "x-school-id": user.schoolId || "",
+            "x-school-name": user.schoolName || "",
+          },
+        });
+
+        if (!response.ok) {
+          throw new Error(`Failed to load questions (${response.status})`);
         }
-        
-        // Fetch from OUP questions if QB is 'oup' or 'both'
-        if (selectedQB === 'oup' || selectedQB === 'both') {
-          try {
-            const oupQuestionsRef = collection(db, 'questions', 'oup', 'items');
-            const snapshot = await getDocs(oupQuestionsRef);
-            const questionList = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-            allQuestions = [...allQuestions, ...questionList];
-          } catch (error) {
-          }
-        }
+
+        const payload = await response.json();
+        let allQuestions: any[] = Array.isArray(payload?.questions) ? payload.questions : [];
+        allQuestions = allQuestions.map((q: any) => ({
+          ...q,
+          // Normalize common field variants so SLO/chapter filters work reliably
+          questionText: q.questionText || q.question || "",
+          chapter: (q.chapter || q.chapterName || "").toString().trim(),
+          slo: (q.slo || q.SLO || "").toString().trim(),
+        }));
+
         setHasQuestionType(allQuestions.some(q => q.type || q.questionType));
         setQuestions(allQuestions);
       } catch (error) {
@@ -484,7 +554,7 @@ const QuizGeneration = () => {
     if (user?.schoolId && selectedQB) {
       fetchQuestions();
     }
-  }, [user?.schoolId, selectedQB]);
+  }, [user?.schoolId, selectedQB, user?.uid, user?.email, user?.role, user?.schoolName, selectedGrade, selectedSubject, selectedBook]);
 
   // Show format modal automatically when QB is selected but format is not
   useEffect(() => {
@@ -544,18 +614,19 @@ const QuizGeneration = () => {
           return;
         }
 
-        const selectedGradeNormalized = String(selectedGrade).replace('Grade ', '').trim().toLowerCase();
-        const selectedSubjectLower = selectedSubject.toLowerCase();
-        const selectedBookLower = selectedBook.toLowerCase();
+        const selectedGradeNormalized = normalizeGradeToken(selectedGrade);
+        const selectedSubjectLower = normalizeToken(selectedSubject);
+        const selectedBookLower = normalizeToken(selectedBook);
         // Reuse bookKey and bookId from above
         const selectedBookId = bookId;
+        const selectedSubjectTokens = getSubjectTokens(selectedSubject, subjectId || foundSubjectId || null);
 
         const slosSet = new Set<string>();
 
         questions.forEach(q => {
-          const qGradeNormalized = (q.grade || q.class || '').toString().replace('Grade ', '').trim().toLowerCase();
-          const qSubject = (q.subject || '').toLowerCase();
-          const qBook = (q.book || '').toLowerCase();
+          const qGradeNormalized = normalizeGradeToken(q.grade || q.class || '');
+          const qSubject = normalizeToken(q.subject || '');
+          const qBook = normalizeToken(q.book || '');
           const qSLO = q.slo || '';
           
           // Match grade, subject, and book (with numeric ID support)
@@ -564,7 +635,7 @@ const QuizGeneration = () => {
                            qBook === selectedBookId;
 
           if (qGradeNormalized === selectedGradeNormalized &&
-              qSubject === selectedSubjectLower &&
+              (selectedSubjectTokens.has(qSubject) || qSubject === selectedSubjectLower) &&
               bookMatch &&
               qSLO) {
             slosSet.add(qSLO);
@@ -643,23 +714,25 @@ const QuizGeneration = () => {
     
     // Filter questions by selected chapters to get SLOs
     const slos = new Set<string>();
-    const selectedGradeNormalized = String(selectedGrade).replace(/^(Grade|Class)\s+/i, '').trim().toLowerCase();
-    const selectedSubjectLower = selectedSubject.toLowerCase();
-    const selectedBookLower = selectedBook.toLowerCase();
+    const selectedGradeNormalized = normalizeGradeToken(selectedGrade);
+    const selectedSubjectLower = normalizeToken(selectedSubject);
+    const selectedBookLower = normalizeToken(selectedBook);
     
     // Get the numeric IDs for subject and book
     const normalizedGradeForKey = normalizeGrade(selectedGrade);
     const bookKey = `${selectedSubject}-${normalizedGradeForKey}-${selectedBook}`;
     const numericSubjectId = foundSubjectId || subjectIdMap[selectedSubject] || selectedSubject;
     const numericBookId = (bookIdMap[bookKey] || selectedBook) as string;
+    const selectedSubjectTokens = getSubjectTokens(selectedSubject, numericSubjectId);
     
     let matchedCount = 0;
     let failedGrade = 0, failedSubject = 0, failedBook = 0, failedChapter = 0, failedNoSLO = 0;
+    const fallbackSlos = new Set<string>();
     
     questions.forEach(q => {
-      const qGradeNormalized = (q.grade || q.class || '').toString().replace(/^(Grade|Class)\s+/i, '').trim().toLowerCase();
-      const qSubject = (q.subject || '').toString().toLowerCase();
-      const qBook = (q.book || '').toString().toLowerCase();
+      const qGradeNormalized = normalizeGradeToken(q.grade || q.class || '');
+      const qSubject = normalizeToken(q.subject || '');
+      const qBook = normalizeToken(q.book || '');
       let qChapter = q.chapter || '';
       const qSLO = q.slo || '';
       
@@ -673,13 +746,13 @@ const QuizGeneration = () => {
       // Check if this question matches our selected grade/subject/book
       // Try both numeric IDs and display names (convert both to lowercase and string for comparison)
       const gradeMatch = qGradeNormalized === selectedGradeNormalized;
-      const subjectMatch = qSubject === selectedSubjectLower || 
-                          qSubject === String(numericSubjectId).toLowerCase() ||
-                          qSubject === numericSubjectId;
+      const subjectMatch = selectedSubjectTokens.has(qSubject) || qSubject === selectedSubjectLower;
       const bookMatch = qBook === selectedBookLower || 
                        qBook === String(numericBookId).toLowerCase() ||
                        qBook === numericBookId;
-      const chapterMatch = selectedChapters.includes(qChapter);
+      // Case-insensitive chapter matching
+      const qChapterLower = qChapter.toLowerCase();
+      const chapterMatch = selectedChapters.some(ch => ch.toLowerCase() === qChapterLower);
       
       // Debug: Log first 5 questions that match grade/subject/book but fail overall
       if (gradeMatch && subjectMatch && bookMatch) {
@@ -698,12 +771,22 @@ const QuizGeneration = () => {
       if (!subjectMatch) failedSubject++;
       if (!bookMatch) failedBook++;
       
+      if (gradeMatch && subjectMatch && bookMatch && qSLO) {
+        fallbackSlos.add(qSLO);
+      }
+
       if (gradeMatch && subjectMatch && bookMatch && chapterMatch && qSLO) {
         slos.add(qSLO);
         matchedCount++;
       }
     });
     
+    // If selected chapters don't match stored chapter text exactly, still allow SLOs
+    // from same grade/subject/book so teacher can proceed with OUP questions.
+    if (slos.size === 0 && fallbackSlos.size > 0) {
+      return Array.from(fallbackSlos).sort();
+    }
+
     const sloArray = Array.from(slos).sort();
     return sloArray;
   }, [questions, selectedGrade, selectedSubject, selectedBook, selectedChapters, bookIdMap, subjectIdMap, foundSubjectId]);
@@ -755,20 +838,59 @@ const QuizGeneration = () => {
     return typeMap[normalized] || normalized;
   };
 
-  const getQuestionCountByType = useCallback((type: string): number => {
+  // Get TOTAL count without chapter/SLO filters (shows all questions for grade/subject/book/type)
+  const getTotalQuestionCountByType = useCallback((type: string): number => {
     if (!selectedGrade || !selectedSubject || !selectedBook) return 0;
-    const selectedDifficulties = (questionConfig as any)[type]?.difficulties || [];
-    const selectedDifficultiesLower = selectedDifficulties.map((d: string) => d.toLowerCase());
     
-    const selectedGradeNormalized = String(selectedGrade).replace(/^(Grade|Class)\s+/i, '').trim().toLowerCase();
-    const selectedSubjectLower = selectedSubject.toLowerCase();
-    const selectedBookLower = selectedBook.toLowerCase();
+    const selectedGradeNormalized = normalizeGradeToken(selectedGrade);
+    const selectedSubjectLower = normalizeToken(selectedSubject);
+    const selectedBookLower = normalizeToken(selectedBook);
     
     // Get the numeric IDs for subject and book
     const normalizedGradeForKey = normalizeGrade(selectedGrade);
     const bookKey = `${selectedSubject}-${normalizedGradeForKey}-${selectedBook}`;
     const numericSubjectId = foundSubjectId || subjectIdMap[selectedSubject] || selectedSubject;
     const numericBookId = bookIdMap[bookKey] || selectedBook;
+    const selectedSubjectTokens = getSubjectTokens(selectedSubject, numericSubjectId);
+    
+    let count = 0;
+    
+    questions.forEach(q => {
+      const qGradeNormalized = normalizeGradeToken(q.grade || q.class || '');
+      const qSubject = normalizeToken(q.subject || '');
+      const qBook = normalizeToken(q.book || '');
+      const qType = (q.type || q.questionType || '').toLowerCase();
+      const normalizedType = normalizeQuestionType(qType);
+      
+      const gradeMatch = qGradeNormalized === selectedGradeNormalized;
+      const subjectMatch = selectedSubjectTokens.has(qSubject) || qSubject === selectedSubjectLower;
+      const bookMatch = qBook === selectedBookLower || qBook === numericBookId.toLowerCase();
+      const typeMatch = normalizedType === type;
+      
+      if (gradeMatch && subjectMatch && bookMatch && typeMatch) {
+        count++;
+      }
+    });
+    
+    return count;
+  }, [questions, selectedGrade, selectedSubject, selectedBook, foundSubjectId, subjectIdMap, bookIdMap]);
+
+  // Get FILTERED count (applies chapter/SLO/difficulty filters)
+  const getQuestionCountByType = useCallback((type: string): number => {
+    if (!selectedGrade || !selectedSubject || !selectedBook) return 0;
+    const selectedDifficulties = (questionConfig as any)[type]?.difficulties || [];
+    const selectedDifficultiesLower = selectedDifficulties.map((d: string) => d.toLowerCase());
+    
+    const selectedGradeNormalized = normalizeGradeToken(selectedGrade);
+    const selectedSubjectLower = normalizeToken(selectedSubject);
+    const selectedBookLower = normalizeToken(selectedBook);
+    
+    // Get the numeric IDs for subject and book
+    const normalizedGradeForKey = normalizeGrade(selectedGrade);
+    const bookKey = `${selectedSubject}-${normalizedGradeForKey}-${selectedBook}`;
+    const numericSubjectId = foundSubjectId || subjectIdMap[selectedSubject] || selectedSubject;
+    const numericBookId = bookIdMap[bookKey] || selectedBook;
+    const selectedSubjectTokens = getSubjectTokens(selectedSubject, numericSubjectId);
     
     let matchCount = 0;
     let totalQuestions = 0;
@@ -780,9 +902,9 @@ const QuizGeneration = () => {
       totalQuestions++;
       
       const qGradeRaw = (q.grade || q.class || '').toString();
-      const qGradeNormalized = qGradeRaw.replace(/^(Grade|Class)\s+/i, '').trim().toLowerCase();
-      const qSubject = (q.subject || '').toString().toLowerCase();
-      const qBook = (q.book || '').toString().toLowerCase();
+      const qGradeNormalized = normalizeGradeToken(qGradeRaw);
+      const qSubject = normalizeToken(q.subject || '');
+      const qBook = normalizeToken(q.book || '');
       const qType = (q.type || q.questionType || '').toLowerCase();
       const normalizedType = normalizeQuestionType(qType);
       
@@ -790,7 +912,7 @@ const QuizGeneration = () => {
       allGradeSubjectBookCombos.add(`${qGradeNormalized}|${qSubject}|${qBook}`);
       
       // Track what types exist for the selected grade/subject/book (try both display names and numeric IDs)
-      const subjectTypeMatch = qSubject === selectedSubjectLower || qSubject === numericSubjectId.toLowerCase();
+      const subjectTypeMatch = selectedSubjectTokens.has(qSubject) || qSubject === selectedSubjectLower;
       const bookTypeMatch = qBook === selectedBookLower || qBook === numericBookId.toLowerCase();
       if (qGradeNormalized === selectedGradeNormalized && subjectTypeMatch && bookTypeMatch) {
         typesInSelectedRange.add(`${qType}(${normalizedType})`);
@@ -812,7 +934,7 @@ const QuizGeneration = () => {
       
       // Check all matching conditions (try both display names and numeric IDs)
       const gradeMatch = qGradeNormalized === selectedGradeNormalized;
-      const subjectMatch = qSubject === selectedSubjectLower || qSubject === numericSubjectId.toLowerCase();
+      const subjectMatch = selectedSubjectTokens.has(qSubject) || qSubject === selectedSubjectLower;
       const bookMatch = qBook === selectedBookLower || qBook === numericBookId.toLowerCase();
       const typeMatch = normalizedType === type;
       
@@ -826,21 +948,13 @@ const QuizGeneration = () => {
         const qDifficulty = (q.difficulty || 'Medium').toString();
         const qDifficultyLower = qDifficulty.toLowerCase();
         
-        // Debug chapter matching
-        if (selectedChapters.length > 0 && qChapter) {
-          const isChapterMatch = selectedChapters.includes(qChapter);
-          if (!isChapterMatch && type === 'multiple') {
-          }
+        // Chapter matching - case-insensitive
+        if (selectedChapters.length > 0) {
+          const qChapterLower = qChapter.toLowerCase();
+          const isChapterMatch = selectedChapters.some(ch => ch.toLowerCase() === qChapterLower);
+          if (!isChapterMatch) return;
         }
         
-        if (selectedChapters.length > 0 && !selectedChapters.includes(qChapter)) {
-          // Skip this question if chapter doesn't match and we have selected chapters
-          // But first, try matching without quotes in case data has quotes
-          const qChapterUnquoted = qChapter.replace(/^["']|["']$/g, '');
-          if (!selectedChapters.includes(qChapterUnquoted)) {
-            return;
-          }
-        }
         if (selectedSLOs.length > 0 && !selectedSLOs.includes(qSLO)) return;
         if (selectedDifficultiesLower.length > 0 && !selectedDifficultiesLower.includes(qDifficultyLower)) return;
         
@@ -889,17 +1003,23 @@ const QuizGeneration = () => {
     // Build questions based on questionConfig
     let allQuestions: any[] = [];
     let questionCounter = 1;
+    // keep track of question IDs already added to quiz to avoid duplicates
+    const usedIds = new Set<string>();
+    // also track question text to guard against identical text with different ids
+    const usedTexts = new Set<string>();
 
     // Debug: Show what questions exist for this grade/subject/book
     const debugQuestionsForCombo = questions.filter(q => {
-      const qGradeNormalized = (q.grade || q.class || '').toString().replace(/^(Grade|Class)\s+/i, '').trim().toLowerCase();
-      const selectedGradeNormalized = String(selectedGrade).replace(/^(Grade|Class)\s+/i, '').trim().toLowerCase();
-      const qSubject = (q.subject || '').toLowerCase();
-      const qBook = (q.book || '').toLowerCase();
+      const qGradeNormalized = normalizeGradeToken(q.grade || q.class || '');
+      const selectedGradeNormalized = normalizeGradeToken(selectedGrade);
+      const qSubject = normalizeToken(q.subject || '');
+      const qBook = normalizeToken(q.book || '');
+      const selectedBookLower = normalizeToken(selectedBook);
+      const subjectTokens = getSubjectTokens(selectedSubject, foundSubjectId || subjectIdMap[selectedSubject] || null);
       
       const gradeMatch = qGradeNormalized === selectedGradeNormalized;
-      const subjectMatch = qSubject === selectedSubject.toLowerCase();
-      const bookMatch = qBook === selectedBook.toLowerCase();
+      const subjectMatch = subjectTokens.has(qSubject) || qSubject === normalizeToken(selectedSubject);
+      const bookMatch = qBook === selectedBookLower;
       
       return gradeMatch && subjectMatch && bookMatch;
     });
@@ -912,11 +1032,11 @@ const QuizGeneration = () => {
       if (config.count === 0) return;
 
       // Filter questions for this type with selected difficulties
-      const typeQuestions = questions.filter(q => {
-        const qGradeNormalized = (q.grade || q.class || '').toString().replace(/^(Grade|Class)\s+/i, '').trim().toLowerCase();
-        const selectedGradeNormalized = String(selectedGrade).replace(/^(Grade|Class)\s+/i, '').trim().toLowerCase();
-        const qSubject = (q.subject || '').toLowerCase();
-        const qBook = (q.book || '').toLowerCase();
+      let typeQuestions = questions.filter(q => {
+        const qGradeNormalized = normalizeGradeToken(q.grade || q.class || '');
+        const selectedGradeNormalized = normalizeGradeToken(selectedGrade);
+        const qSubject = normalizeToken(q.subject || '');
+        const qBook = normalizeToken(q.book || '');
         let qChapter = (q.chapter || '').trim();
         // Remove surrounding quotes if present and normalize
         if ((qChapter.startsWith('"') && qChapter.endsWith('"')) || (qChapter.startsWith("'") && qChapter.endsWith("'"))) {
@@ -931,15 +1051,16 @@ const QuizGeneration = () => {
         // Book matching: check both display name and numeric ID from bookIdMap
         const normalizedGradeForKey = normalizeGrade(selectedGrade);
         const bookKey = `${selectedSubject}-${normalizedGradeForKey}-${selectedBook}`;
-        const selectedBookLower = selectedBook.toLowerCase();
+        const selectedBookLower = normalizeToken(selectedBook);
         const selectedBookId = bookIdMap[bookKey];
+        const subjectTokens = getSubjectTokens(selectedSubject, foundSubjectId || subjectIdMap[selectedSubject] || null);
         const bookMatch = qBook === selectedBookLower || 
                          qBook === selectedBookId?.toString().toLowerCase() ||
                          qBook === selectedBookId;
 
         // Basic matches (grade, subject, book, type, difficulty)
         const gradeMatch = qGradeNormalized === selectedGradeNormalized;
-        const subjectMatch = qSubject === selectedSubject.toLowerCase();
+        const subjectMatch = subjectTokens.has(qSubject) || qSubject === normalizeToken(selectedSubject);
         const typeMatch = normalizedType === type;
         const difficultiesLower = (config.difficulties || ['Easy', 'Medium', 'Hard']).map(d => d.toLowerCase());
         const difficultyMatch = difficultiesLower.length === 0 || difficultiesLower.includes(qDifficultyLower);
@@ -988,7 +1109,22 @@ const QuizGeneration = () => {
       }
 
       // Shuffle and select the required count
+      // exclude questions already used earlier in this quiz (by id or text)
+      typeQuestions = typeQuestions.filter(q => {
+        if (usedIds.has(q.id)) return false;
+        const txt = (q.questionText || q.question || '').toString().trim();
+        if (txt && usedTexts.has(txt)) return false;
+        return true;
+      });
+
       const selectedQuestions = shuffle(typeQuestions, seedToUse).slice(0, config.count);
+
+      // keep track of used ids/texts so later types don't reuse the same question
+      selectedQuestions.forEach(q => {
+        usedIds.add(q.id);
+        const txt = (q.questionText || q.question || '').toString().trim();
+        if (txt) usedTexts.add(txt);
+      });
 
       // Convert to quiz format
       selectedQuestions.forEach(q => {
@@ -1007,21 +1143,30 @@ const QuizGeneration = () => {
           interactiveData = q.interactiveData;
           answer = { value: 'interactive', text: 'See interactive data' };
         } else if (qType === 'multiple') {
-          options = shuffle(q.options.map((opt: any, idx: number) => ({
-            text: opt || `Option ${idx + 1}`,
-            format: q.subject === 'Math' ? 'math' : 'text',
-          })), seedToUse);
-          // Normalize correct answer: handle arrays, comma-separated, and case-insensitive matching
-          let correctCandidate: any = q.correctAnswer;
-          if (Array.isArray(correctCandidate)) {
-            correctCandidate = correctCandidate[0] || '';
+          // Only skip if there's no correct answer at all
+          if (!q.correctAnswer || q.correctAnswer.toString().trim() === '') return;
+          
+          // Handle questions with options
+          if (q.options && Array.isArray(q.options) && q.options.length > 0) {
+            options = shuffle(q.options.map((opt: any, idx: number) => ({
+              text: opt || `Option ${idx + 1}`,
+              format: q.subject === 'Math' ? 'math' : 'text',
+            })), seedToUse);
+            // Normalize correct answer: handle arrays, comma-separated, and case-insensitive matching
+            let correctCandidate: any = q.correctAnswer;
+            if (Array.isArray(correctCandidate)) {
+              correctCandidate = correctCandidate[0] || '';
+            }
+            if (typeof correctCandidate === 'string' && correctCandidate.includes(',')) {
+              correctCandidate = correctCandidate.split(',')[0].trim();
+            }
+            const idx = options.findIndex(opt => (opt.text || '').toString().trim().toLowerCase() === (correctCandidate || '').toString().trim().toLowerCase());
+            answer = { value: idx !== -1 ? idx : 0, text: q.correctAnswer };
+          } else {
+            // MCQ without options - use answer as text (for questions that don't have pre-defined options)
+            options = [];
+            answer = { value: q.correctAnswer, text: q.correctAnswer };
           }
-          if (typeof correctCandidate === 'string' && correctCandidate.includes(',')) {
-            correctCandidate = correctCandidate.split(',')[0].trim();
-          }
-          const idx = options.findIndex(opt => (opt.text || '').toString().trim().toLowerCase() === (correctCandidate || '').toString().trim().toLowerCase());
-          answer = { value: idx, text: q.correctAnswer };
-          if (idx === -1 || !q.correctAnswer) return;
         } else if (qType === 'truefalse') {
           const trueFalseOptions = [
             { text: 'True', format: 'text' },
@@ -1166,14 +1311,32 @@ const QuizGeneration = () => {
       randomization: { seed: newSeed, shuffledOrder: true, shuffleOptions: questions.some(q => q.type === 'multiple') },
       rendering: { respectRTL: selectedSubject === 'Urdu' || selectedSubject === 'Islamiyat', renderMath: selectedSubject === 'Math' },
       status: 'draft',
-      createdAt: serverTimestamp(),
-      updatedAt: serverTimestamp(),
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
       version: 1,
       notes: null,
     });
 
-      const quizDoc = await addDoc(collection(db, 'quizzes'), quiz);
-      const quizId = quizDoc.id;
+      const response = await fetch('/api/teacher/quizzes', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-user-id': user?.uid || '',
+          'x-school-id': user?.schoolId || '',
+        },
+        body: JSON.stringify(quiz),
+      });
+
+      if (!response.ok) {
+        const err = await response.json().catch(() => ({}));
+        throw new Error(err?.error || `Failed to create quiz (${response.status})`);
+      }
+
+      const result = await response.json();
+      const quizId = result?.quiz?.id || result?.quizId;
+      if (!quizId) {
+        throw new Error('Quiz created but ID is missing from response');
+      }
       
       setGeneratedQuiz({ ...quiz, id: quizId });
       setEditedQuestions(questions);
@@ -1305,24 +1468,33 @@ const QuizGeneration = () => {
         return;
       }
       
-      // Update quiz in Firestore with timeLimit and schedule
-      const { doc, updateDoc } = await import('firebase/firestore');
-      const quizRef = doc(db, 'quizzes', quizId);
-      
       const updateData: any = {
         timeLimitMinutes: timeLimit,
-        updatedAt: serverTimestamp(),
+        updatedAt: new Date().toISOString(),
       };
       
       // Only add schedule for Online quizzes
       if (quizFormat === 'Online') {
         updateData.schedule = {
-          startAt: scheduledStart ? Timestamp.fromDate(new Date(scheduledStart)) : null,
-          endAt: scheduledEnd ? Timestamp.fromDate(new Date(scheduledEnd)) : null,
+          startAt: scheduledStart ? new Date(scheduledStart).toISOString() : null,
+          endAt: scheduledEnd ? new Date(scheduledEnd).toISOString() : null,
         };
       }
-      
-      await updateDoc(quizRef, updateData);
+
+      const updateResponse = await fetch(`/api/teacher/quizzes/${quizId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-user-id': user?.uid || '',
+          'x-school-id': user?.schoolId || '',
+        },
+        body: JSON.stringify(updateData),
+      });
+
+      if (!updateResponse.ok) {
+        const err = await updateResponse.json().catch(() => ({}));
+        throw new Error(err?.error || `Failed to update quiz (${updateResponse.status})`);
+      }
       
       // If students are assigned, create assignment records
       if (assignedStudents.length > 0) {
@@ -1381,7 +1553,9 @@ const QuizGeneration = () => {
         throw new Error('Invalid response format from API');
       }
       
-      // Filter questions: same type, same subject, same grade, and exclude currently selected question
+      // Filter questions: same type, same subject, same grade, exclude currently selected and anything already in the quiz
+      const existingIds = new Set(editedQuestions.map((q: any) => q.id));
+      const existingTexts = new Set(editedQuestions.map((q: any) => (q.question?.text || q.question || '').toString().trim()));
       const filteredQuestions = data.questions.filter((q: any) => {
         const qType = normalizeQuestionType((q.type || q.questionType || '').toLowerCase());
         const selectedType = normalizeQuestionType(currentQuestion.type.toLowerCase());
@@ -1394,14 +1568,20 @@ const QuizGeneration = () => {
                        qGrade === questionGrade && 
                        qSubject === questionSubject;
         
-        if (matches && q.id !== currentQuestion.id) {
+        const qText = (q.questionText || q.question || '').toString().trim();
+        if (
+          matches &&
+          q.id !== currentQuestion.id &&
+          !existingIds.has(q.id) &&
+          (!qText || !existingTexts.has(qText))
+        ) {
           return true;
         }
         return false;
       });
       
       if (filteredQuestions.length === 0) {
-        alert(`No replacement questions found for type: ${currentQuestion.type}, Grade: ${currentQuestion.grade}, Subject: ${currentQuestion.subject}`);
+        alert(`No replacement questions available – all matching questions are already in the quiz.`);
       } else {
         // Automatically select a random question
         const randomReplacement = filteredQuestions[Math.floor(Math.random() * filteredQuestions.length)];
@@ -1760,13 +1940,14 @@ const QuizGeneration = () => {
           .header { border-bottom: 3px solid #3b82f6; padding-bottom: 20px; margin-bottom: 30px; }
           .title { font-size: 28px; font-weight: bold; color: #1f2937; margin-bottom: 10px; }
           .info { font-size: 14px; color: #6b7280; margin-bottom: 5px; }
-          .answer { margin-bottom: 20px; }
+          .answer { margin-bottom: 25px; padding-bottom: 15px; border-bottom: 1px solid #e5e7eb; }
           .answer-number { margin-bottom: 8px; overflow: hidden; display: flex; justify-content: space-between; align-items: center; }
           .answer-number-urdu { font-family: 'OUP Mehr Nastaliq', sans-serif; direction: rtl; text-align: right; font-weight: bold; font-size: 18px; }
           .answer-number-marks { font-family: Arial, sans-serif; direction: ltr; text-align: right; font-weight: bold; }
           .answer-number-marks-urdu { font-family: Arial, sans-serif; direction: ltr; text-align: left; font-weight: bold; }
           .answer-number-english { font-family: Arial, sans-serif; direction: ltr; text-align: left; font-weight: bold; font-size: 18px; }
           .answer-text { font-size: 16px; margin-bottom: 12px; }
+          .explanation-text { font-size: 15px; margin-top: 10px; padding: 12px; background-color: #f0fdf4; border-left: 3px solid #10b981; color: #065f46; border-radius: 4px; }
           .urdu { font-family: 'OUP Mehr Nastaliq', sans-serif; direction: rtl; text-align: right; }
           mark { background-color: #fef08a; padding: 2px 4px; border-radius: 2px; }
           b, strong { font-weight: bold; }
@@ -1812,6 +1993,9 @@ const QuizGeneration = () => {
                         .join(', ')
                     : convertNewlinesToHtml(q.answer.text || q.answer.value)
                 }</div>
+                ${q.explanation && q.explanation.text && q.explanation.text.trim() ? `
+                <div class="explanation-text"><strong>Explanation:</strong> ${convertNewlinesToHtml(extractLatexFromFormulas(q.explanation.text))}</div>
+                ` : ''}
               </div>
             `
           )
@@ -2529,30 +2713,16 @@ const QuizGeneration = () => {
                       >
                         <option value="">Select Subject</option>
                         {(() => {
-                          // Get subjects for the selected grade
-                          if (subjectGradePairs.length > 0) {
-                            // Use subjectGradePairs for Teachers
-                            const normalizedSelectedGrade = normalizeGrade(selectedGrade);
-                            return subjectGradePairs
-                              .filter((p: any) => normalizeGrade(p.grade) === normalizedSelectedGrade)
-                              .map((p: any) => p.subject)
-                              .filter((v: any, i: any, a: any) => a.indexOf(v) === i)
-                              .map((subject: any) => (
-                                <option key={subject} value={subject}>{subject}</option>
-                              ));
-                          } else {
-                            // Fallback to assignedBooks
-                            return assignedBooks
-                              .filter((b: any) => {
-                                const normalizedBookGrade = normalizeGrade(b.grade);
-                                return normalizedBookGrade === selectedGrade;
-                              })
-                              .map((b: any) => b.subject)
-                              .filter((v: any, i: any, a: any) => a.indexOf(v) === i)
-                              .map((subject: any) => (
-                                <option key={subject} value={subject}>{subject}</option>
-                              ));
-                          }
+                          const normalizedSelectedGrade = normalizeGrade(selectedGrade);
+                          const gradeSubjects = subjectsByGrade[normalizedSelectedGrade]
+                            ? Array.from(subjectsByGrade[normalizedSelectedGrade])
+                            : [];
+
+                          return gradeSubjects
+                            .sort((a, b) => a.localeCompare(b))
+                            .map((subject: any) => (
+                              <option key={subject} value={subject}>{subject}</option>
+                            ));
                         })()}
                       </select>
                     </div>
@@ -2769,6 +2939,17 @@ const QuizGeneration = () => {
                     )}
                   </h3>
                   
+                  {/* Info about filtering */}
+                  {(selectedChapters.length > 0 || selectedSLOs.length > 0) && (
+                    <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                      <p className="text-xs text-blue-800">
+                        ℹ️ <strong>Note:</strong> Question counts shown below are filtered by your selected chapters
+                        {selectedSLOs.length > 0 && ', SLOs'}
+                        {' '}and difficulty levels. Total available counts (unfiltered) are shown in parentheses.
+                      </p>
+                    </div>
+                  )}
+                  
                   {/* Check if any questions are available */}
                   {(() => {
                     const selectedGradeNormalized = String(selectedGrade).replace(/^(Grade|Class)\s+/i, '').trim().toLowerCase();
@@ -2779,13 +2960,15 @@ const QuizGeneration = () => {
                       const qGradeNormalized = (q.grade || q.class || '').toString().replace(/^(Grade|Class)\s+/i, '').trim().toLowerCase();
                       const qSubject = (q.subject || '').toLowerCase();
                       const qBook = (q.book || '').toLowerCase();
-                      const qChapter = q.chapter || '';
+                      const qChapter = (q.chapter || '').trim();
                       const qSLO = q.slo || '';
                       
                       const gradeMatch = qGradeNormalized === selectedGradeNormalized;
                       const subjectMatch = qSubject === selectedSubjectLower;
                       const bookMatch = qBook === selectedBookLower;
-                      const chapterMatch = selectedChapters.length === 0 || selectedChapters.includes(qChapter);
+                      // Case-insensitive chapter matching
+                      const qChapterLower = qChapter.toLowerCase();
+                      const chapterMatch = selectedChapters.length === 0 || selectedChapters.some(ch => ch.toLowerCase() === qChapterLower);
                       const sloMatch = selectedSLOs.length === 0 || selectedSLOs.includes(qSLO);
                       
                       return gradeMatch && subjectMatch && bookMatch && chapterMatch && sloMatch;
@@ -2817,6 +3000,8 @@ const QuizGeneration = () => {
                           .filter(qt => quizFormat === 'Online' || !qt.isInteractive)
                           .map(({ key, label, icon, isInteractive }) => {
                           const available = getQuestionCountByType(key);
+                          const totalAvailable = getTotalQuestionCountByType(key);
+                          const isFiltered = available !== totalAvailable;
                           return (
                             <div key={key} className={`border rounded-lg p-4 ${available > 0 ? 'bg-gray-50' : 'bg-red-50 opacity-50'}`}>
                               <div className="flex items-center justify-between mb-3">
@@ -2827,8 +3012,9 @@ const QuizGeneration = () => {
                                     <span className="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full">Interactive</span>
                                   )}
                                   <span className={`text-xs ${available > 0 ? 'text-gray-500' : 'text-red-600 font-medium'}`}>
-                                    ({available} available)
-                                    {available === 0 && ' - Not available in ' + selectedQB}
+                                    ({available} available{isFiltered ? ` of ${totalAvailable} total` : ''})
+                                    {available === 0 && totalAvailable === 0 && ' - Not available in ' + selectedQB}
+                                    {available === 0 && totalAvailable > 0 && ' - Filtered out by chapter/SLO/difficulty selection'}
                                   </span>
                                 </div>
                               </div>

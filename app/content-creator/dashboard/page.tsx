@@ -4,13 +4,12 @@ import { useState, useEffect } from 'react';
 import Sidebar from '@/components/Sidebar';
 import { useUserProfile } from '@/hooks/useUserProfile';
 import { AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { db } from '@/firebase/firebase';
-import { collection, query, where, getDocs, Timestamp } from 'firebase/firestore';
 
 export default function ContentCreatorDashboard() {
-  const { user } = useUserProfile();
+  const { user, loading: profileLoading, error: profileError, refresh: refreshUserProfile } = useUserProfile();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [stats, setStats] = useState({
     questionsCreated: 0,
     questionsApproved: 0,
@@ -29,11 +28,18 @@ export default function ContentCreatorDashboard() {
   const [availableSubjects, setAvailableSubjects] = useState<string[]>([]);
   const [allQuestions, setAllQuestions] = useState<any[]>([]);
   const [hasFetched, setHasFetched] = useState(false);
+  const [fetchError, setFetchError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!user?.uid || hasFetched) return;
     fetchDashboardData();
   }, [user?.uid, hasFetched]);
+
+  useEffect(() => {
+    if (!profileLoading && !user?.uid) {
+      setLoading(false);
+    }
+  }, [profileLoading, user?.uid]);
 
   // Helper function to normalize grade
   const normalizeGrade = (grade: string) => {
@@ -133,140 +139,49 @@ export default function ContentCreatorDashboard() {
     
     try {
       setLoading(true);
-      
-      // Fetch all questions created by this content creator
-      // Note: API stores as 'createdBy', not 'createdById'
-      const questionsRef = collection(db, 'questions', 'oup', 'items');
-      const q = query(questionsRef, where('createdBy', '==', user.uid));
-      const snapshot = await getDocs(q);
-      
-      const questions = snapshot.docs.map(doc => {
-        const data = doc.data();
-        return {
-          id: doc.id,
-          ...data
-        } as any;
+      setFetchError(null);
+
+      const response = await fetch('/api/content-creator/dashboard-stats', {
+        method: 'GET',
+        headers: {
+          'x-user-id': user.uid,
+          'x-user-email': user.email || '',
+          'x-user-role': user.role || 'content_creator',
+        },
+        cache: 'no-store',
       });
 
-      // Calculate stats
-      const totalQuestions = questions.length;
-      
-      // Calculate this week's questions
-      const oneWeekAgo = new Date();
-      oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
-      const thisWeekQuestions = questions.filter(q => {
-        const createdAt = q.createdAt?.toDate ? q.createdAt.toDate() : new Date(q.createdAt);
-        return createdAt >= oneWeekAgo;
-      }).length;
-
-      // Calculate week-wise data for last 4 weeks
-      const weekData = [];
-      for (let i = 3; i >= 0; i--) {
-        const weekStart = new Date();
-        weekStart.setDate(weekStart.getDate() - (i + 1) * 7);
-        const weekEnd = new Date();
-        weekEnd.setDate(weekEnd.getDate() - i * 7);
-        
-        const weekQuestions = questions.filter(q => {
-          const createdAt = q.createdAt?.toDate ? q.createdAt.toDate() : new Date(q.createdAt);
-          return createdAt >= weekStart && createdAt < weekEnd;
-        });
-        
-        weekData.push({
-          week: `Week ${4 - i}`,
-          created: weekQuestions.length,
-          approved: 0,
-          rejected: 0
-        });
+      if (!response.ok) {
+        throw new Error(`Failed to load dashboard (${response.status})`);
       }
-      setCreationTrendData(weekData);
 
-      // Extract unique grades from questions
-      const normalizeGrade = (grade: string) => {
-        if (!grade) return '';
-        return grade.replace(/^grade\s*/i, '').trim();
-      };
-      
-      const uniqueGrades = [...new Set(questions.map(q => normalizeGrade(q.grade)).filter(Boolean))].sort((a, b) => {
-        const aNum = parseInt(a);
-        const bNum = parseInt(b);
-        if (!isNaN(aNum) && !isNaN(bNum)) return aNum - bNum;
-        return a.localeCompare(b);
-      });
-      setAvailableGrades(uniqueGrades);
-
-      // Extract unique subjects
-      const uniqueSubjects = [...new Set(questions.map(q => q.subject).filter(Boolean))].sort();
-      setAvailableSubjects(uniqueSubjects);
-
-      // Store all questions for later filtering
-      setAllQuestions(questions);
-
-      // Filter questions based on current filters
-      const filteredQuestions = questions;
-
-      // Calculate difficulty distribution for pie chart
-      const difficultyCounts: { [key: string]: number } = { Easy: 0, Medium: 0, Hard: 0 };
-      filteredQuestions.forEach(q => {
-        const difficulty = q.difficulty || 'Medium';
-        if (difficultyCounts[difficulty] !== undefined) {
-          difficultyCounts[difficulty]++;
-        }
-      });
-      
-      // Create pie chart data for difficulty
-      const difficultyColors = { Easy: '#10B981', Medium: '#F59E0B', Hard: '#EF4444' };
-      const difficultyPieData = Object.entries(difficultyCounts).map(([level, count]) => ({
-        subject: level, // Keep 'subject' key for compatibility with PieChart component
-        count,
-        color: difficultyColors[level as keyof typeof difficultyColors]
+      const payload = await response.json();
+      const questions = (payload.allQuestions || []).map((q: any) => ({
+        ...q,
+        questionText: q.questionText || q.question_text || q.question || '',
+        createdAt: q.createdAt || q.created_at || null,
       }));
-      setSubjectDistribution(difficultyPieData);
 
-      // Question type distribution will be calculated in separate useEffect
-      // based on selectedTypeGrade filter
-
-      // Get recent questions (last 4)
-      const sortedQuestions = questions
-        .sort((a, b) => {
-          const aTime = a.createdAt?.toDate ? a.createdAt.toDate() : new Date(a.createdAt);
-          const bTime = b.createdAt?.toDate ? b.createdAt.toDate() : new Date(b.createdAt);
-          return bTime.getTime() - aTime.getTime();
-        })
-        .slice(0, 4)
-        .map(q => {
-          const createdAt = q.createdAt?.toDate ? q.createdAt.toDate() : new Date(q.createdAt);
-          const timeDiff = Date.now() - createdAt.getTime();
-          const hours = Math.floor(timeDiff / (1000 * 60 * 60));
-          const days = Math.floor(hours / 24);
-          const timeAgo = days > 0 ? `${days} day${days > 1 ? 's' : ''} ago` : 
-                         hours > 0 ? `${hours} hour${hours > 1 ? 's' : ''} ago` : 
-                         'Just now';
-          
-          return {
-            id: q.id,
-            text: q.questionText || q.question || 'No question text',
-            subject: q.subject || 'N/A',
-            grade: q.grade || 'N/A',
-            difficulty: q.difficulty || 'Medium',
-            status: 'approved', // Since approval queue is removed, all are approved
-            time: timeAgo
-          };
-        });
-      setRecentQuestions(sortedQuestions);
-
-      setStats({
-        questionsCreated: totalQuestions,
-        questionsApproved: totalQuestions, // Since approval is removed
-        pendingReview: 0, // No approval queue
-        rejectedQuestions: 0, // No rejection
-        thisWeek: thisWeekQuestions,
-        approvalRate: 100 // All approved since no approval workflow
+      setStats(payload.stats || {
+        questionsCreated: 0,
+        questionsApproved: 0,
+        pendingReview: 0,
+        rejectedQuestions: 0,
+        thisWeek: 0,
+        approvalRate: 0
       });
+      setCreationTrendData(payload.creationTrendData || []);
+      setSubjectDistribution(payload.subjectDistribution || []);
+      setDifficultyBreakdown(payload.difficultyBreakdown || []);
+      setRecentQuestions(payload.recentQuestions || []);
+      setAvailableGrades(payload.availableGrades || []);
+      setAvailableSubjects(payload.availableSubjects || []);
+      setAllQuestions(questions);
       
       setHasFetched(true);
 
     } catch (error) {
+      setFetchError(error instanceof Error ? error.message : 'Failed to load dashboard data');
     } finally {
       setLoading(false);
     }
@@ -275,7 +190,7 @@ export default function ContentCreatorDashboard() {
   if (loading) {
     return (
       <div className="flex min-h-screen bg-white">
-        <Sidebar userRole="Content Creator" currentPage="dashboard" open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
+        <Sidebar userRole="Content Creator" currentPage="dashboard" open={sidebarOpen} onClose={() => setSidebarOpen(false)} userOverride={user} />
         <div className="flex-1 lg:ml-[256px] flex items-center justify-center">
           <div className="text-center">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#1F46D8] mx-auto mb-4"></div>
@@ -286,9 +201,39 @@ export default function ContentCreatorDashboard() {
     );
   }
 
+  if (!user?.uid) {
+    return (
+      <div className="flex min-h-screen bg-white">
+        <Sidebar userRole="Content Creator" currentPage="dashboard" open={sidebarOpen} onClose={() => setSidebarOpen(false)} userOverride={user} />
+        <div className="flex-1 lg:ml-[256px] flex items-center justify-center">
+          <div className="text-center">
+            <p className="text-[#374151] text-lg font-semibold mb-2">Unable to load dashboard</p>
+            <p className="text-[#6B7280] text-sm">
+              {profileError || 'User session not available. Please log out and log in again.'}
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (fetchError) {
+    return (
+      <div className="flex min-h-screen bg-white">
+        <Sidebar userRole="Content Creator" currentPage="dashboard" open={sidebarOpen} onClose={() => setSidebarOpen(false)} userOverride={user} />
+        <div className="flex-1 lg:ml-[256px] flex items-center justify-center">
+          <div className="text-center">
+            <p className="text-[#374151] text-lg font-semibold mb-2">Dashboard request failed</p>
+            <p className="text-[#6B7280] text-sm">{fetchError}</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="flex min-h-screen bg-white">
-      <Sidebar userRole="Content Creator" currentPage="dashboard" open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
+      <Sidebar userRole="Content Creator" currentPage="dashboard" open={sidebarOpen} onClose={() => setSidebarOpen(false)} userOverride={user} />
       
       <div className="flex-1 lg:ml-[256px] min-w-0">
         {/* Header */}
@@ -309,6 +254,33 @@ export default function ContentCreatorDashboard() {
             {/* Profile Section */}
             {user && (
               <div className="flex items-center gap-3">
+                {/* Refresh Button */}
+                <button
+                  onClick={async () => {
+                    setIsRefreshing(true);
+                    await refreshUserProfile();
+                    setIsRefreshing(false);
+                    // Re-fetch dashboard data after refresh
+                    setHasFetched(false);
+                  }}
+                  disabled={isRefreshing}
+                  className="p-2 hover:bg-[#E8EEFF] rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                  title="Refresh assignments"
+                >
+                  <svg
+                    className={`w-5 h-5 text-[#1F46D8] ${isRefreshing ? 'animate-spin' : ''}`}
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+                    />
+                  </svg>
+                </button>
                 <div className="w-10 h-10 bg-[#1F46D8] rounded-full flex items-center justify-center text-white text-sm font-bold">
                   {(user.name || 'U').split(' ').map((n: any) => n[0]).join('').substring(0, 2).toUpperCase()}
                 </div>

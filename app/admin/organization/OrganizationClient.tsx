@@ -195,6 +195,44 @@ export default function OrganizationClient({ initialSchools, initialCampuses, us
     }
   };
 
+  const handleDeleteSchool = async (schoolId: string, schoolName: string) => {
+    if (!confirm(`Are you sure you want to delete "${schoolName}"? This action cannot be undone.`)) {
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      const user = auth.currentUser;
+      if (!user) {
+        throw new Error('Not authenticated');
+      }
+
+      const idToken = await user.getIdToken();
+
+      const response = await fetch(`/api/admin/schools?id=${schoolId}`, {
+        method: 'DELETE',
+        headers: { 
+          'Authorization': `Bearer ${idToken}`
+        },
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to delete school');
+      }
+
+      // Remove school from state
+      setSchools(prev => prev.filter(s => s.id !== schoolId));
+      // Remove associated campuses
+      setCampuses(prev => prev.filter(c => c.schoolId !== schoolId));
+      alert('School deleted successfully!');
+    } catch (error: any) {
+      alert(error.message || 'Failed to delete school');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const totalStats = {
     schools: schools.length,
     campuses: campuses.length,
@@ -329,11 +367,13 @@ export default function OrganizationClient({ initialSchools, initialCampuses, us
                 return (
                   <div key={school.id} className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
                     <div 
-                      className="p-4 sm:p-6 cursor-pointer hover:bg-gray-50 transition-colors"
-                      onClick={() => toggleSchoolExpand(school.id)}
+                      className="p-4 sm:p-6 hover:bg-gray-50 transition-colors"
                     >
                       <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-4">
+                        <div 
+                          className="flex items-center gap-4 flex-1 cursor-pointer"
+                          onClick={() => toggleSchoolExpand(school.id)}
+                        >
                           <div className="w-12 h-12 bg-emerald-100 rounded-xl flex items-center justify-center flex-shrink-0">
                             <i className="ri-building-2-line text-emerald-600 text-2xl"></i>
                           </div>
@@ -354,7 +394,7 @@ export default function OrganizationClient({ initialSchools, initialCampuses, us
                           </div>
                         </div>
                         
-                        <div className="flex items-center gap-6">
+                        <div className="flex items-center gap-3">
                           <div className="hidden sm:flex items-center gap-4 text-sm">
                             <div className="text-center px-3 py-1 bg-indigo-50 rounded-lg">
                               <span className="font-semibold text-indigo-600">{counts.students}</span>
@@ -378,7 +418,24 @@ export default function OrganizationClient({ initialSchools, initialCampuses, us
                             {school.status}
                           </span>
                           
-                          <i className={`ri-arrow-${isExpanded ? 'up' : 'down'}-s-line text-gray-400 text-xl transition-transform`}></i>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDeleteSchool(school.id, school.name);
+                            }}
+                            disabled={isLoading}
+                            className="p-2 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed group"
+                            title="Delete School"
+                          >
+                            <i className="ri-delete-bin-line text-gray-400 group-hover:text-red-600 text-xl"></i>
+                          </button>
+                          
+                          <div 
+                            className="cursor-pointer p-2"
+                            onClick={() => toggleSchoolExpand(school.id)}
+                          >
+                            <i className={`ri-arrow-${isExpanded ? 'up' : 'down'}-s-line text-gray-400 text-xl transition-transform`}></i>
+                          </div>
                         </div>
                       </div>
                       

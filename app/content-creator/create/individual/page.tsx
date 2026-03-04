@@ -12,7 +12,7 @@ function CreateIndividualQuestionPageContent() {
   const [loading, setLoading] = useState(false);
   const [successMessage, setSuccessMessage] = useState("");
   const [systemBooks, setSystemBooks] = useState<Array<{ id: string; title: string; subject: string; grade: string; chapters?: number }>>([]);
-  const { user } = useUserProfile();
+  const { user, loading: profileLoading, error: profileError } = useUserProfile();
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -112,6 +112,7 @@ function CreateIndividualQuestionPageContent() {
         headers: {
           "Content-Type": "application/json",
           "x-user-id": user?.uid || "",
+          "x-user-email": user?.email || "",
           "x-user-name": user?.name || "",
           "x-user-role": "content_creator",
         },
@@ -144,14 +145,25 @@ function CreateIndividualQuestionPageContent() {
     router.push("/content-creator/create?mode=bank");
   };
 
-  if (!user) {
+  if (profileLoading) {
     return <div className="flex items-center justify-center h-screen">Loading...</div>;
+  }
+
+  if (!user?.uid) {
+    return (
+      <div className="flex items-center justify-center h-screen text-center px-4">
+        <div>
+          <p className="text-lg font-semibold text-gray-800 mb-2">Unable to load profile</p>
+          <p className="text-sm text-gray-600">{profileError || "Please log out and log in again."}</p>
+        </div>
+      </div>
+    );
   }
 
   return (
     <div className="flex min-h-screen bg-gray-50">
       {/* Sidebar */}
-      <Sidebar userRole="Content Creator" currentPage="create" open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
+      <Sidebar userRole="Content Creator" currentPage="create" open={sidebarOpen} onClose={() => setSidebarOpen(false)} userOverride={user} />
 
       {/* Main Content */}
       <div className="flex-1 lg:ml-[256px] min-w-0 flex flex-col">

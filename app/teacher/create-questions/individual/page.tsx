@@ -10,7 +10,6 @@ import QuestionForm, { QuestionFormData } from "@/components/QuestionForm";
 function TeacherCreateIndividualQuestionPageContent() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [successMessage, setSuccessMessage] = useState("");
   const { user } = useUserProfile();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -85,16 +84,8 @@ function TeacherCreateIndividualQuestionPageContent() {
       });
 
       if (!response.ok) throw new Error("Failed to create question");
-
-      setSuccessMessage("✅ Question created successfully! It's now in your Question Bank.");
-      
-      // Scroll to top immediately to show success message
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-      
-      setTimeout(() => setSuccessMessage(""), 5000); // Show message for 5 seconds
     } catch (error) {
-      setSuccessMessage("❌ Failed to create question. Please try again.");
-      window.scrollTo({ top: 0, behavior: 'smooth' });
+      // QuestionForm handles error display via its own toast
     } finally {
       setLoading(false);
     }
@@ -139,16 +130,7 @@ function TeacherCreateIndividualQuestionPageContent() {
         </div>
 
         <div className="flex-1 overflow-auto w-full">
-          <div className="w-full max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
-            {successMessage && (
-              <div className="sticky top-0 z-20 mb-6 p-4 rounded-lg bg-green-50 border-2 border-green-500 text-green-800 shadow-lg animate-pulse">
-                <div className="flex items-center gap-3">
-                  <span className="text-2xl">{successMessage.includes('✅') ? '✅' : '❌'}</span>
-                  <span className="font-semibold">{successMessage}</span>
-                </div>
-              </div>
-            )}
-
+          <div className="w-full px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
             <QuestionForm
               onSubmit={handleQuestionSubmit}
               onSwitchToBank={handleSwitchToBank}

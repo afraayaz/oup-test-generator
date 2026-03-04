@@ -26,7 +26,6 @@ interface UpcomingQuiz {
   totalQuestions: number;
   schedule: { startAt: string; endAt: string };
 }
-
 interface Stats {
   averageScore: number;
   quizzesAttempted: number;
@@ -175,6 +174,7 @@ function calculateBadges(quizHistory: QuizAttempt[]): Badge[] {
 export default function DashboardClient({ initialQuizHistory, initialUpcomingQuizzes, initialStats, studentName = 'Student' }: Props) {
   const router = useRouter();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [showHistoryModal, setShowHistoryModal] = useState(false);
   const [badges, setBadges] = useState<Badge[]>(ACHIEVEMENT_BADGES);
   const [previousBadgeCount, setPreviousBadgeCount] = useState(0);
   const quizHistory = initialQuizHistory;
@@ -191,7 +191,6 @@ export default function DashboardClient({ initialQuizHistory, initialUpcomingQui
 
   const recentScores = quizHistory.slice(0, 5);
   const earnedBadges = badges.filter(b => b.earned);
-  const lockedBadges = badges.filter(b => !b.earned);
 
   const getScoreGradient = (percentage: number) => {
     if (percentage >= 80) return 'from-green-500 to-emerald-600';
@@ -209,221 +208,421 @@ export default function DashboardClient({ initialQuizHistory, initialUpcomingQui
     }
   };
 
-  return (
+  const scoreTrendSource = quizHistory.length > 0 ? [...quizHistory].slice(0, 8) : [];
+  const fallbackTrend = [65, 70, 78, 75, 82, 85, 88, 90];
+  const subjectPalette = ['#00A86B', '#1E88E5', '#4A148C', '#FFB300', '#FF7043', '#D32F2F', '#7B1FA2', '#00897B'];
 
-      <div className="flex min-h-screen bg-gray-50">
-      <Sidebar userRole="Student" currentPage="dashboard" open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
-      
-      <div className="flex-1 lg:ml-[256px]">
-        {/* Header */}
-        <div className="bg-white border-b border-gray-200 px-4 sm:px-6 lg:px-8 py-3 sm:py-4 flex items-center justify-between sticky top-0 z-10">
+  const trendData = scoreTrendSource.length > 0
+    ? scoreTrendSource.map((attempt, index) => {
+        const completedDate = attempt.completedAt ? new Date(attempt.completedAt) : null;
+        const label = completedDate && !Number.isNaN(completedDate.getTime())
+          ? completedDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+          : `Q${index + 1}`;
+
+        return {
+          value: Math.round(attempt.percentage),
+          label,
+          subject: String(attempt.subject || 'Overall'),
+        };
+      })
+    : fallbackTrend.map((value, index) => ({ value, label: `Q${index + 1}`, subject: 'Overall' }));
+
+  const trendValues = trendData.map((point) => point.value);
+  const trendLabels = trendData.map((point) => point.label);
+
+  const subjectNames = Array.from(new Set(trendData.map((point) => point.subject).filter(Boolean)));
+  const subjectColorMap = new Map(subjectNames.map((name, index) => [name, subjectPalette[index % subjectPalette.length]]));
+  const dynamicSubjectLegend = subjectNames.map((name) => ({
+    name,
+    color: subjectColorMap.get(name) || '#1f8b4c',
+  }));
+
+  const trendPoints = trendValues
+    .map((value, index) => {
+      const x = (index / (trendValues.length - 1 || 1)) * 100;
+      const y = 100 - Math.min(100, Math.max(0, value));
+      return `${x},${y}`;
+    })
+    .join(' ');
+
+  const latestQuiz = upcomingQuizzes[0];
+  const avgScore = Math.round(stats.averageScore || 0);
+  const pendingCount = stats.pendingQuizzes ?? upcomingQuizzes.length ?? 0;
+  const statCards = [
+    {
+      label: 'Quizzes Attempted',
+      value: stats.quizzesAttempted ?? 0,
+      subtext: 'All-time practice sessions',
+      icon: 'ri-file-list-3-line',
+      color: '#1f6fb2'
+    },
+    {
+      label: 'Pending Quizzes',
+      value: pendingCount,
+      subtext: '',
+      icon: 'ri-timer-line',
+      color: '#14b8a6'
+    },
+    {
+      label: 'Latest Score',
+      value: `${Math.round(stats.lastQuizScore || 0)}%`,
+      subtext: 'Most recent attempt',
+      icon: 'ri-line-chart-line',
+      color: '#f59e0b'
+    },
+    {
+      label: 'Average Score',
+      value: `${avgScore}%`,
+      subtext: 'Overall performance',
+      icon: 'ri-trophy-line',
+      color: '#8b5cf6'
+    }
+  ];
+  const openHistoryModal = () => setShowHistoryModal(true);
+  const closeHistoryModal = () => setShowHistoryModal(false);
+
+  return (
+    <div className="flex min-h-screen bg-[#e6efff]">
+      <Sidebar
+        userRole="Student"
+        currentPage="dashboard"
+        open={sidebarOpen}
+        onClose={() => setSidebarOpen(false)}
+      />
+
+      <div className="flex-1 lg:ml-[256px] bg-[#f2f6ff] min-h-screen">
+        {/* Top Bar */}
+        <div className="bg-white/90 backdrop-blur px-4 sm:px-8 py-3 flex items-center justify-between sticky top-0 z-20 border-b border-white/70">
           <button
             onClick={() => setSidebarOpen(true)}
-            className="lg:hidden min-w-[44px] min-h-[44px] w-11 h-11 flex items-center justify-center text-gray-600 hover:text-purple-600 hover:bg-purple-50 rounded-lg transition-colors"
+            className="lg:hidden w-11 h-11 flex items-center justify-center rounded-lg bg-[#eef3ff] text-[#1f2667]"
             aria-label="Open menu"
           >
-            <i className="ri-menu-line text-2xl"></i>
+            <i className="ri-menu-fill text-2xl"></i>
           </button>
-          <h1 className="text-lg sm:text-xl lg:text-2xl font-bold text-purple-600 font-gibson-semibold">Student Dashboard</h1>
-          <div className="w-11 h-11"></div>
+          <h1 className="text-xl sm:text-2xl font-bold text-[#1b45d8] tracking-tight">Student Dashboard</h1>
+          <div className="w-11" />
         </div>
 
-        {/* Main Content */}
-        <div className="p-4 sm:p-6 lg:p-8">
-          {/* Welcome Banner */}
-          <div className="mb-6 bg-gradient-to-r from-purple-500 via-purple-600 to-indigo-600 rounded-lg sm:rounded-xl p-4 sm:p-6 text-white shadow-lg">
-            <h2 className="text-xl sm:text-2xl font-bold mb-2">Welcome back, {studentName}! 👋</h2>
-            <p className="text-sm sm:text-base text-purple-100">Ready to challenge yourself with a new quiz today?</p>
+        {/* Content */}
+        <div className="px-4 sm:px-8 py-6 space-y-6">
+          {/* Hero */}
+          <div className="relative overflow-hidden rounded-[28px] border border-white/70 bg-gradient-to-r from-[#dff5ff] via-[#f4ecff] to-[#fff4de] p-4 sm:p-6 shadow-xl">
+            <div className="absolute inset-y-0 right-0 w-1/3 bg-gradient-to-b from-white/40 to-transparent blur-3xl pointer-events-none"></div>
+            <div className="relative z-10 flex flex-col gap-6 lg:flex-row lg:items-center">
+              <div className="flex-1">
+                <p className="text-sm leading-6 font-semibold tracking-[0.35em] uppercase text-[#0c5573]">Learning Journey</p>
+                <h2 className="mt-2 text-2xl md:text-3xl font-semibold text-[#0c223f] leading-tight">Welcome back, {studentName || 'Student'}!</h2>
+                <p className="mt-2 text-sm text-[#173b52] max-w-2xl">
+                  Ready to challenge yourself with a new quiz today?
+                  {latestQuiz
+                    ? ` Your next quiz "${latestQuiz.title}" opens ${formatDate(latestQuiz.schedule?.startAt || '')}.`
+                    : ' Explore assignments to keep your streak alive.'}
+                </p>
+                <div className="mt-4 flex flex-wrap gap-3">
+                  <button
+                    onClick={() => router.push('/student/assigned')}
+                    className="px-4 py-2 rounded-full bg-[#1b45d8] text-white text-sm font-semibold shadow-md hover:bg-[#1537ab] transition-colors"
+                  >
+                    Start Next Quiz
+                  </button>
+                  <button
+                    onClick={openHistoryModal}
+                    className="px-4 py-2 rounded-full border border-[#1b45d8]/40 text-sm font-semibold text-[#1b45d8] hover:bg-white/60 transition-colors"
+                  >
+                    Review History
+                  </button>
+                </div>
+              </div>
+              <div className="w-full max-w-lg">
+                <div className="bg-white/85 border border-white/70 rounded-[24px] p-4 shadow-lg">
+                  <div className="flex items-center justify-between mb-3">
+                    <div>
+                      <p className="text-xs font-semibold text-gray-500">Keep earning</p>
+                      <h3 className="text-sm font-bold text-[#1b45d8]">Achievement Badges</h3>
+                    </div>
+                    <span className="text-xs text-gray-500">{earnedBadges.length}/{badges.length} unlocked</span>
+                  </div>
+                  <div className="grid grid-cols-4 gap-2">
+                    {badges.map((badge) => (
+                      <div
+                        key={badge.id}
+                        className={`rounded-xl px-2 py-3 text-center transition-all duration-300 ${badge.earned ? 'border border-amber-400/40 bg-gradient-to-br from-amber-50 to-orange-50 shadow-sm hover:-translate-y-0.5 hover:shadow-md' : 'border border-dashed border-gray-300 bg-white'}`}
+                      >
+                        <div className={`w-8 h-8 mx-auto rounded-full flex items-center justify-center text-lg mb-1 transition-all duration-300 ${badge.earned ? 'bg-gradient-to-br from-amber-500 to-orange-500 text-white shadow-md' : 'bg-gray-100 text-gray-400'}`}>
+                          {badge.icon}
+                        </div>
+                        <p className={`text-xs font-semibold truncate transition-colors duration-300 ${badge.earned ? 'text-orange-700' : 'text-[#1f2667]'}`}>{badge.name}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
 
-          {/* Stats Cards */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-4 mb-6">
-            {[
-              { label: 'Average Score', value: stats.averageScore, suffix: '%', color: 'from-purple-500 to-purple-600' },
-              { label: 'Quizzes Attempted', value: stats.quizzesAttempted, suffix: '', color: 'from-blue-500 to-blue-600' },
-              { label: 'Badges Earned', value: earnedBadges.length, suffix: '', color: 'from-yellow-500 to-yellow-600' },
-              { label: 'Last Quiz Score', value: stats.lastQuizScore, suffix: '%', color: 'from-pink-500 to-pink-600' }
-            ].map((stat, idx) => (
-              <div key={idx} className={`bg-gradient-to-br ${stat.color} rounded-lg sm:rounded-xl p-4 text-white shadow-lg hover:shadow-xl transition-shadow`}>
-                <div className="text-2xl sm:text-3xl font-bold mb-1">{stat.value}{stat.suffix}</div>
-                <div className="text-xs sm:text-sm text-white/90">{stat.label}</div>
+          {/* Stats Row */}
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            {statCards.map((item, index) => (
+              <div
+                key={item.label}
+                className="rounded-2xl px-5 py-4 shadow-lg text-white relative overflow-hidden border border-white/25 min-h-[150px] transition-all duration-300 hover:shadow-xl hover:-translate-y-1 hover:scale-[1.02] cursor-pointer"
+                style={{ backgroundColor: item.color }}
+              >
+                <div className="absolute inset-0 bg-gradient-to-br from-white/10 via-transparent to-black/10 pointer-events-none transition-opacity duration-300 hover:opacity-80" />
+                <div className={`${index === 1 ? 'text-5xl' : 'text-4xl'} font-semibold leading-none`}>{item.value}</div>
+                <div className="absolute bottom-6 left-5 right-20">
+                  <p className="text-lg font-semibold tracking-wide leading-6 text-white/95">{item.label}</p>
+                </div>
+                <div className="absolute bottom-4 right-4 w-12 h-12 rounded-2xl bg-white/25 backdrop-blur-sm flex items-center justify-center text-2xl border border-white/30">
+                  <i className={item.icon}></i>
+                </div>
               </div>
             ))}
           </div>
 
-          {/* Achievement Badges Section */}
-          <div className="mb-8">
-            <div className="flex items-center gap-2 mb-4">
-              <i className="ri-trophy-line text-2xl text-yellow-500"></i>
-              <h2 className="text-lg sm:text-xl font-bold text-gray-800">Achievement Badges</h2>
-              <span className="ml-auto text-sm text-gray-600">{earnedBadges.length}/{badges.length} unlocked</span>
-            </div>
-            
-            {earnedBadges.length > 0 && (
-              <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-2 sm:gap-3 mb-4">
-                {earnedBadges.map((badge) => (
-                  <div
-                    key={badge.id}
-                    title={`${badge.name} - ${badge.description}`}
-                    className="bg-white rounded-lg p-3 shadow-md hover:shadow-lg transition-all duration-300 hover:-translate-y-1 group cursor-pointer text-center"
-                  >
-                    <div className={`w-12 h-12 mx-auto mb-2 bg-gradient-to-br ${badge.color} rounded-full flex items-center justify-center text-2xl group-hover:scale-110 transition-transform duration-300`}>
-                      {badge.icon}
-                    </div>
-                    <h3 className="text-xs font-bold text-gray-800 line-clamp-2">{badge.name}</h3>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {lockedBadges.length > 0 && (
-              <div>
-                <p className="text-xs sm:text-sm font-semibold text-gray-600 mb-2 flex items-center gap-1">
-                  <i className="ri-lock-line"></i> Next Badges to Unlock
-                </p>
-                <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-2 sm:gap-3">
-                  {lockedBadges.slice(0, 6).map((badge) => (
-                    <div
-                      key={badge.id}
-                      title={`${badge.name} - ${badge.description}`}
-                      className="bg-gray-200 rounded-lg p-3 shadow-sm opacity-50 cursor-not-allowed text-center"
-                    >
-                      <div className={`w-12 h-12 mx-auto mb-2 bg-gradient-to-br ${badge.color} rounded-full flex items-center justify-center text-2xl opacity-40`}>
-                        {badge.icon}
-                      </div>
-                      <h3 className="text-xs font-bold text-gray-600 line-clamp-2">{badge.name}</h3>
-                    </div>
-                  ))}
+          {/* Score Trend + History */}
+          <div className="grid gap-6 lg:grid-cols-[2fr,1fr]">
+            <div className="bg-gradient-to-br from-white via-white to-blue-50/30 border border-white/70 rounded-[26px] shadow-xl p-6">
+              <div className="flex items-center justify-between mb-6">
+                <div>
+                  <p className="text-sm font-semibold text-gray-600">Subject performance</p>
+                  <h3 className="text-xl font-bold bg-gradient-to-r from-[#1b45d8] to-[#4f7bff] bg-clip-text text-transparent">Performance Overview</h3>
+                </div>
+                <div className="text-right">
+                  <p className="text-xs text-gray-500">Target: 80%</p>
                 </div>
               </div>
-            )}
+              <div className="bg-white rounded-2xl p-6 border border-gray-100">
+                <div className="space-y-6">
+                  {/* Bullet Graphs */}
+                  {(() => {
+                    // Group scores by subject and calculate average
+                    const subjectScores = new Map<string, number[]>();
+                    trendData.forEach(point => {
+                      const subject = point.subject;
+                      if (!subjectScores.has(subject)) {
+                        subjectScores.set(subject, []);
+                      }
+                      subjectScores.get(subject)!.push(point.value);
+                    });
+
+                    const bulletData = Array.from(subjectScores.entries()).map(([subject, scores]) => {
+                      const avgScore = Math.round(scores.reduce((a, b) => a + b, 0) / scores.length);
+                      const recentScore = scores[scores.length - 1];
+                      const color = subjectColorMap.get(subject) || '#1b45d8';
+                      return { subject, avgScore, recentScore, color };
+                    });
+
+                    return bulletData.map((data, index) => (
+                      <div key={index} className="group">
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="flex items-center gap-2">
+                            <span className="w-2 h-2 rounded-full" style={{ backgroundColor: data.color }}></span>
+                            <span className="font-semibold text-gray-700 text-sm">{data.subject}</span>
+                          </div>
+                          <div className="flex items-center gap-4">
+                            <span className="text-xs text-gray-500">Latest: <span className="font-semibold text-gray-700">{data.recentScore}%</span></span>
+                            <span className="text-xs text-gray-500">Avg: <span className="font-semibold text-gray-700">{data.avgScore}%</span></span>
+                          </div>
+                        </div>
+                        
+                        {/* Bullet Graph */}
+                        <div className="relative h-10 rounded-lg overflow-hidden">
+                          {/* Qualitative ranges (background bands) */}
+                          <div className="absolute inset-0 flex">
+                            <div className="h-full bg-red-100" style={{ width: '50%' }}></div>
+                            <div className="h-full bg-amber-100" style={{ width: '25%' }}></div>
+                            <div className="h-full bg-emerald-100" style={{ width: '25%' }}></div>
+                          </div>
+                          
+                          {/* Average score bar (darker) */}
+                          <div 
+                            className="absolute top-1/2 -translate-y-1/2 h-6 rounded transition-all duration-500 group-hover:brightness-90"
+                            style={{ 
+                              width: `${data.avgScore}%`,
+                              backgroundColor: data.color,
+                              opacity: 0.5
+                            }}
+                          ></div>
+                          
+                          {/* Recent score bar (brighter) */}
+                          <div 
+                            className="absolute top-1/2 -translate-y-1/2 h-4 rounded shadow-sm transition-all duration-500 group-hover:shadow-md group-hover:scale-x-[1.01] origin-left"
+                            style={{ 
+                              width: `${data.recentScore}%`,
+                              backgroundColor: data.color
+                            }}
+                          ></div>
+                          
+                          {/* Target marker (80%) */}
+                          <div 
+                            className="absolute top-0 bottom-0 w-1 bg-gray-800"
+                            style={{ left: '80%' }}
+                          >
+                            <div className="absolute -top-1 left-1/2 -translate-x-1/2 w-3 h-3 rotate-45 bg-gray-800"></div>
+                          </div>
+                          
+                          {/* Grid lines */}
+                          <div className="absolute inset-0 flex">
+                            {[25, 50, 75].map(val => (
+                              <div 
+                                key={val}
+                                className="absolute top-0 bottom-0 w-px bg-white/60"
+                                style={{ left: `${val}%` }}
+                              ></div>
+                            ))}
+                          </div>
+                        </div>
+                        
+                        {/* Scale labels */}
+                        {index === bulletData.length - 1 && (
+                          <div className="flex justify-between text-xs text-gray-500 mt-2 px-1">
+                            <span>0%</span>
+                            <span>25%</span>
+                            <span>50%</span>
+                            <span>75%</span>
+                            <span>100%</span>
+                          </div>
+                        )}
+                      </div>
+                    ));
+                  })()}
+                  
+                  {/* Legend */}
+                  <div className="pt-4 border-t border-gray-200 flex items-center justify-center gap-6 text-xs">
+                    <div className="flex items-center gap-2">
+                      <div className="w-8 h-3 bg-gray-400 rounded opacity-50"></div>
+                      <span className="text-gray-600">Average</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className="w-8 h-2 bg-gray-600 rounded"></div>
+                      <span className="text-gray-600">Latest</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className="w-1 h-4 bg-gray-800"></div>
+                      <span className="text-gray-600">Target (80%)</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div id="quiz-history" className="bg-white/90 border border-white/70 rounded-[26px] shadow-xl p-6 flex flex-col gap-4">
+              <div>
+                <p className="text-sm font-semibold text-gray-600">Latest attempts</p>
+                <h3 className="text-xl font-bold text-[#1b45d8]">Quiz History</h3>
+              </div>
+              <div className="space-y-3">
+                {recentScores.length > 0 ? (
+                  recentScores.map((attempt) => (
+                    <div key={attempt.id} className="border-2 border-gray-200 rounded-2xl p-4 flex items-center justify-between bg-white hover:-translate-y-0.5 hover:border-blue-300 transition-all shadow-sm">
+                      <div>
+                        <p className="font-semibold text-[#1f2667]">{attempt.quizTitle || 'Quiz'}</p>
+                        <p className="text-xs text-gray-500">{formatDate(attempt.completedAt)}</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-lg font-bold text-[#1f2667]">{Math.round(attempt.percentage)}%</p>
+                        <p className="text-xs text-gray-500">{attempt.subject || 'Subject'}</p>
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <p className="text-sm text-gray-500 text-center">No quiz history yet</p>
+                )}
+              </div>
+              <button
+                onClick={() => router.push('/student/assigned')}
+                className="w-full bg-gradient-to-r from-[#1b45d8] to-[#4f7bff] text-white rounded-full py-2.5 font-semibold hover:shadow-lg transition"
+              >
+                Go to Assigned Quizzes
+              </button>
+            </div>
           </div>
 
-          {/* Main Grid */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
-            {/* Quiz History */}
-            <div className="lg:col-span-2 bg-white rounded-lg sm:rounded-xl p-4 sm:p-6 shadow-lg">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-base sm:text-lg font-bold text-gray-800">Quiz History</h3>
-                <button 
-                  onClick={() => router.push('#quiz-history-section')}
-                  className="text-xs sm:text-sm text-purple-600 hover:text-purple-700 font-medium"
-                >
-                  View All
-                </button>
+          {/* Quick Stats */}
+          <div className="grid gap-6 lg:grid-cols-1">
+            <div className="bg-white/90 border border-white/70 rounded-[26px] shadow-xl p-6 space-y-4">
+              <div>
+                <p className="text-sm text-gray-500">Performance snapshot</p>
+                <h3 className="text-xl font-bold text-[#1b45d8]">Quick Stats</h3>
               </div>
-              <div className="overflow-x-auto">
-                <table className="w-full text-xs sm:text-sm">
-                  <thead className="bg-purple-50">
-                    <tr>
-                      <th className="px-2 sm:px-4 py-2 text-left font-semibold text-gray-700">Quiz</th>
-                      <th className="px-2 sm:px-4 py-2 text-left font-semibold text-gray-700 hidden sm:table-cell">Subject</th>
-                      <th className="px-2 sm:px-4 py-2 text-left font-semibold text-gray-700">Score</th>
-                      <th className="px-2 sm:px-4 py-2 text-left font-semibold text-gray-700 hidden md:table-cell">Date</th>
-                      <th className="px-2 sm:px-4 py-2 text-left font-semibold text-gray-700">Action</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {quizHistory.slice(0, 5).map((attempt) => (
-                      <tr key={attempt.id} className="border-t hover:bg-purple-50 transition-colors">
-                        <td className="px-2 sm:px-4 py-3 font-medium truncate">{attempt.quizTitle || 'Quiz'}</td>
-                        <td className="px-2 sm:px-4 py-3 text-gray-600 hidden sm:table-cell">{attempt.subject || '-'}</td>
-                        <td className="px-2 sm:px-4 py-3">
-                          <div className="flex items-center gap-2">
-                            <span className={`px-2 py-1 bg-gradient-to-r ${getScoreGradient(attempt.percentage)} text-white rounded text-xs font-bold`}>
-                              {attempt.score}/{attempt.totalMarks}
-                            </span>
-                            {attempt.isMarked && (
-                              <span className="px-2 py-0.5 bg-red-100 text-red-700 rounded text-xs font-medium whitespace-nowrap">
-                                Marked
-                              </span>
-                            )}
-                          </div>
-                        </td>
-                        <td className="px-2 sm:px-4 py-3 hidden md:table-cell text-gray-600">{formatDate(attempt.completedAt)}</td>
-                        <td className="px-2 sm:px-4 py-3">
-                          {!attempt.isMarked ? (
-                            <button
-                              onClick={() => router.push(`/student/attempt?id=${attempt.quizId}`)}
-                              className="text-purple-600 hover:text-purple-700 font-medium text-xs whitespace-nowrap"
-                            >
-                              Retake
-                            </button>
-                          ) : (
-                            <span className="text-gray-400 text-xs font-medium whitespace-nowrap cursor-not-allowed">
-                              Marked
-                            </span>
-                          )}
-                        </td>
-                      </tr>
-                    ))}
-                    {quizHistory.length === 0 && (
-                      <tr>
-                        <td colSpan={5} className="px-4 py-8 text-center text-gray-500">
-                          <p className="font-medium mb-2">No quiz history available yet</p>
-                          <button 
-                            onClick={() => router.push('/student/assigned')}
-                            className="text-purple-600 hover:text-purple-700 font-medium"
-                          >
-                            Take a Quiz
-                          </button>
-                        </td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-
-            {/* Sidebar - Recent Scores & Quick Stats */}
-            <div className="space-y-4">
-              {/* Recent Scores */}
-              <div className="bg-gradient-to-br from-purple-50 to-purple-100 rounded-lg sm:rounded-xl p-4 sm:p-6 shadow-lg">
-                <h3 className="text-base sm:text-lg font-bold text-gray-800 mb-4">Recent Scores</h3>
-                <div className="space-y-2">
-                  {recentScores.length > 0 ? (
-                    recentScores.map((attempt) => (
-                      <div key={attempt.id} className="bg-white rounded p-2 sm:p-3 flex items-center justify-between text-xs sm:text-sm">
-                        <span className="truncate">{attempt.quizTitle || 'Quiz'}</span>
-                        <span className={`px-2 py-1 bg-gradient-to-r ${getScoreGradient(attempt.percentage)} text-white rounded text-xs font-bold whitespace-nowrap ml-2`}>
-                          {Math.round(attempt.percentage)}%
-                        </span>
-                      </div>
-                    ))
-                  ) : (
-                    <p className="text-gray-600 text-center text-xs">No scores yet</p>
-                  )}
-                </div>
-              </div>
-
-              {/* Quick Stats */}
-              <div className="bg-gradient-to-br from-yellow-50 to-amber-100 rounded-lg sm:rounded-xl p-4 sm:p-6 shadow-lg">
-                <h3 className="text-base sm:text-lg font-bold text-gray-800 mb-4">Quick Stats</h3>
-                <div className="space-y-2 text-xs sm:text-sm">
-                  <div className="bg-white rounded p-2 flex justify-between">
-                    <span>Best Score</span>
-                    <span className="font-bold text-green-600">
-                      {quizHistory.length > 0 ? `${Math.round(Math.max(...quizHistory.map(q => q.percentage)))}%` : '-'}
-                    </span>
+              <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                {[{
+                  label: 'Best Score',
+                  value: quizHistory.length > 0 ? `${Math.round(Math.max(...quizHistory.map((q) => q.percentage)))}%` : '-',
+                  color: '#00a75d'
+                }, {
+                  label: 'Total Marks',
+                  value: quizHistory.reduce((sum, q) => sum + (q.score || 0), 0),
+                  color: '#1f2667'
+                }, {
+                  label: 'Improvement',
+                  value: quizHistory.length >= 2 ? `${Math.round(quizHistory[0].percentage - quizHistory[quizHistory.length - 1].percentage)}%` : '-',
+                  color: '#ff8c00'
+                }, {
+                  label: 'Upcoming Quizzes',
+                  value: upcomingQuizzes.length,
+                  color: '#1f2667'
+                }].map((stat) => (
+                  <div key={stat.label} className="flex items-center justify-between rounded-2xl border border-white/70 bg-white/60 px-4 py-3">
+                    <p className="text-gray-500">{stat.label}</p>
+                    <p className="font-bold" style={{ color: stat.color }}>{stat.value}</p>
                   </div>
-                  <div className="bg-white rounded p-2 flex justify-between">
-                    <span>Total Marks</span>
-                    <span className="font-bold text-purple-600">
-                      {quizHistory.reduce((sum, q) => sum + (q.score || 0), 0)}
-                    </span>
-                  </div>
-                  <div className="bg-white rounded p-2 flex justify-between">
-                    <span>Improvement</span>
-                    <span className="font-bold text-blue-600">
-                      {quizHistory.length >= 2 ? `${Math.round(quizHistory[0].percentage - quizHistory[quizHistory.length - 1].percentage)}%` : '-'}
-                    </span>
-                  </div>
-                </div>
+                ))}
               </div>
             </div>
           </div>
         </div>
       </div>
+
+      {showHistoryModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="w-full max-w-3xl rounded-2xl bg-white shadow-2xl border border-gray-100 overflow-hidden">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+              <h3 className="text-lg font-bold text-[#1b45d8]">Attempted Quiz History</h3>
+              <button
+                onClick={closeHistoryModal}
+                className="w-9 h-9 rounded-lg hover:bg-gray-100 text-gray-600"
+                aria-label="Close history"
+              >
+                <i className="ri-close-line text-xl"></i>
+              </button>
+            </div>
+
+            <div className="max-h-[65vh] overflow-y-auto p-4">
+              {quizHistory.length > 0 ? (
+                <div className="space-y-3">
+                  {quizHistory.map((attempt) => (
+                    <div key={attempt.id} className="rounded-xl border border-[#e7ecff] p-4 bg-white">
+                      <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 text-sm">
+                        <div>
+                          <p className="text-xs text-gray-500">Quiz Name</p>
+                          <p className="font-semibold text-[#1f2667]">{attempt.quizTitle || 'Quiz'}</p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-gray-500">Subject</p>
+                          <p className="font-medium text-gray-700">{attempt.subject || 'N/A'}</p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-gray-500">Marks</p>
+                          <p className="font-medium text-gray-700">{attempt.score}/{attempt.totalMarks}</p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-gray-500">Attempted Date</p>
+                          <p className="font-medium text-gray-700">{formatDate(attempt.completedAt)}</p>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-sm text-gray-500 text-center py-8">No attempted quiz history found.</p>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

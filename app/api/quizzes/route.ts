@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { pgPool } from '@/lib/postgres';
 
 const PROJECT_ID = 'quiz-app-ff0ab';
 const FIRESTORE_URL = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/(default)/documents/quizzes`;
@@ -53,9 +54,51 @@ function parseDocument(doc: FirestoreDocument): { id: string; data: Record<strin
 
 export async function GET() {
   try {
-    // Add pageSize limit to reduce reads
+    try {
+      const res = await pgPool.query(
+        `
+          SELECT
+            id::text AS id,
+            COALESCE(title, 'Untitled Quiz') AS title,
+            COALESCE(quiz_type, '') AS "quizType",
+            COALESCE(quiz_format, 'Online') AS "quizFormat",
+            COALESCE(subject, '') AS subject,
+            COALESCE(class, '') AS class,
+            COALESCE(total_questions, 0) AS "totalQuestions",
+            COALESCE(total_marks, 0) AS "totalMarks",
+            COALESCE(status, 'draft') AS status,
+            created_at AS "createdAt",
+            items
+          FROM quizzes
+          WHERE COALESCE(is_published, true) = true
+          ORDER BY created_at DESC NULLS LAST
+          LIMIT 500
+        `
+      );
+
+      const quizzes = res.rows.map((row: any) => ({
+        id: String(row.id),
+        data: {
+          title: row.title,
+          quizType: row.quizType,
+          quizFormat: row.quizFormat,
+          subject: row.subject,
+          class: row.class,
+          totalQuestions: Number(row.totalQuestions) || 0,
+          totalMarks: Number(row.totalMarks) || 0,
+          status: row.status,
+          createdAt: row.createdAt ? new Date(row.createdAt).toISOString() : null,
+          items: Array.isArray(row.items) ? row.items : [],
+        },
+      }));
+
+      return NextResponse.json({ quizzes, source: 'postgres' });
+    } catch (pgError) {
+      console.error('[api/quizzes][GET] PostgreSQL failed, falling back to Firestore REST:', pgError);
+    }
+
     const response = await fetch(`${FIRESTORE_URL}?pageSize=500`);
-    
+
     if (!response.ok) {
       const errorText = await response.text();
       return NextResponse.json(
@@ -63,16 +106,14 @@ export async function GET() {
         { status: response.status }
       );
     }
-    
+
     const data = await response.json();
-    
     if (!data.documents) {
-      return NextResponse.json({ quizzes: [] });
+      return NextResponse.json({ quizzes: [], source: 'firebase_fallback' });
     }
-    
+
     const quizzes = data.documents.map(parseDocument);
-    
-    return NextResponse.json({ quizzes });
+    return NextResponse.json({ quizzes, source: 'firebase_fallback' });
   } catch (error: any) {
     return NextResponse.json(
       { error: 'Failed to fetch quizzes', details: error.message },

@@ -19,6 +19,12 @@ interface SidebarProps {
   open?: boolean;
   onClose?: () => void;
   hideProfile?: boolean;
+  userOverride?: {
+    name?: string;
+    email?: string;
+    role?: string;
+    uid?: string;
+  } | null;
 }
 
 export default function Sidebar({
@@ -27,11 +33,18 @@ export default function Sidebar({
   open,
   onClose,
   hideProfile = false,
+  userOverride = null,
 }: SidebarProps) {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [internalMobileOpen, setInternalMobileOpen] = useState(false);
-  const { user } = useUserProfile();
+  const [mounted, setMounted] = useState(false);
+  const { user: hookUser } = useUserProfile({ disabled: !!userOverride });
+  const user = userOverride || hookUser;
   const router = useRouter();
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const isMobileOpen = open !== undefined ? open : internalMobileOpen;
 
@@ -93,18 +106,6 @@ export default function Sidebar({
       icon: "ri-book-open-line",
       href: "/teacher/quizzes",
     },
-    {
-      id: "interactiveQuiz",
-      label: "Interactive Question",
-      icon: "ri-file-list-3-line",
-      href: "/teacher/interactiveQuiz",
-    },
-    {
-      id: "profile",
-      label: "Profile",
-      icon: "ri-user-line",
-      href: "/teacher/profile",
-    },
   ];
 
   const studentMenuItems = [
@@ -119,12 +120,6 @@ export default function Sidebar({
       label: "Assigned Quizzes",
       icon: "ri-file-list-3-line",
       href: "/student/assigned",
-    },
-    {
-      id: "profile",
-      label: "Profile",
-      icon: "ri-user-line",
-      href: "/student/profile",
     },
   ];
 
@@ -146,19 +141,19 @@ export default function Sidebar({
       label: "User Management",
       icon: "ri-team-line",
       href: "/school-admin/users",
-    },
-    {
-      id: "reports",
-      label: "Reports & Analytics",
-      icon: "ri-bar-chart-line",
-      href: "/school-admin/reports",
-    },
-    {
-      id: "settings",
-      label: "School Settings",
-      icon: "ri-settings-line",
-      href: "/school-admin/settings",
-    },
+    }
+    // {
+    //   id: "reports",
+    //   label: "Reports & Analytics",
+    //   icon: "ri-bar-chart-line",
+    //   href: "/school-admin/reports",
+    // },
+    // {
+    //   id: "settings",
+    //   label: "School Settings",
+    //   icon: "ri-settings-line",
+    //   href: "/school-admin/settings",
+    // },
   ];
 
   const moderatorMenuItems = [
@@ -344,7 +339,7 @@ export default function Sidebar({
 
         <div className="absolute bottom-6 left-0 right-0 px-4 space-y-3">
           {/* User Profile Card */}
-          {user && !isCollapsed && !hideProfile && (
+          {mounted && user && !isCollapsed && !hideProfile && (
             <div className="bg-white/10 rounded-xl p-3 mb-3">
               <div className="flex items-center space-x-2">
                 <div className="w-10 h-10 bg-[#1F46D8] rounded-full flex items-center justify-center text-white text-xs font-semibold flex-shrink-0">

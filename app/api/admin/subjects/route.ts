@@ -1,175 +1,136 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { db, getDb, switchToSecondaryFirebase, resetToPrimaryFirebase } from '@/lib/firebaseAdmin';
+import { NextRequest, NextResponse } from "next/server";
+import { pgPool } from "@/lib/postgres";
 
-export const dynamic = 'force-dynamic';
+export const dynamic = "force-dynamic";
 
 export async function GET() {
   try {
-    // Check if Firebase is properly initialized
-    if (!process.env.FIREBASE_PRIVATE_KEY || !process.env.FIREBASE_CLIENT_EMAIL) {
-      return NextResponse.json(
-        { error: 'Firebase not configured' },
-        { status: 503 }
-      );
-    }
-
-    const currentDb = await getDb();
-    const subjectsSnapshot = await currentDb.collection('subjects').get();
-    
-    const subjects = await Promise.all(
-      subjectsSnapshot.docs.map(async (doc) => {
-        const booksSnapshot = await currentDb.collection('subjects').doc(doc.id).collection('books').get();
-        const books = booksSnapshot.docs.map(bookDoc => ({
-          id: bookDoc.id,
-          ...bookDoc.data(),
-        }));
-
-        return {
-          id: doc.id,
-          ...doc.data(),
-          books,
-        };
-      })
+    const subjectsRes = await pgPool.query(
+      `
+        SELECT id::text AS id, name, created_at AS "createdAt"
+        FROM subjects
+        ORDER BY name ASC
+      `
     );
 
-    // Reset to primary if it was switched
-    resetToPrimaryFirebase();
+    const booksRes = await pgPool.query(
+      `
+        SELECT
+          b.id::text AS id,
+          b.subject_id::text AS "subjectId",
+          b.title,
+          b.grade,
+          COALESCE(b.description, '') AS description,
+          COALESCE(b.chapters, 0) AS chapters,
+          b.created_at AS "createdAt",
+          b.updated_at AS "updatedAt"
+        FROM books b
+        ORDER BY b.title ASC
+      `
+    );
+
+    const booksBySubject = new Map<string, any[]>();
+    for (const book of booksRes.rows) {
+      const key = String(book.subjectId);
+      if (!booksBySubject.has(key)) booksBySubject.set(key, []);
+      booksBySubject.get(key)!.push(book);
+    }
+
+    const subjects = subjectsRes.rows.map((subject) => ({
+      id: subject.id,
+      name: subject.name,
+      createdAt: subject.createdAt,
+      books: booksBySubject.get(String(subject.id)) || [],
+    }));
 
     return NextResponse.json({ subjects });
-  } catch (error: any) {
-    
-    // Check for quota error
-    if (error.message?.includes('quota') || error.code === 'RESOURCE_EXHAUSTED' || error.message?.includes('quota')) {
-      switchToSecondaryFirebase();
-      
-      try {
-        // Retry with secondary Firebase
-        const backupDb = await getDb();
-        const subjectsSnapshot = await backupDb.collection('subjects').get();
-        
-        const subjects = await Promise.all(
-          subjectsSnapshot.docs.map(async (doc) => {
-            const booksSnapshot = await backupDb.collection('subjects').doc(doc.id).collection('books').get();
-            const books = booksSnapshot.docs.map(bookDoc => ({
-              id: bookDoc.id,
-              ...bookDoc.data(),
-            }));
-
-            return {
-              id: doc.id,
-              ...doc.data(),
-              books,
-            };
-          })
-        );
-        return NextResponse.json({ subjects });
-      } catch (retryError) {
-        return NextResponse.json(
-          { error: 'Firebase quota exceeded and backup unavailable' },
-          { status: 503 }
-        );
-      }
-    }
-
-    return NextResponse.json(
-      { error: 'Failed to fetch subjects' },
-      { status: 500 }
-    );
+  } catch (error) {
+    return NextResponse.json({ error: "Failed to fetch subjects" }, { status: 500 });
   }
 }
 
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { name } = body;
+    const name = String(body?.name || "").trim();
 
     if (!name) {
-      return NextResponse.json(
-        { error: 'Subject name is required' },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: "Subject name is required" }, { status: 400 });
     }
 
-    const subjectRef = await db.collection('subjects').add({
-      name,
-      createdAt: new Date().toISOString(),
-    });
-
-    const createdSubject = {
-      id: subjectRef.id,
-      name,
-      createdAt: new Date().toISOString(),
-      books: []
-    };
-
-    return NextResponse.json({ subject: createdSubject });
-  } catch (error) {
-    return NextResponse.json(
-      { error: 'Failed to create subject' },
-      { status: 500 }
+    const existing = await pgPool.query(
+      `SELECT id::text AS id, name, created_at AS "createdAt" FROM subjects WHERE lower(name)=lower($1) LIMIT 1`,
+      [name]
     );
+    if (existing.rowCount) {
+      return NextResponse.json({ subject: { ...existing.rows[0], books: [] } });
+    }
+
+    const insert = await pgPool.query(
+      `
+        INSERT INTO subjects (name, created_at)
+        VALUES ($1, NOW())
+        RETURNING id::text AS id, name, created_at AS "createdAt"
+      `,
+      [name]
+    );
+
+    return NextResponse.json({ subject: { ...insert.rows[0], books: [] } });
+  } catch (error) {
+    return NextResponse.json({ error: "Failed to create subject" }, { status: 500 });
   }
 }
 
 export async function PUT(request: NextRequest) {
   try {
     const body = await request.json();
-    const { id, name } = body;
+    const id = String(body?.id || "");
+    const name = String(body?.name || "").trim();
 
     if (!id || !name) {
-      return NextResponse.json(
-        { error: 'Subject ID and name are required' },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: "Subject ID and name are required" }, { status: 400 });
     }
 
-    await db.collection('subjects').doc(id).update({
-      name,
-      updatedAt: new Date().toISOString(),
-    });
-
-    const updatedSubject = {
-      id,
-      name,
-      updatedAt: new Date().toISOString()
-    };
-
-    return NextResponse.json({ subject: updatedSubject });
-  } catch (error) {
-    return NextResponse.json(
-      { error: 'Failed to update subject' },
-      { status: 500 }
+    const update = await pgPool.query(
+      `
+        UPDATE subjects
+        SET name = $2
+        WHERE id::text = $1
+        RETURNING id::text AS id, name
+      `,
+      [id, name]
     );
+
+    if (!update.rowCount) {
+      return NextResponse.json({ error: "Subject not found" }, { status: 404 });
+    }
+
+    return NextResponse.json({ subject: update.rows[0] });
+  } catch (error) {
+    return NextResponse.json({ error: "Failed to update subject" }, { status: 500 });
   }
 }
 
 export async function DELETE(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
-    const subjectId = searchParams.get('id');
+    const subjectId = searchParams.get("id");
 
     if (!subjectId) {
-      return NextResponse.json(
-        { error: 'Subject ID is required' },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: "Subject ID is required" }, { status: 400 });
     }
 
-    // Delete all books in this subject
-    const booksSnapshot = await db.collection('subjects').doc(subjectId).collection('books').get();
-    
-    for (const bookDoc of booksSnapshot.docs) {
-      await db.collection('subjects').doc(subjectId).collection('books').doc(bookDoc.id).delete();
-    }
-
-    // Delete the subject
-    await db.collection('subjects').doc(subjectId).delete();
-
-    return NextResponse.json({ message: 'Subject deleted successfully' });
-  } catch (error) {
-    return NextResponse.json(
-      { error: 'Failed to delete subject' },
-      { status: 500 }
+    // Delete dependent rows first if FK/cascade is not defined
+    await pgPool.query(
+      `DELETE FROM book_chapters WHERE book_id IN (SELECT id FROM books WHERE subject_id::text = $1)`,
+      [subjectId]
     );
+    await pgPool.query(`DELETE FROM books WHERE subject_id::text = $1`, [subjectId]);
+    await pgPool.query(`DELETE FROM subjects WHERE id::text = $1`, [subjectId]);
+
+    return NextResponse.json({ message: "Subject deleted successfully" });
+  } catch (error) {
+    return NextResponse.json({ error: "Failed to delete subject" }, { status: 500 });
   }
 }
+

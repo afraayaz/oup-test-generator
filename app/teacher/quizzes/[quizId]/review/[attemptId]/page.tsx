@@ -247,7 +247,7 @@ export default function ReviewResultsPage() {
                 {/* Student Answer - Amber Background */}
                 <div className="bg-amber-50 border-b border-amber-200 p-4 sm:p-6">
                   <label className="text-sm font-bold text-amber-900 block mb-2">📝 Student's Answer:</label>
-                  <p className="text-amber-900 bg-white border border-amber-200 rounded p-3">{question.userAnswer || 'No answer provided'}</p>
+                  <p className="text-amber-900 bg-white border border-amber-200 rounded p-3">{question.userAnswer ?? 'No answer provided'}</p>
                 </div>
 
                 {/* Correct Answer - Green Background (only if wrong) */}

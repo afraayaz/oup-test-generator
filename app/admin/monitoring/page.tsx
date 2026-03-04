@@ -42,6 +42,7 @@ export default function ContentMonitoring() {
   const [showBookModal, setShowBookModal] = useState(false);
   const [selectedSubject, setSelectedSubject] = useState<string>('');
   const [selectedGrade, setSelectedGrade] = useState<string>('');
+  const [selectedSubjectFilter, setSelectedSubjectFilter] = useState<string>('');
   const [subjectName, setSubjectName] = useState('');
   const [bookTitle, setBookTitle] = useState('');
   const [bookGrade, setBookGrade] = useState('');
@@ -112,34 +113,39 @@ export default function ContentMonitoring() {
     return matchesSearch && matchesStatus && matchesType;
   });
 
-  // Get all unique grades from all books
-  const getAllGrades = () => {
+  // Get unique grades for current subject filter only (not from all subjects)
+  const getFilteredGrades = () => {
     const gradesSet = new Set<string>();
-    subjects.forEach(subject => {
-      subject.books.forEach((book: any) => {
-        if (book.grade) {
-          gradesSet.add(book.grade);
-        }
+    subjects
+      .filter((subject) => !selectedSubjectFilter || subject.name === selectedSubjectFilter)
+      .forEach((subject) => {
+        subject.books.forEach((book: any) => {
+          if (book.grade) gradesSet.add(book.grade);
+        });
       });
-    });
-    const gradeArray = Array.from(gradesSet).sort();
-    return gradeArray;
+    return Array.from(gradesSet).sort();
   };
 
-  // Get books filtered by selected grade
-  const getBooksByGrade = () => {
-    if (!selectedGrade) {
-      return subjects.map(subject => ({
+  // Get books filtered by selected subject + grade
+  const getBooksByFilters = () => {
+    const subjectScoped = subjects.filter(
+      (subject) => !selectedSubjectFilter || subject.name === selectedSubjectFilter
+    );
+
+    return subjectScoped
+      .map((subject) => ({
         subject: subject.name,
-        books: subject.books
-      }));
-    }
-    
-    return subjects.map(subject => ({
-      subject: subject.name,
-      books: subject.books.filter((book: any) => book.grade === selectedGrade)
-    })).filter(item => item.books.length > 0);
+        books: (subject.books || []).filter((book: any) => !selectedGrade || book.grade === selectedGrade),
+      }))
+      .filter((item) => item.books.length > 0);
   };
+
+  useEffect(() => {
+    // Reset grade if not valid for current subject selection
+    if (selectedGrade && !getFilteredGrades().includes(selectedGrade)) {
+      setSelectedGrade('');
+    }
+  }, [selectedSubjectFilter, subjects]);
 
   const handleBulkApprove = () => {
     if (selectedItems.length === 0) {
@@ -625,34 +631,39 @@ export default function ContentMonitoring() {
                   </div>
                 </div>
                 
-                {/* Grade Filter */}
+                {/* Subject + Grade Filters */}
                 <div className="p-6 border-b border-gray-200 bg-gray-50">
-                  <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
-                    <label className="text-sm font-medium text-gray-700">Filter by Grade:</label>
-                    <div className="flex flex-wrap gap-2">
-                      <button
-                        onClick={() => setSelectedGrade('')}
-                        className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-                          selectedGrade === ''
-                            ? 'bg-blue-600 text-white'
-                            : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-                        }`}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="flex items-center gap-2">
+                      <label className="text-sm font-medium text-gray-700 min-w-[64px]">Subject:</label>
+                      <select
+                        value={selectedSubjectFilter}
+                        onChange={(e) => setSelectedSubjectFilter(e.target.value)}
+                        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                       >
-                        All Grades
-                      </button>
-                      {getAllGrades().map((grade) => (
-                        <button
-                          key={grade}
-                          onClick={() => setSelectedGrade(grade)}
-                          className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-                            selectedGrade === grade
-                              ? 'bg-blue-600 text-white'
-                              : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-                          }`}
-                        >
-                          {grade}
-                        </button>
-                      ))}
+                        <option value="">All Subjects</option>
+                        {subjects.map((subject) => (
+                          <option key={subject.id} value={subject.name}>
+                            {subject.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <label className="text-sm font-medium text-gray-700 min-w-[64px]">Grade:</label>
+                      <select
+                        value={selectedGrade}
+                        onChange={(e) => setSelectedGrade(e.target.value)}
+                        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      >
+                        <option value="">All Grades</option>
+                        {getFilteredGrades().map((grade) => (
+                          <option key={grade} value={grade}>
+                            {grade}
+                          </option>
+                        ))}
+                      </select>
                     </div>
                   </div>
                 </div>
@@ -680,7 +691,7 @@ export default function ContentMonitoring() {
                       <p className="text-gray-500 text-sm">Click "Add Subject" to create your first subject.</p>
                     </div>
                   ) : (
-                    getBooksByGrade().map((subjectData) => {
+                    getBooksByFilters().map((subjectData) => {
                       const subject = subjects.find(s => s.name === subjectData.subject);
                       return (
                     <div key={subject.id} className="mb-6 border border-gray-200 rounded-lg">

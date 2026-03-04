@@ -1,6 +1,127 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { pgPool } from '@/lib/postgres';
 import { db } from '@/firebase/firebase';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
+
+let hasQuizAttemptsTableCache: boolean | null = null;
+let hasQuizAssignmentsTableCache: boolean | null = null;
+let attemptsColumnsCache: Set<string> | null = null;
+let assignmentColumnsCache: Set<string> | null = null;
+let userColumnsCache: Set<string> | null = null;
+
+async function hasTable(tableName: string): Promise<boolean> {
+  const res = await pgPool.query(
+    `
+      SELECT 1
+      FROM information_schema.tables
+      WHERE table_schema = 'public'
+        AND table_name = $1
+      LIMIT 1
+    `,
+    [tableName]
+  );
+  return res.rowCount > 0;
+}
+
+async function hasQuizAttemptsTable(): Promise<boolean> {
+  if (hasQuizAttemptsTableCache !== null) return hasQuizAttemptsTableCache;
+  hasQuizAttemptsTableCache = await hasTable('quiz_attempts');
+  return hasQuizAttemptsTableCache;
+}
+
+async function hasQuizAssignmentsTable(): Promise<boolean> {
+  if (hasQuizAssignmentsTableCache !== null) return hasQuizAssignmentsTableCache;
+  hasQuizAssignmentsTableCache = await hasTable('quiz_assignments');
+  return hasQuizAssignmentsTableCache;
+}
+
+async function getAttemptsColumns(): Promise<Set<string>> {
+  if (attemptsColumnsCache) return attemptsColumnsCache;
+  const res = await pgPool.query(
+    `
+      SELECT column_name
+      FROM information_schema.columns
+      WHERE table_schema = 'public'
+        AND table_name = 'quiz_attempts'
+    `
+  );
+  attemptsColumnsCache = new Set<string>(res.rows.map((row: any) => String(row.column_name)));
+  return attemptsColumnsCache;
+}
+
+async function getAssignmentColumns(): Promise<Set<string>> {
+  if (assignmentColumnsCache) return assignmentColumnsCache;
+  const res = await pgPool.query(
+    `
+      SELECT column_name
+      FROM information_schema.columns
+      WHERE table_schema = 'public'
+        AND table_name = 'quiz_assignments'
+    `
+  );
+  assignmentColumnsCache = new Set<string>(res.rows.map((row: any) => String(row.column_name)));
+  return assignmentColumnsCache;
+}
+
+async function getUserColumns(): Promise<Set<string>> {
+  if (userColumnsCache) return userColumnsCache;
+  const res = await pgPool.query(
+    `
+      SELECT column_name
+      FROM information_schema.columns
+      WHERE table_schema = 'public'
+        AND table_name = 'users'
+    `
+  );
+  userColumnsCache = new Set<string>(res.rows.map((row: any) => String(row.column_name)));
+  return userColumnsCache;
+}
+
+async function getStudentKeys(studentId: string): Promise<string[]> {
+  const cols = await getUserColumns();
+  const where: string[] = ['id::text = $1'];
+  if (cols.has('firebase_uid')) where.push('firebase_uid = $1');
+  if (cols.has('uid')) where.push('uid = $1');
+
+  const keys = new Set<string>([String(studentId)]);
+  const res = await pgPool.query(
+    `
+      SELECT id::text AS id
+      FROM users
+      WHERE ${where.join(' OR ')}
+      LIMIT 1
+    `,
+    [studentId]
+  );
+  if (res.rows[0]?.id) keys.add(String(res.rows[0].id));
+  return Array.from(keys);
+}
+
+function parseExplanationText(raw: any): string {
+  if (raw === null || raw === undefined) return '';
+  if (typeof raw === 'string') {
+    const trimmed = raw.trim();
+    if (!trimmed || trimmed === '[object Object]') return '';
+    if ((trimmed.startsWith('{') && trimmed.endsWith('}')) || (trimmed.startsWith('[') && trimmed.endsWith(']'))) {
+      try {
+        const parsed = JSON.parse(trimmed);
+        if (typeof parsed === 'string') return parsed;
+        if (parsed && typeof parsed === 'object' && typeof parsed.text === 'string') return parsed.text;
+      } catch {
+      }
+    }
+    return trimmed;
+  }
+  if (typeof raw === 'object') {
+    if (typeof raw.text === 'string') return raw.text;
+    try {
+      return JSON.stringify(raw);
+    } catch {
+      return '';
+    }
+  }
+  return String(raw);
+}
 
 // Function to extract cognitive level from question data
 function getQuestionCognitiveLevel(item: any): string {
@@ -123,14 +244,7 @@ export async function POST(request: NextRequest) {
       }
 
       // Extract explanation text safely
-      let explanation = '';
-      if (item.explanation) {
-        if (typeof item.explanation === 'string') {
-          explanation = item.explanation;
-        } else if (typeof item.explanation === 'object' && item.explanation?.text) {
-          explanation = item.explanation.text;
-        }
-      }
+      const explanation = parseExplanationText(item.explanation);
 
       if (index < 2) {
       }
@@ -180,6 +294,116 @@ export async function POST(request: NextRequest) {
       );
     });
 
+    const submittedAtIso = submittedAt || new Date().toISOString();
+
+    try {
+      if (!(await hasQuizAttemptsTable())) {
+        throw new Error('quiz_attempts table not found');
+      }
+
+      const attemptColumns = await getAttemptsColumns();
+      const studentKeys = await getStudentKeys(String(studentId));
+      const studentPk = studentKeys.find((key) => key !== String(studentId)) || String(studentId);
+
+      const insertMapping: Array<{ column: string; value: any; json?: boolean }> = [
+        { column: 'quiz_id', value: String(quizId) },
+        { column: 'quiz_title', value: quizTitle || 'Quiz' },
+        { column: 'subject', value: subject || '' },
+        { column: 'student_id', value: studentPk },
+        { column: 'student_name', value: studentName || 'Unknown Student' },
+        { column: 'score', value: Number(score) || 0 },
+        { column: 'total_marks', value: Number(totalMarks) || 0 },
+        { column: 'percentage', value: Number(percentage) || 0 },
+        { column: 'time_spent', value: Number(timeSpent) || 0 },
+        { column: 'submitted_at', value: submittedAtIso },
+        { column: 'completed_at', value: submittedAtIso },
+        { column: 'is_marked', value: isMarked === true },
+        { column: 'answers', value: answers || {}, json: true },
+        { column: 'question_results', value: questionResults || [], json: true },
+        { column: 'cognitive_breakdown', value: cognitiveBreakdown || {}, json: true },
+        { column: 'status', value: 'submitted' },
+        { column: 'has_manual_grades', value: false },
+        { column: 'created_at', value: new Date() },
+        { column: 'updated_at', value: new Date() },
+      ];
+
+      const present = insertMapping.filter((item) => attemptColumns.has(item.column));
+      const insertColumns = present.map((item) => item.column);
+      const values = present.map((item) => item.json ? JSON.stringify(item.value) : item.value);
+      const placeholders = present.map((item, index) => item.json ? `$${index + 1}::jsonb` : `$${index + 1}`);
+
+      const attemptInsert = await pgPool.query(
+        `
+          INSERT INTO quiz_attempts (${insertColumns.join(', ')})
+          VALUES (${placeholders.join(', ')})
+          RETURNING id::text AS id
+        `,
+        values
+      );
+
+      const attemptId = attemptInsert.rows[0]?.id;
+
+      if ((await hasQuizAssignmentsTable())) {
+        const assignmentColumns = await getAssignmentColumns();
+        const updates: string[] = [];
+        const updateValues: any[] = [];
+
+        if (assignmentColumns.has('status')) {
+          updateValues.push('completed');
+          updates.push(`status = $${updateValues.length}`);
+        }
+        if (assignmentColumns.has('completed_at')) {
+          updateValues.push(submittedAtIso);
+          updates.push(`completed_at = $${updateValues.length}`);
+        }
+        if (assignmentColumns.has('score')) {
+          updateValues.push(Number(score) || 0);
+          updates.push(`score = $${updateValues.length}`);
+        }
+        if (assignmentColumns.has('percentage')) {
+          updateValues.push(Number(percentage) || 0);
+          updates.push(`percentage = $${updateValues.length}`);
+        }
+        if (assignmentColumns.has('is_marked')) {
+          updateValues.push(isMarked === true);
+          updates.push(`is_marked = $${updateValues.length}`);
+        }
+        if (assignmentColumns.has('updated_at')) {
+          updates.push('updated_at = NOW()');
+        }
+
+        if (updates.length) {
+          updateValues.push(String(quizId));
+          updateValues.push(studentKeys);
+
+          await pgPool.query(
+            `
+              UPDATE quiz_assignments
+              SET ${updates.join(', ')}
+              WHERE quiz_id::text = $${updateValues.length - 1}
+                AND student_id::text = ANY($${updateValues.length}::text[])
+            `,
+            updateValues
+          );
+        }
+      }
+
+      return NextResponse.json(
+        {
+          success: true,
+          attemptId,
+          score,
+          percentage,
+          questionResults,
+          cognitiveBreakdown,
+          source: 'postgres',
+        },
+        { status: 200 }
+      );
+    } catch (pgError) {
+      console.error('[quiz-attempts][POST] PostgreSQL failed, falling back to Firebase:', pgError);
+    }
+
     // Save to Firestore using SDK
     const attemptsRef = collection(db, 'quizAttempts');
     const attemptDoc = await addDoc(attemptsRef, {
@@ -192,8 +416,8 @@ export async function POST(request: NextRequest) {
       totalMarks: totalMarks || 0,
       percentage: percentage || 0,
       timeSpent: timeSpent || 0,
-      submittedAt: submittedAt || new Date().toISOString(),
-      completedAt: submittedAt || new Date().toISOString(),  // Use submittedAt as completedAt for consistency
+      submittedAt: submittedAtIso,
+      completedAt: submittedAtIso,  // Use submittedAt as completedAt for consistency
       createdAt: serverTimestamp(),
       isMarked: isMarked === true,  // Ensure boolean value
       questionResults: questionResults || [],
@@ -208,6 +432,7 @@ export async function POST(request: NextRequest) {
         percentage,
         questionResults,
         cognitiveBreakdown,
+        source: 'firebase_fallback',
       },
       { status: 200 }
     );

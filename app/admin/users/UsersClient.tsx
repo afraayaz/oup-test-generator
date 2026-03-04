@@ -264,6 +264,9 @@ export default function UsersClient({ initialUsers, schools, campuses }: Props) 
         userType: userType,
         assignedBooks: finalBooks,
         subjectGradePairs: userForm.role === 'teacher' ? userForm.subjectGradePairs : [],
+        grade: userForm.role === 'student' ? userForm.grade : '',
+        section: userForm.role === 'student' ? userForm.section : '',
+        rollNumber: userForm.role === 'student' ? userForm.rollNumber : '',
       };
 
       const response = await fetch('/api/admin/users', {

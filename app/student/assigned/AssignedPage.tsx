@@ -26,6 +26,18 @@ export default function AssignedPage() {
       }
 
       try {
+        await fetch('/api/student/link-postgres', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            uid: user.uid,
+            email: user.email,
+            name: user.name,
+            schoolId: user.schoolId,
+            assignedGrade: user.class || user.grade,
+          }),
+        }).catch(() => null);
+
         const response = await fetch(`/api/student/assigned-quizzes?studentId=${user.uid}`);
         if (response.ok) {
           const data = await response.json();

@@ -1,206 +1,165 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from "next/server";
+import { pgPool } from "@/lib/postgres";
 
-const FIREBASE_PROJECT_ID = 'quiz-app-ff0ab';
-const FIRESTORE_BASE_URL = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents`;
+export const dynamic = "force-dynamic";
 
-// GET - Fetch chapters for a specific book
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
-    const bookId = searchParams.get('bookId');
-    const subjectId = searchParams.get('subjectId');
+    const bookId = searchParams.get("bookId");
 
-    if (!bookId || !subjectId) {
-      return NextResponse.json(
-        { error: 'Book ID and Subject ID are required' },
-        { status: 400 }
-      );
+    if (!bookId) {
+      return NextResponse.json({ error: "Book ID is required" }, { status: 400 });
     }
 
-    const chaptersPath = `${FIRESTORE_BASE_URL}/subjects/${subjectId}/books/${bookId}/chapters`;
-
-    const response = await fetch(
-      chaptersPath,
-      {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      }
+    const response = await pgPool.query(
+      `
+        SELECT
+          id::text AS id,
+          chapter_number AS "chapterNo",
+          chapter_name AS "chapterName",
+          NULL::text AS topic,
+          COALESCE(description, '') AS description,
+          created_at AS "createdAt"
+        FROM book_chapters
+        WHERE book_id::text = $1
+        ORDER BY chapter_number ASC, chapter_name ASC
+      `,
+      [bookId]
     );
 
-    if (!response.ok) {
-      // If chapters don't exist, return empty array
-      if (response.status === 404) {
-        return NextResponse.json({ chapters: [] });
-      }
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
-
-    const data = await response.json();
-    
-    const chapters = (data.documents || []).map((doc: any) => {
-      const pathParts = doc.name.split('/');
-      const id = pathParts[pathParts.length - 1];
-      const fields = doc.fields || {};
-
-      return {
-        id,
-        chapterNo: fields.chapterNo?.integerValue || 0,
-        chapterName: fields.chapterName?.stringValue || '',
-        topic: fields.topic?.stringValue || '',
-        description: fields.description?.stringValue || '',
-        createdAt: fields.createdAt?.timestampValue,
-      };
-    }).sort((a: any, b: any) => a.chapterNo - b.chapterNo);
-    return NextResponse.json({ chapters });
+    return NextResponse.json({ chapters: response.rows });
   } catch (error) {
-    return NextResponse.json(
-      { error: 'Failed to fetch chapters' },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: "Failed to fetch chapters" }, { status: 500 });
   }
 }
 
-// POST - Create a new chapter for a book
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { bookId, subjectId, chapterNo, chapterName, topic, description } = body;
+    const bookId = String(body?.bookId || "");
+    const chapterNo = Number(body?.chapterNo);
+    const chapterName = String(body?.chapterName || "").trim();
+    const description = String(body?.description || "");
 
-    if (!bookId || !subjectId || !chapterNo || !chapterName) {
+    if (!bookId || !Number.isFinite(chapterNo) || !chapterName) {
       return NextResponse.json(
-        { error: 'Book ID, Subject ID, Chapter No, and Chapter Name are required' },
+        { error: "Book ID, Chapter No, and Chapter Name are required" },
         { status: 400 }
       );
     }
 
-    const chapterId = `chapter_${chapterNo}`;
-    const chapterData = {
-      fields: {
-        chapterNo: { integerValue: chapterNo },
-        chapterName: { stringValue: chapterName },
-        topic: { stringValue: topic || '' },
-        description: { stringValue: description || '' },
-        createdAt: { timestampValue: new Date().toISOString() },
-      },
-    };
-
-    const chapterPath = `${FIRESTORE_BASE_URL}/subjects/${subjectId}/books/${bookId}/chapters/${chapterId}`;
-
-    const response = await fetch(
-      chapterPath,
-      {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(chapterData),
-      }
+    const insert = await pgPool.query(
+      `
+        INSERT INTO book_chapters (book_id, chapter_number, chapter_name, description, created_at, updated_at)
+        VALUES ($1::bigint, $2, $3, $4, NOW(), NOW())
+        RETURNING
+          id::text AS id,
+          chapter_number AS "chapterNo",
+          chapter_name AS "chapterName",
+          NULL::text AS topic,
+          COALESCE(description, '') AS description,
+          created_at AS "createdAt"
+      `,
+      [bookId, chapterNo, chapterName, description]
     );
 
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
+    // keep books.chapters count aligned
+    await pgPool.query(
+      `
+        UPDATE books b
+        SET chapters = sub.cnt, updated_at = NOW()
+        FROM (
+          SELECT book_id, COUNT(*)::int AS cnt
+          FROM book_chapters
+          WHERE book_id::text = $1
+          GROUP BY book_id
+        ) sub
+        WHERE b.id = sub.book_id
+      `,
+      [bookId]
+    );
 
-    const createdChapter = {
-      id: chapterId,
-      chapterNo,
-      chapterName,
-      topic: topic || '',
-      description: description || '',
-      createdAt: new Date().toISOString(),
-    };
-    return NextResponse.json({ chapter: createdChapter });
+    return NextResponse.json({ chapter: insert.rows[0] });
   } catch (error) {
-    return NextResponse.json(
-      { error: 'Failed to create chapter' },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: "Failed to create chapter" }, { status: 500 });
   }
 }
 
-// PUT - Update a chapter
 export async function PUT(request: NextRequest) {
   try {
     const body = await request.json();
-    const { bookId, subjectId, chapterId, chapterNo, chapterName, topic, description } = body;
+    const chapterId = String(body?.chapterId || "");
+    const chapterNo = Number(body?.chapterNo);
+    const chapterName = String(body?.chapterName || "").trim();
+    const description = String(body?.description || "");
 
-    if (!bookId || !subjectId || !chapterId || !chapterNo || !chapterName) {
-      return NextResponse.json(
-        { error: 'All required fields are missing' },
-        { status: 400 }
-      );
+    if (!chapterId || !Number.isFinite(chapterNo) || !chapterName) {
+      return NextResponse.json({ error: "All required fields are missing" }, { status: 400 });
     }
 
-    const chapterData = {
-      fields: {
-        chapterNo: { integerValue: chapterNo },
-        chapterName: { stringValue: chapterName },
-        topic: { stringValue: topic || '' },
-        description: { stringValue: description || '' },
-        updatedAt: { timestampValue: new Date().toISOString() },
-      },
-    };
-
-    const response = await fetch(
-      `${FIRESTORE_BASE_URL}/subjects/${subjectId}/books/${bookId}/chapters/${chapterId}`,
-      {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(chapterData),
-      }
+    const update = await pgPool.query(
+      `
+        UPDATE book_chapters
+        SET
+          chapter_number = $2,
+          chapter_name = $3,
+          description = $4,
+          updated_at = NOW()
+        WHERE id::text = $1
+        RETURNING id::text AS id
+      `,
+      [chapterId, chapterNo, chapterName, description]
     );
 
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
+    if (!update.rowCount) {
+      return NextResponse.json({ error: "Chapter not found" }, { status: 404 });
     }
 
     return NextResponse.json({ success: true });
   } catch (error) {
-    return NextResponse.json(
-      { error: 'Failed to update chapter' },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: "Failed to update chapter" }, { status: 500 });
   }
 }
 
-// DELETE - Delete a chapter
 export async function DELETE(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
-    const bookId = searchParams.get('bookId');
-    const subjectId = searchParams.get('subjectId');
-    const chapterId = searchParams.get('chapterId');
+    const bookId = searchParams.get("bookId");
+    const chapterId = searchParams.get("chapterId");
 
-    if (!bookId || !subjectId || !chapterId) {
-      return NextResponse.json(
-        { error: 'Book ID, Subject ID, and Chapter ID are required' },
-        { status: 400 }
-      );
+    if (!bookId || !chapterId) {
+      return NextResponse.json({ error: "Book ID and Chapter ID are required" }, { status: 400 });
     }
 
-    const response = await fetch(
-      `${FIRESTORE_BASE_URL}/subjects/${subjectId}/books/${bookId}/chapters/${chapterId}`,
-      {
-        method: 'DELETE',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      }
+    const del = await pgPool.query(
+      `DELETE FROM book_chapters WHERE id::text = $1 AND book_id::text = $2`,
+      [chapterId, bookId]
     );
 
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
+    if (!del.rowCount) {
+      return NextResponse.json({ error: "Chapter not found" }, { status: 404 });
     }
+
+    // keep books.chapters count aligned
+    await pgPool.query(
+      `
+        UPDATE books
+        SET
+          chapters = (
+            SELECT COUNT(*)::int
+            FROM book_chapters
+            WHERE book_id::text = $1
+          ),
+          updated_at = NOW()
+        WHERE id::text = $1
+      `,
+      [bookId]
+    );
 
     return NextResponse.json({ success: true });
   } catch (error) {
-    return NextResponse.json(
-      { error: 'Failed to delete chapter' },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: "Failed to delete chapter" }, { status: 500 });
   }
 }
+

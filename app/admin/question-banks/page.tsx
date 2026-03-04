@@ -2,8 +2,6 @@
 import { useState, useEffect } from 'react';
 import Sidebar from '@/components/Sidebar';
 import { useUserProfile } from '@/hooks/useUserProfile';
-import { db } from '@/firebase/firebase';
-import { collection, getDocs, doc, getDoc } from 'firebase/firestore';
 
 interface QuestionBankStats {
   schoolId?: string;
@@ -55,86 +53,9 @@ export default function AdminQuestionBanksPage() {
   const fetchAllQBs = async () => {
     try {
       setLoading(true);
-      const allBanks: QuestionBankStats[] = [];
-
-      // Fetch school QBs - RECALCULATE stats from actual questions (not cached)
-      const schoolStatsRef = collection(db, 'school-stats');
-      const schoolSnapshot = await getDocs(schoolStatsRef);
-      
-      // For each school, recalculate stats from actual questions
-      for (const schoolDoc of schoolSnapshot.docs) {
-        const schoolId = schoolDoc.id;
-        const schoolData = schoolDoc.data();
-        
-        try {
-          // Fetch actual questions for this school
-          const questionsRef = collection(db, 'questions', 'schools', schoolId);
-          const questionsSnapshot = await getDocs(questionsRef);
-          
-          // Recalculate stats from actual questions
-          const stats: any = {
-            schoolId: schoolId,
-            schoolName: schoolData.schoolName || schoolId,
-            totalQuestions: questionsSnapshot.size,
-            questionsBySubject: {},
-            questionsByGrade: {},
-            questionsByType: {},
-            questionsByDifficulty: {},
-          };
-
-          questionsSnapshot.docs.forEach((doc: any) => {
-            const q = doc.data();
-            if (q.subject) stats.questionsBySubject[q.subject] = (stats.questionsBySubject[q.subject] || 0) + 1;
-            if (q.grade) stats.questionsByGrade[q.grade] = (stats.questionsByGrade[q.grade] || 0) + 1;
-            if (q.type) stats.questionsByType[q.type] = (stats.questionsByType[q.type] || 0) + 1;
-            const difficulty = q.difficulty || 'Medium';
-            stats.questionsByDifficulty[difficulty] = (stats.questionsByDifficulty[difficulty] || 0) + 1;
-          });
-          
-          allBanks.push({
-            schoolId: schoolId,
-            schoolName: stats.schoolName,
-            bankName: stats.schoolName || schoolId,
-            bankType: 'school',
-            totalQuestions: stats.totalQuestions,
-            questionsBySubject: stats.questionsBySubject,
-            questionsByGrade: stats.questionsByGrade,
-            lastUpdated: schoolData.lastUpdated,
-          });
-        } catch (error) {
-          // Fall back to cached stats if calculation fails
-          allBanks.push({
-            schoolId: schoolId,
-            schoolName: schoolData.schoolName,
-            bankName: schoolData.schoolName || schoolId,
-            bankType: 'school',
-            totalQuestions: schoolData.totalQuestions || 0,
-            questionsBySubject: schoolData.questionsBySubject || {},
-            questionsByGrade: schoolData.questionsByGrade || {},
-            lastUpdated: schoolData.lastUpdated,
-          });
-        }
-      }
-
-      // Fetch OUP QB
-      try {
-        const oupStatsRef = doc(db, 'question-bank-stats', 'oup');
-        const oupStats = await getDoc(oupStatsRef);
-        if (oupStats.exists()) {
-          const oupData = oupStats.data();
-          allBanks.unshift({
-            schoolId: 'oup',
-            bankName: 'OUP Question Bank',
-            bankType: 'oup',
-            totalQuestions: oupData.totalQuestions || 0,
-            questionsBySubject: oupData.questionsBySubject || {},
-            questionsByGrade: oupData.questionsByGrade || {},
-            lastUpdated: oupData.lastUpdated,
-          });
-        }
-      } catch (oupError) {
-      }
-      setAllQBs(allBanks);
+      const res = await fetch('/api/admin/question-banks/overview');
+      const data = await res.json();
+      setAllQBs(Array.isArray(data?.banks) ? data.banks : []);
     } catch (error) {
     }
     setLoading(false);
@@ -143,29 +64,17 @@ export default function AdminQuestionBanksPage() {
   const fetchBankQuestions = async (bankId: string, bankType: 'school' | 'oup') => {
     try {
       setDetailsLoading(true);
-      
-      let questionsRef;
-      if (bankType === 'oup') {
-        questionsRef = collection(db, 'questions', 'oup', 'items');
-      } else {
-        questionsRef = collection(db, 'questions', 'schools', bankId);
-      }
-
-      const snapshot = await getDocs(questionsRef);
-
-      let questions = snapshot.docs.map(doc => ({
-        id: doc.id,
-        source: bankType,
-        ...doc.data()
-      })) as Question[];
-
-      // Apply filters
-      if (filters.subject !== 'all') questions = questions.filter(q => q.subject === filters.subject);
-      if (filters.grade !== 'all') questions = questions.filter(q => q.grade === filters.grade);
-      if (filters.difficulty !== 'all') questions = questions.filter(q => q.difficulty === filters.difficulty);
-      if (filters.type !== 'all') questions = questions.filter(q => q.type === filters.type);
-
-      setBankQuestions(questions);
+      const params = new URLSearchParams({
+        bankId,
+        bankType,
+        subject: filters.subject,
+        grade: filters.grade,
+        difficulty: filters.difficulty,
+        type: filters.type,
+      });
+      const res = await fetch(`/api/admin/question-banks/questions?${params.toString()}`);
+      const data = await res.json();
+      setBankQuestions(Array.isArray(data?.questions) ? data.questions : []);
     } catch (error) {
     }
     setDetailsLoading(false);
@@ -195,44 +104,36 @@ export default function AdminQuestionBanksPage() {
   const fetchBankQuestionsWithFilters = async (bankId: string, bankType: 'school' | 'oup', filtersToApply: typeof filters) => {
     try {
       setDetailsLoading(true);
-      
-      let questionsRef;
-      if (bankType === 'oup') {
-        questionsRef = collection(db, 'questions', 'oup', 'items');
-      } else {
-        questionsRef = collection(db, 'questions', 'schools', bankId);
-      }
-
-      const snapshot = await getDocs(questionsRef);
-
-      let questions = snapshot.docs.map(doc => ({
-        id: doc.id,
-        source: bankType,
-        ...doc.data()
-      })) as Question[];
-
-      // Apply filters
-      if (filtersToApply.subject !== 'all') questions = questions.filter(q => q.subject === filtersToApply.subject);
-      if (filtersToApply.grade !== 'all') questions = questions.filter(q => q.grade === filtersToApply.grade);
-      if (filtersToApply.difficulty !== 'all') questions = questions.filter(q => q.difficulty?.toLowerCase() === filtersToApply.difficulty.toLowerCase());
-      if (filtersToApply.type !== 'all') questions = questions.filter(q => q.type === filtersToApply.type);
-
-      setBankQuestions(questions);
+      const params = new URLSearchParams({
+        bankId,
+        bankType,
+        subject: filtersToApply.subject,
+        grade: filtersToApply.grade,
+        difficulty: filtersToApply.difficulty,
+        type: filtersToApply.type,
+      });
+      const res = await fetch(`/api/admin/question-banks/questions?${params.toString()}`);
+      const data = await res.json();
+      setBankQuestions(Array.isArray(data?.questions) ? data.questions : []);
     } catch (error) {
     }
     setDetailsLoading(false);
   };
 
   const getSubjects = () => {
-    if (!selectedBank) return [];
-    const bank = allQBs.find(b => (b.schoolId || b.bankName) === selectedBank);
-    return Object.keys(bank?.questionsBySubject || {});
+    if (!selectedBank || !selectedBankType) return [];
+    const bank = selectedBankType === 'oup'
+      ? allQBs.find(b => b.bankType === 'oup')
+      : allQBs.find(b => String(b.schoolId || '') === String(selectedBank) && b.bankType === 'school');
+    return Object.keys(bank?.questionsBySubject || {}).sort();
   };
 
   const getGrades = () => {
-    if (!selectedBank) return [];
-    const bank = allQBs.find(b => (b.schoolId || b.bankName) === selectedBank);
-    return Object.keys(bank?.questionsByGrade || {});
+    if (!selectedBank || !selectedBankType) return [];
+    const bank = selectedBankType === 'oup'
+      ? allQBs.find(b => b.bankType === 'oup')
+      : allQBs.find(b => String(b.schoolId || '') === String(selectedBank) && b.bankType === 'school');
+    return Object.keys(bank?.questionsByGrade || {}).sort();
   };
 
   return (
@@ -335,12 +236,20 @@ export default function AdminQuestionBanksPage() {
                           </span>
                         </div>
                         <h2 className="text-2xl font-bold text-gray-800 mb-2">
-                          {allQBs.find(b => (b.schoolId || 'oup') === selectedBank)?.bankName}
+                          {(
+                            selectedBankType === 'oup'
+                              ? allQBs.find(b => b.bankType === 'oup')
+                              : allQBs.find(b => String(b.schoolId || '') === String(selectedBank) && b.bankType === 'school')
+                          )?.bankName}
                         </h2>
                         <p className="text-gray-600">
                           Total Questions:{' '}
                           <span className="font-bold text-blue-600">
-                            {allQBs.find(b => (b.schoolId || 'oup') === selectedBank)?.totalQuestions || 0}
+                            {(
+                              selectedBankType === 'oup'
+                                ? allQBs.find(b => b.bankType === 'oup')
+                                : allQBs.find(b => String(b.schoolId || '') === String(selectedBank) && b.bankType === 'school')
+                            )?.totalQuestions || 0}
                           </span>
                         </p>
                       </div>
@@ -354,7 +263,13 @@ export default function AdminQuestionBanksPage() {
 
                     {/* Stats */}
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                      {Object.entries(allQBs.find(b => (b.schoolId || 'oup') === selectedBank)?.questionsBySubject || {}).map(
+                      {Object.entries(
+                        (
+                          selectedBankType === 'oup'
+                            ? allQBs.find(b => b.bankType === 'oup')
+                            : allQBs.find(b => String(b.schoolId || '') === String(selectedBank) && b.bankType === 'school')
+                        )?.questionsBySubject || {}
+                      ).map(
                         ([subject, count]) => (
                           <div key={subject} className="bg-white rounded p-3">
                             <p className="text-sm text-gray-600">{subject}</p>

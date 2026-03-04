@@ -7,16 +7,27 @@ import QuestionBank from "@/components/QuestionBank";
 
 export default function MyQuestionBankPage() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const { user } = useUserProfile();
+  const { user, loading: profileLoading, error: profileError } = useUserProfile();
 
-  if (!user) {
+  if (profileLoading) {
     return <div className="flex items-center justify-center h-screen">Loading...</div>;
+  }
+
+  if (!user?.uid) {
+    return (
+      <div className="flex items-center justify-center h-screen text-center px-4">
+        <div>
+          <p className="text-lg font-semibold text-gray-800 mb-2">Unable to load profile</p>
+          <p className="text-sm text-gray-600">{profileError || "Please log out and log in again."}</p>
+        </div>
+      </div>
+    );
   }
 
   return (
     <div className="flex min-h-screen bg-gray-50">
       {/* Sidebar */}
-      <Sidebar userRole="Content Creator" currentPage="bank" open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
+      <Sidebar userRole="Content Creator" currentPage="bank" open={sidebarOpen} onClose={() => setSidebarOpen(false)} userOverride={user} />
 
       {/* Main Content */}
       <div className="flex-1 lg:ml-[256px] min-w-0 flex flex-col">
@@ -52,6 +63,7 @@ export default function MyQuestionBankPage() {
             apiEndpoint="/api/oup-creator/questions"
             userRole="content_creator"
             userId={user.uid}
+            userEmail={user.email}
             allowEdit={true}
             allowDelete={true}
           />

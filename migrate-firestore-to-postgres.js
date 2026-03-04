@@ -231,6 +231,42 @@ function normalizeAnswer(d) {
   return null;
 }
 
+async function resolveBookPk(client, subject, book, grade) {
+  const subjectsTable = await resolveTableName(client, 'subjects');
+  const booksTable = await resolveTableName(client, 'books');
+  if (!subjectsTable || !booksTable) return null;
+  if (!subject || !book) return null;
+
+  const byGrade = await client.query(
+    `
+      SELECT b.id
+      FROM "${booksTable}" b
+      JOIN "${subjectsTable}" s ON s.id = b.subject_id
+      WHERE LOWER(s.name) = LOWER($1)
+        AND LOWER(b.title) = LOWER($2)
+        AND LOWER(COALESCE(b.grade, '')) = LOWER(COALESCE($3, ''))
+      ORDER BY b.id DESC
+      LIMIT 1
+    `,
+    [subject, book, grade || null]
+  );
+  if (byGrade.rows[0]?.id) return byGrade.rows[0].id;
+
+  const fallback = await client.query(
+    `
+      SELECT b.id
+      FROM "${booksTable}" b
+      JOIN "${subjectsTable}" s ON s.id = b.subject_id
+      WHERE LOWER(s.name) = LOWER($1)
+        AND LOWER(b.title) = LOWER($2)
+      ORDER BY b.id DESC
+      LIMIT 1
+    `,
+    [subject, book]
+  );
+  return fallback.rows[0]?.id ?? null;
+}
+
 (async () => {
   const client = new Client();
   await client.connect();
@@ -470,13 +506,18 @@ function normalizeAnswer(d) {
   const oup = await db.collection('questions').doc('oup').collection('items').get();
   for (const doc of oup.docs) {
     const d = doc.data();
+    const gradeValue = d.grade || d.class || null;
+    const bookValue = d.book || null;
+    const subjectValue = d.subject || null;
+    const resolvedBookId = await resolveBookPk(client, subjectValue, bookValue, gradeValue);
     rows.push({
       id: doc.id,
       question_text: d.questionText || d.question || null,
       type: d.type || d.questionType || null,
-      grade: d.grade || d.class || null,
-      subject: d.subject || null,
-      book: d.book || null,
+      grade: gradeValue,
+      subject: subjectValue,
+      book: bookValue,
+      book_id: resolvedBookId,
       chapter: d.chapter || null,
       slo: d.slo || null,
       difficulty: d.difficulty || null,
@@ -505,13 +546,18 @@ function normalizeAnswer(d) {
     const schoolQ = await db.collection('questions').doc('schools').collection(sid).get();
     for (const doc of schoolQ.docs) {
       const d = doc.data();
+      const gradeValue = d.grade || d.class || null;
+      const bookValue = d.book || null;
+      const subjectValue = d.subject || null;
+      const resolvedBookId = await resolveBookPk(client, subjectValue, bookValue, gradeValue);
       rows.push({
         id: doc.id,
         question_text: d.questionText || d.question || null,
         type: d.type || d.questionType || null,
-        grade: d.grade || d.class || null,
-        subject: d.subject || null,
-        book: d.book || null,
+        grade: gradeValue,
+        subject: subjectValue,
+        book: bookValue,
+        book_id: resolvedBookId,
         chapter: d.chapter || null,
         slo: d.slo || null,
         difficulty: d.difficulty || null,

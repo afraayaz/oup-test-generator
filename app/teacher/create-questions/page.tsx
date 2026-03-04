@@ -7,100 +7,94 @@ import { useUserProfile } from "@/hooks/useUserProfile";
 import { useSearchParams } from "next/navigation";
 import QuestionCreationModePage from "@/components/QuestionCreationModePage";
 import QuestionBank from "@/components/QuestionBank";
+import BulkUploadPage from "@/components/BulkUploadPage";
+import { FiMenu } from "react-icons/fi";
+
+type Mode = "create" | "bulk" | "bank";
 
 function TeacherCreateQuestionPageContent() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [mode, setMode] = useState<'create' | 'bank'>('create');
+  const [mode, setMode] = useState<Mode>("create");
   const { user } = useUserProfile();
   const searchParams = useSearchParams();
 
-  // Handle mode from query parameter
   useEffect(() => {
-    const modeParam = searchParams.get('mode');
-    if (modeParam === 'bank') {
-      setMode('bank');
-    }
+    const modeParam = searchParams.get("mode");
+    if (modeParam === "bank") setMode("bank");
+    else if (modeParam === "bulk") setMode("bulk");
   }, [searchParams]);
-
-  // Debug log
-  React.useEffect(() => {
-  }, [user]);
 
   if (!user) {
     return <div className="flex items-center justify-center h-screen">Loading...</div>;
   }
 
+  const tabs: { key: Mode; label: string }[] = [
+    { key: "create", label: "Create Questions" },
+    { key: "bulk", label: "Bulk Upload" },
+    { key: "bank", label: "Question Bank" },
+  ];
+
   return (
     <div className="h-screen bg-gray-50 w-screen overflow-hidden">
-      {/* Sidebar */}
       <Sidebar userRole="Teacher" currentPage="create" open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
 
-      {/* Main Content */}
-      <div className="fixed top-0 right-0 bottom-0 left-0 xl:left-64 flex flex-col overflow-hidden">
-        {/* Header with Toggle */}
+      <div className="fixed top-0 right-0 bottom-0 left-0 lg:left-64 flex flex-col overflow-hidden">
+        {/* ── OUP-style top bar ── */}
         <div className="bg-white border-b border-gray-200 sticky top-0 z-10 flex-shrink-0">
-          <div className="flex items-center justify-between px-4 sm:px-6 py-3 sm:py-4">
-            <button
-              onClick={() => setSidebarOpen(!sidebarOpen)}
-              className="lg:hidden p-2 hover:bg-gray-100 rounded-lg"
-            >
-              <svg
-                className="w-6 h-6"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M4 6h16M4 12h16M4 18h16"
-                />
-              </svg>
-            </button>
-            <h1 className="text-lg sm:text-2xl font-bold text-gray-900 font-gibson-semibold">
-              {mode === 'create' ? 'Create Questions' : 'My Question Bank'}
-            </h1>
-            
-            {/* Toggle Buttons */}
-            <div className="flex gap-2">
+          <div className="flex items-center justify-between px-4 sm:px-6 py-3">
+
+            {/* Left: hamburger (mobile) + pill tabs */}
+            <div className="flex items-center gap-3">
               <button
-                onClick={() => setMode('create')}
-                className={`px-3 sm:px-4 py-2 rounded-lg font-medium transition-colors ${
-                  mode === 'create'
-                    ? 'bg-blue-600 text-white'
-                    : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-                }`}
+                onClick={() => setSidebarOpen(!sidebarOpen)}
+                className="lg:hidden p-2 hover:bg-gray-100 rounded-lg"
               >
-                <span className="hidden sm:inline">Create</span>
-                <span className="sm:hidden">+</span>
+                <FiMenu size={22} />
               </button>
-              <button
-                onClick={() => setMode('bank')}
-                className={`px-3 sm:px-4 py-2 rounded-lg font-medium transition-colors ${
-                  mode === 'bank'
-                    ? 'bg-blue-600 text-white'
-                    : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-                }`}
-              >
-                <span className="hidden sm:inline">Question Bank</span>
-                <span className="sm:hidden">📚</span>
-              </button>
+
+              {/* Pill-tab group */}
+              <nav className="flex flex-wrap items-center rounded-lg border border-gray-200 overflow-hidden">
+                {tabs.map((tab) => (
+                  <button
+                    key={tab.key}
+                    onClick={() => setMode(tab.key)}
+                    className={`px-4 py-2 text-sm font-semibold transition-colors whitespace-nowrap
+                      ${mode === tab.key
+                        ? "bg-[#1b2d5b] text-white"
+                        : "bg-white text-gray-600 hover:bg-gray-100"
+                      }`}
+                  >
+                    {tab.label}
+                  </button>
+                ))}
+              </nav>
             </div>
+
+
+
           </div>
         </div>
 
-        {/* Content */}
+        {/* ── Tab content ── */}
         <div className="flex-1 overflow-auto">
-          {mode === 'create' ? (
-            <QuestionCreationModePage
+          <div className="w-full px-4 sm:px-6 lg:px-8">
+            {mode === "create" && (
+              <QuestionCreationModePage
+                userRole="Teacher"
+                baseRoute="/teacher/create-questions"
+                apiEndpoint="/api/teacher/questions"
+                embeddedMode={true}
+                user={user}
+              />
+            )}
+          {mode === "bulk" && (
+            <BulkUploadPage
               userRole="Teacher"
-              baseRoute="/teacher/create-questions"
               apiEndpoint="/api/teacher/questions"
-              embeddedMode={true}
-              user={user}
+              userRoleParam="teacher"
             />
-          ) : (
+          )}
+            {mode === "bank" && (
             <QuestionBank
               apiEndpoint="/api/teacher/questions"
               userRole="teacher"
@@ -111,6 +105,7 @@ function TeacherCreateQuestionPageContent() {
               allowDelete={true}
             />
           )}
+          </div>
         </div>
       </div>
     </div>

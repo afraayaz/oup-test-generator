@@ -1,5 +1,6 @@
 @import url('https://cdnjs.cloudflare.com/ajax/libs/remixicon/4.5.0/remixicon.min.css');
 @import url('https://fonts.googleapis.com/css2?family=Noto+Nastaliq+Urdu:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;600;700&display=swap');
 
 @font-face {
   font-family: 'OUP Mehr Nastaliq';
@@ -33,6 +34,25 @@ body {
   font-family: 'Jameel Noori Nastaleeq', serif;
 }
 
+.todo-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: #9b1827 #ffe6e8;
+}
+
+.todo-scrollbar::-webkit-scrollbar {
+  width: 8px;
+}
+
+.todo-scrollbar::-webkit-scrollbar-track {
+  background: #ffe6e8;
+  border-radius: 9999px;
+}
+
+.todo-scrollbar::-webkit-scrollbar-thumb {
+  background: #9b1827;
+  border-radius: 9999px;
+}
+
 @layer utilities {
   .font-noto-nastaliq {
     font-family: 'Noto Nastaliq Urdu', serif;
@@ -54,6 +74,10 @@ body {
   .font-gibson {
     font-family: 'Gibson Regular', sans-serif;
     font-weight: 400;
+  }
+
+  .font-open-sans {
+    font-family: 'Open Sans', sans-serif;
   }
   
   .animate-slide-in-right {

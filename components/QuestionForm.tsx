@@ -22,14 +22,14 @@ interface QuestionFormProps {
 }
 
 export interface QuestionFormData {
-  type: "multiple" | "truefalse" | "short" | "long" | "fillblanks";
+  type: "multiple" | "truefalse" | "short" | "long" | "fillblanks" | "";
   subject: string;
   grade: string;
   book: string;
   chapter: string;
   topic?: string;
   slo?: string;
-  difficulty: "Easy" | "Medium" | "Hard";
+  difficulty: "" | "Easy" | "Medium" | "Hard";
   questionText: string;
   options: string[];
   correctAnswer: string | string[]; // Support both single and multiple answers
@@ -44,12 +44,12 @@ export interface QuestionFormData {
 }
 
 const initialFormData: QuestionFormData = {
-  type: "multiple",
+  type: "",
   subject: "",
   grade: "",
   book: "",
   chapter: "",
-  difficulty: "Medium",
+  difficulty: "",
   questionText: "",
   options: ["", "", "", ""],
   correctAnswer: [], // Initialize as empty array for multiple answers
@@ -81,10 +81,18 @@ export default function QuestionForm({
   const [formData, setFormData] = useState<QuestionFormData>(initialFormData);
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
   const [toast, setToast] = useState<{ type: "error" | "success" | "info"; message: string } | null>(null);
+
+  // Auto-dismiss success/info toasts after 4 seconds
+  useEffect(() => {
+    if (!toast || toast.type === "error") return;
+    const timer = setTimeout(() => setToast(null), 4000);
+    return () => clearTimeout(timer);
+  }, [toast]);
   const [focusedMathField, setFocusedMathField] = useState<"question" | "explanation" | "option" | "blank" | "correctAnswer" | null>(null);
   const [activeOptionIndex, setActiveOptionIndex] = useState(-1);
   const [availableChapters, setAvailableChapters] = useState<string[]>([]); // Store fetched chapters
   const [chaptersLoading, setChaptersLoading] = useState(false); // Loading state for chapters
+  const [chapterFetchFailed, setChapterFetchFailed] = useState(false);
   const [activeBlankId, setActiveBlankId] = useState<string | null>(null);
   const [urduKeyboardFocus, setUrduKeyboardFocus] = useState<"topic" | "slo" | null>(null); // Track which field needs Urdu keyboard
   const [imageFile, setImageFile] = useState<File | null>(null);
@@ -116,6 +124,7 @@ export default function QuestionForm({
 
       try {
         setChaptersLoading(true);
+        setChapterFetchFailed(false);
         
         // Find the book object to get its ID - match by title, grade, AND subject
         const selectedBook = submittedBooks.find(
@@ -133,7 +142,10 @@ export default function QuestionForm({
         // Call the chapters API - API will find subjectId from subject name
         const url = `/api/admin/chapters?subject=${encodeURIComponent(formData.subject)}&book=${encodeURIComponent(formData.book)}&bookId=${encodeURIComponent(selectedBook.id)}`;
         
-        const response = await fetch(url);
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 5000);
+        const response = await fetch(url, { signal: controller.signal });
+        clearTimeout(timeout);
 
         if (response.ok) {
           const data = await response.json();
@@ -153,9 +165,11 @@ export default function QuestionForm({
           }
         } else {
           setAvailableChapters([]);
+          setChapterFetchFailed(true);
         }
       } catch (error) {
         setAvailableChapters([]);
+        setChapterFetchFailed(true);
       } finally {
         setChaptersLoading(false);
       }
@@ -314,6 +328,8 @@ export default function QuestionForm({
     if (!formData.grade) newErrors.grade = "Grade is required";
     if (!formData.book) newErrors.book = "Book is required";
     if (!formData.chapter) newErrors.chapter = "Chapter is required";
+    if (!formData.type) newErrors.type = "Question type is required";
+    if (!formData.difficulty) newErrors.difficulty = "Difficulty is required";
     if (showTopicField && !formData.topic) newErrors.topic = "Topic is required";
     // SLO is now optional - no validation required
 
@@ -349,7 +365,11 @@ export default function QuestionForm({
           newErrors[blankId] = `Please add answers for ${blankId}`;
         }
       }
-    } else if (!(formData.correctAnswer as string).trim()) {
+    } else if (
+      formData.type &&
+      !["short", "long"].includes(formData.type) &&
+      !(formData.correctAnswer as string).trim()
+    ) {
       newErrors.correctAnswer = "Correct answer is required";
     }
 
@@ -392,7 +412,7 @@ export default function QuestionForm({
       setImagePreview("");
       setImageError("");
       
-      setToast(null);
+      setToast({ type: "success", message: "Question created successfully! It's now in your Question Bank." });
     } catch (error) {
     }
   };
@@ -442,16 +462,32 @@ export default function QuestionForm({
 
   return (
     <div className="w-full">
-      {/* Toast Message */}
+      {/* Fixed floating toast popup */}
       {toast && (
-        <div className={`mb-4 sm:mb-6 p-3 sm:p-4 rounded-lg text-sm sm:text-base ${toast.type === "success" ? "bg-green-100 text-green-800" : toast.type === "error" ? "bg-red-100 text-red-800" : "bg-blue-100 text-blue-800"}`}>
-          {toast.message}
+        <div className="fixed top-5 left-1/2 -translate-x-1/2 z-[9999] w-full max-w-md px-4">
+          <div className={`flex items-start gap-3 p-4 rounded-xl shadow-lg border ${
+            toast.type === "success"
+              ? "bg-green-50 border-green-200 text-green-800"
+              : toast.type === "error"
+              ? "bg-red-50 border-red-200 text-red-800"
+              : "bg-blue-50 border-blue-200 text-blue-800"
+          }`}>
+            <span className="flex-shrink-0 mt-0.5 text-lg">
+              {toast.type === "success" ? "✅" : toast.type === "error" ? "❌" : "ℹ️"}
+            </span>
+            <p className="flex-1 text-sm font-medium">{toast.message}</p>
+            <button
+              onClick={() => setToast(null)}
+              className="flex-shrink-0 text-current opacity-50 hover:opacity-100 transition-opacity text-lg leading-none"
+            >
+              &times;
+            </button>
+          </div>
         </div>
       )}
 
       {/* Step 1: Metadata */}
-      {currentStep === 1 && (
-        <div className="bg-white rounded-lg shadow-sm p-3 sm:p-4 lg:p-6 w-full overflow-hidden">
+        <div className="bg-[#F8F8F8] border border-gray-200 rounded-lg shadow-sm p-3 sm:p-4 lg:p-6 w-full overflow-hidden">
           <h2 className="text-base sm:text-lg lg:text-xl font-bold mb-3 sm:mb-4 lg:mb-6 text-gray-900">Question Metadata</h2>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3 lg:gap-6 mb-4 sm:mb-6 lg:mb-8">
@@ -479,8 +515,7 @@ export default function QuestionForm({
               <select
                 value={formData.grade}
                 onChange={(e) => setFormData({ ...formData, grade: e.target.value, book: "", chapter: "" })}
-                disabled={!formData.subject}
-                className={`w-full px-2 sm:px-3 py-1.5 sm:py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100 text-xs sm:text-sm ${errors.grade ? "border-red-500" : "border-gray-300"}`}
+                className={`w-full px-2 sm:px-3 py-1.5 sm:py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-xs sm:text-sm ${errors.grade ? "border-red-500" : "border-gray-300"}`}
               >
                 <option value="">Select Grade</option>
                 {grades.map((grade) => (
@@ -498,7 +533,7 @@ export default function QuestionForm({
               <select
                 value={formData.book}
                 onChange={(e) => setFormData({ ...formData, book: e.target.value, chapter: "" })}
-                disabled={!formData.subject}
+                disabled={!formData.subject || !formData.grade}
                 className={`w-full px-2 sm:px-3 py-1.5 sm:py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100 text-xs sm:text-sm ${errors.book ? "border-red-500" : "border-gray-300"}`}
               >
                 <option value="">Select Book</option>
@@ -508,6 +543,9 @@ export default function QuestionForm({
                   </option>
                 ))}
               </select>
+              {formData.subject && formData.grade && getAvailableBooks().length === 0 && (
+                <p className="text-amber-600 text-xs sm:text-sm mt-1">No book assigned for this grade and subject.</p>
+              )}
               {errors.book && <p className="text-red-500 text-xs sm:text-sm mt-1">{errors.book}</p>}
             </div>
 
@@ -520,8 +558,17 @@ export default function QuestionForm({
                   Loading chapters...
                 </div>
               ) : formData.book && getAvailableChapters().length === 0 ? (
-                <div className="w-full px-2 sm:px-3 py-1.5 sm:py-2 border border-yellow-300 rounded-lg text-xs sm:text-sm text-yellow-700 bg-yellow-50">
-                  ⚠️ No chapter available yet
+                <div className="space-y-2">
+                  <input
+                    type="text"
+                    value={formData.chapter}
+                    onChange={(e) => setFormData({ ...formData, chapter: e.target.value })}
+                    placeholder="Enter Chapter Name"
+                    className={`w-full px-2 sm:px-3 py-1.5 sm:py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-xs sm:text-sm ${errors.chapter ? "border-red-500" : "border-gray-300"}`}
+                  />
+                  <div className="w-full px-2 sm:px-3 py-1.5 sm:py-2 border border-yellow-300 rounded-lg text-xs sm:text-sm text-yellow-700 bg-yellow-50">
+                    {chapterFetchFailed ? "No chapters loaded from API. Enter chapter manually." : "No chapter available yet. Enter chapter manually."}
+                  </div>
                 </div>
               ) : (
                 <select
@@ -604,12 +651,14 @@ export default function QuestionForm({
               <select
                 value={formData.difficulty}
                 onChange={(e) => setFormData({ ...formData, difficulty: e.target.value as any })}
-                className="w-full px-2 sm:px-3 py-1.5 sm:py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-xs sm:text-sm"
+                className={`w-full px-2 sm:px-3 py-1.5 sm:py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-xs sm:text-sm ${errors.difficulty ? "border-red-500" : "border-gray-300"}`}
               >
+                <option value="">Select Difficulty</option>
                 <option value="Easy">Easy</option>
                 <option value="Medium">Medium</option>
                 <option value="Hard">Hard</option>
               </select>
+              {errors.difficulty && <p className="text-red-500 text-xs sm:text-sm mt-1">{errors.difficulty}</p>}
             </div>
 
             {/* Question Type */}
@@ -618,14 +667,16 @@ export default function QuestionForm({
               <select
                 value={formData.type}
                 onChange={(e) => handleQuestionTypeChange(e.target.value as any)}
-                className="w-full px-2 sm:px-3 py-1.5 sm:py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-xs sm:text-sm"
+                className={`w-full px-2 sm:px-3 py-1.5 sm:py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-xs sm:text-sm ${errors.type ? "border-red-500" : "border-gray-300"}`}
               >
+                <option value="">Select Question Type</option>
                 <option value="multiple">Multiple Choice (MCQ)</option>
                 <option value="truefalse">True/False</option>
                 <option value="short">Short Answer</option>
                 <option value="long">Long Answer</option>
                 <option value="fillblanks">Fill in the Blanks</option>
               </select>
+              {errors.type && <p className="text-red-500 text-xs sm:text-sm mt-1">{errors.type}</p>}
             </div>
 
             {/* Cognitive Level */}
@@ -672,29 +723,11 @@ export default function QuestionForm({
             </div>
           </div>
 
-          <button
-            onClick={() => setCurrentStep(2)}
-            disabled={loading}
-            className="w-full px-3 sm:px-4 lg:px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium text-xs sm:text-sm lg:text-base mt-4 sm:mt-6 lg:mt-8 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-          >
-            {loading ? (
-              <>
-                <svg className="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                </svg>
-                Proceeding...
-              </>
-            ) : (
-              "Next: Question Content"
-            )}
-          </button>
         </div>
-      )}
 
       {/* Step 2: Question Content */}
-      {currentStep === 2 && (
-        <div className="bg-white rounded-lg shadow-sm p-3 sm:p-4 lg:p-6 w-full overflow-hidden">
+      {formData.type && (
+        <div className="bg-[#F8F8F8] border border-gray-200 rounded-lg shadow-sm p-3 sm:p-4 lg:p-6 w-full overflow-hidden mt-4 sm:mt-6">
           <h2 className="text-base sm:text-lg lg:text-xl font-bold mb-3 sm:mb-4 lg:mb-6 text-gray-900">Question Content</h2>
 
           {/* Question Text */}
@@ -943,7 +976,7 @@ export default function QuestionForm({
           {/* Short/Long Answer */}
           {(formData.type === "short" || formData.type === "long") && (
             <div className="mb-4 sm:mb-6">
-              <label className="block text-sm font-medium text-gray-700 mb-2">Correct Answer *</label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Correct Answer (Optional)</label>
               {isUrduSubject && focusedMathField === "correctAnswer" && (
                 <UrduKeyboard
                   isVisible={true}
@@ -955,12 +988,15 @@ export default function QuestionForm({
                 onChange={(e) => setFormData({ ...formData, correctAnswer: e.target.value })}
                 onFocus={() => isUrduSubject && handleMathFieldFocus("correctAnswer")}
                 onBlur={() => isUrduSubject && setFocusedMathField(null)}
-                placeholder="Enter the correct answer"
+                placeholder="Add sample answer or leave blank"
                 rows={formData.type === "long" ? 6 : 3}
                 dir={isUrduSubject ? "rtl" : "ltr"}
                 className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm ${errors.correctAnswer ? "border-red-500" : "border-gray-300"}`}
               />
               {errors.correctAnswer && <p className="text-red-500 text-sm mt-1">{errors.correctAnswer}</p>}
+              {!errors.correctAnswer && (
+                <p className="text-xs text-gray-500 mt-1">Optional: include reference text to guide reviewers.</p>
+              )}
             </div>
           )}
 
@@ -1050,19 +1086,11 @@ export default function QuestionForm({
           {/* Buttons */}
           <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 mt-6 sm:mt-8">
             <button
-              onClick={() => setCurrentStep(1)}
+              onClick={() => onSwitchToBank ? onSwitchToBank() : window.history.back()}
               className="flex-1 px-4 sm:px-6 py-2 bg-gray-300 text-gray-900 rounded-lg hover:bg-gray-400 transition-colors font-medium text-sm sm:text-base"
             >
               Back
             </button>
-            {onSwitchToBank && (
-              <button
-                onClick={onSwitchToBank}
-                className="flex-1 px-4 sm:px-6 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors font-medium text-sm sm:text-base"
-              >
-                Go to Question Bank
-              </button>
-            )}
             <button
               onClick={handleFormSubmit}
               disabled={loading || imageUploading}

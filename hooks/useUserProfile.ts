@@ -18,12 +18,14 @@ export interface UserProfile {
   subjectGradePairs?: { id: string; subject: string; grade: string; assignedBooks: { id: string; title: string; subject: string; grade: string; chapters: number }[] }[];
 }
 
-export function useUserProfile(): { user: UserProfile | null; loading: boolean; error: string | null } {
-  const [user, setUser] = useState<UserProfile | null>(null);
-  const [loading, setLoading] = useState(true);
+export function useUserProfile(options?: { disabled?: boolean }): { user: UserProfile | null; loading: boolean; error: string | null; refresh: () => Promise<void> } {
+  const disabled = !!options?.disabled;
+  const cachedSession = typeof window !== 'undefined' ? getTabSession() : null;
+  const [user, setUser] = useState<UserProfile | null>((cachedSession?.user as UserProfile) || null);
+  const [loading, setLoading] = useState<boolean>(!cachedSession?.user);
   const [error, setError] = useState<string | null>(null);
-  const [lastFetchTime, setLastFetchTime] = useState<number>(0);
-  const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes cache
+  const [lastFetchTime, setLastFetchTime] = useState<number>(cachedSession?.loginTime || 0);
+  const CACHE_DURATION = 2 * 60 * 1000; // 2 minutes cache (reduced from 5 for better sync)
 
   // Function to fetch and update user profile from Firestore
   const refreshUserProfile = async (authUser: any, forceRefresh = false) => {
@@ -33,158 +35,77 @@ export function useUserProfile(): { user: UserProfile | null; loading: boolean; 
       if (!forceRefresh && (now - lastFetchTime) < CACHE_DURATION && user) {
         return true;
       }
-      
-      
-      // Query by email field instead of fetching all users - this is MUCH more efficient
-      const usersResponse = await fetch(
-        `https://firestore.googleapis.com/v1/projects/quiz-app-ff0ab/databases/(default)/documents:runQuery`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            structuredQuery: {
-              from: [{ collectionId: 'users' }],
-              where: {
-                fieldFilter: {
-                  field: { fieldPath: 'email' },
-                  op: 'EQUAL',
-                  value: { stringValue: authUser.email }
-                }
-              },
-              limit: 1
-            }
-          })
-        }
-      );
-      
-      if (usersResponse.ok) {
-        const usersData = await usersResponse.json();
-        const userDoc = usersData[0]?.document;
+      const response = await fetch('/api/auth/check-role', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ uid: authUser.uid, email: authUser.email }),
+      });
 
-        if (userDoc) {
-          
-          // Parse subjects array
-          let subjects: string[] = [];
-          if (userDoc.fields?.subjects?.arrayValue?.values) {
-            subjects = userDoc.fields.subjects.arrayValue.values.map((value: any) => 
-              value.stringValue || ''
-            ).filter(Boolean);
-          }
+      if (!response.ok) return false;
 
-          // Parse assignedGrades array
-          let assignedGrades: string[] = [];
-          if (userDoc.fields?.assignedGrades?.arrayValue?.values) {
-            assignedGrades = userDoc.fields.assignedGrades.arrayValue.values.map((value: any) => 
-              value.stringValue || ''
-            ).filter(Boolean);
-          }
-          
-          // Parse assignedBooks array
-          let assignedBooks: { id: string; title: string; subject: string; grade: string; chapters: number }[] = [];
-          if (userDoc.fields?.assignedBooks?.arrayValue?.values) {
-            assignedBooks = userDoc.fields.assignedBooks.arrayValue.values.map((bookValue: any) => {
-              const book = {
-                id: bookValue.mapValue?.fields?.id?.stringValue || '',
-                title: bookValue.mapValue?.fields?.title?.stringValue || '',
-                subject: bookValue.mapValue?.fields?.subject?.stringValue || '',
-                grade: bookValue.mapValue?.fields?.grade?.stringValue || '',
-                chapters: parseInt(bookValue.mapValue?.fields?.chapters?.integerValue || '0')
-              };
-              return book;
-            }).filter((book: any) => book.id);
-          }
+      const payload = await response.json();
+      const dbUser = payload?.user;
+      if (!dbUser) return false;
 
-          // Parse subjectGradePairs array - TRY TO PARSE FROM DATABASE FIRST
-          let subjectGradePairs: { id: string; subject: string; grade: string; assignedBooks: { id: string; title: string; subject: string; grade: string; chapters: number }[] }[] = [];
-          
-          
-          if (userDoc.fields?.subjectGradePairs?.arrayValue?.values && userDoc.fields.subjectGradePairs.arrayValue.values.length > 0) {
-            try {
-              subjectGradePairs = userDoc.fields.subjectGradePairs.arrayValue.values.map((pairValue: any, idx: number) => {
-                
-                // Parse books in this pair
-                const pairBooks = (pairValue.mapValue?.fields?.assignedBooks?.arrayValue?.values || []).map((bookValue: any) => {
-                  return {
-                    id: bookValue.mapValue?.fields?.id?.stringValue || '',
-                    title: bookValue.mapValue?.fields?.title?.stringValue || '',
-                    subject: bookValue.mapValue?.fields?.subject?.stringValue || '',
-                    grade: bookValue.mapValue?.fields?.grade?.stringValue || '',
-                    chapters: parseInt(bookValue.mapValue?.fields?.chapters?.integerValue || '0')
-                  };
-                }).filter((book: any) => book.id && book.title);
-                
-                const pair = {
-                  id: pairValue.mapValue?.fields?.id?.stringValue || `pair-${idx}`,
-                  subject: pairValue.mapValue?.fields?.subject?.stringValue || '',
-                  grade: pairValue.mapValue?.fields?.grade?.stringValue || '',
-                  assignedBooks: pairBooks
-                };
-                
-                return pair;
-              });
-            } catch (err) {
-            }
-          }
-          
-          // Fallback: If we couldn't parse from database, rebuild from subjects/grades/books
-          if (subjectGradePairs.length === 0) {
-            
-            if (subjects.length > 0 && assignedGrades.length > 0) {
-              // Create one pair per subject-grade combination
-              subjectGradePairs = subjects.map((subject, idx) => {
-                const grade = assignedGrades[idx] || assignedGrades[0];
-                const normalizedGrade = grade.startsWith('Grade') ? grade : `Grade ${grade}`;
-                
-                // Find all books that match this grade
-                const booksForThisGrade = assignedBooks.filter(book => {
-                  const bookGrade = book.grade.replace('Grade ', '').trim();
-                  const gradeNum = grade.replace('Grade ', '').trim();
-                  return bookGrade === gradeNum;
-                });
-                
-                
-                return {
-                  id: `${subject.toLowerCase()}-${grade.replace('Grade ', '').trim()}-${Date.now()}`,
-                  subject: subject,
-                  grade: normalizedGrade,
-                  assignedBooks: booksForThisGrade.map(book => ({
-                    ...book,
-                    subject: subject // Ensure subject is always set
-                  }))
-                };
-              });
-            } else {
-            }
-          }
+      const subjects = Array.isArray(dbUser.subjects) ? dbUser.subjects.filter(Boolean) : [];
+      const assignedGrades = Array.isArray(dbUser.assignedGrades) ? dbUser.assignedGrades.filter(Boolean) : [];
+      const assignedBooks = Array.isArray(dbUser.assignedBooks) ? dbUser.assignedBooks.filter((b: any) => b?.id) : [];
 
-          const userProfile: UserProfile = {
-            name: userDoc.fields?.name?.stringValue || 'User',
-            email: userDoc.fields?.email?.stringValue || authUser.email || '',
-            role: userDoc.fields?.role?.stringValue || 'User',
-            schoolId: userDoc.fields?.schoolId?.stringValue || '',
-            schoolName: userDoc.fields?.schoolName?.stringValue || '',
-            uid: authUser.uid,
-            class: userDoc.fields?.class?.stringValue || userDoc.fields?.grade?.stringValue || '',
-            grade: userDoc.fields?.grade?.stringValue || userDoc.fields?.class?.stringValue || '',
-            subjects: subjects.length > 0 ? subjects : undefined,
-            assignedGrades: assignedGrades.length > 0 ? assignedGrades : undefined,
-            assignedBooks: assignedBooks,
-            subjectGradePairs: subjectGradePairs && subjectGradePairs.length > 0 ? subjectGradePairs : [],
+      let subjectGradePairs = Array.isArray(dbUser.subjectGradePairs) ? dbUser.subjectGradePairs : [];
+
+      if (subjectGradePairs.length === 0 && subjects.length > 0 && assignedGrades.length > 0) {
+        subjectGradePairs = subjects.map((subject: string, idx: number) => {
+          const grade = assignedGrades[idx] || assignedGrades[0];
+          const normalizedGrade = String(grade || '').startsWith('Grade') ? grade : `Grade ${grade}`;
+          const gradeNum = String(grade || '').replace('Grade ', '').trim();
+
+          const booksForThisGrade = assignedBooks.filter((book: any) => {
+            const bookGrade = String(book?.grade || '').replace('Grade ', '').trim();
+            return bookGrade === gradeNum;
+          });
+
+          return {
+            id: `${String(subject || '').toLowerCase()}-${gradeNum || idx}-${Date.now()}`,
+            subject: String(subject || ''),
+            grade: normalizedGrade,
+            assignedBooks: booksForThisGrade.map((book: any) => ({
+              ...book,
+              subject: String(subject || ''),
+            })),
           };
-          
-          setUser(userProfile);
-          saveTabSession(userProfile);
-          setLastFetchTime(Date.now());
-          return true;
-        }
+        });
       }
-      return false;
+
+      const userProfile: UserProfile = {
+        name: dbUser.name || dbUser.displayName || 'User',
+        email: dbUser.email || authUser.email || '',
+        role: dbUser.role || payload?.role || 'User',
+        schoolId: dbUser.schoolId || '',
+        schoolName: dbUser.schoolName || '',
+        uid: authUser.uid,
+        class: dbUser.class || dbUser.grade || '',
+        grade: dbUser.grade || dbUser.class || '',
+        subjects: subjects.length > 0 ? subjects : undefined,
+        assignedGrades: assignedGrades.length > 0 ? assignedGrades : undefined,
+        assignedBooks,
+        subjectGradePairs,
+      };
+
+      setUser(userProfile);
+      saveTabSession(userProfile);
+      setLastFetchTime(Date.now());
+      return true;
     } catch (err) {
       return false;
     }
   };
 
   useEffect(() => {
+    if (disabled) {
+      setLoading(false);
+      return;
+    }
+
     // Listen to localStorage changes from OTHER tabs
     const handleStorageChange = (e: StorageEvent) => {
       if (e.key === 'multitab_sessions' && e.newValue) {
@@ -202,15 +123,6 @@ export function useUserProfile(): { user: UserProfile | null; loading: boolean; 
 
     window.addEventListener('storage', handleStorageChange);
 
-    // Handle visibility change - refresh when tab becomes visible
-    const handleVisibilityChange = async () => {
-      if (document.visibilityState === 'visible' && auth.currentUser) {
-        await refreshUserProfile(auth.currentUser);
-      }
-    };
-
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-
     // Listen to Firebase Auth
     const unsubscribe = onAuthStateChanged(auth, async (authUser) => {
       
@@ -218,6 +130,19 @@ export function useUserProfile(): { user: UserProfile | null; loading: boolean; 
         if (!authUser) {
           setUser(null);
           clearTabSession();
+          setLoading(false);
+          return;
+        }
+
+        // Use cached session immediately when still fresh for same auth user
+        const tabSession = getTabSession();
+        const now = Date.now();
+        const cachedUser = tabSession?.user as UserProfile | null;
+        const isFreshCache = !!tabSession?.loginTime && (now - tabSession.loginTime) < CACHE_DURATION;
+        const isSameUser = !!cachedUser?.email && !!authUser.email && cachedUser.email === authUser.email;
+        if (isFreshCache && isSameUser) {
+          setUser(cachedUser);
+          setLastFetchTime(tabSession!.loginTime);
           setLoading(false);
           return;
         }
@@ -239,9 +164,28 @@ export function useUserProfile(): { user: UserProfile | null; loading: boolean; 
     return () => {
       unsubscribe();
       window.removeEventListener('storage', handleStorageChange);
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
-  }, []);
+  }, [disabled]);
 
-  return { user, loading, error };
+  // Expose a manual refresh function that forces a profile update
+  const refresh = async () => {
+    if (disabled) return;
+    const authUser = auth.currentUser;
+    if (!authUser) return;
+    
+    setLoading(true);
+    setError(null);
+    try {
+      const success = await refreshUserProfile(authUser, true); // Force refresh
+      if (!success) {
+        setError('Failed to refresh profile');
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to refresh profile');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return { user, loading, error, refresh };
 }

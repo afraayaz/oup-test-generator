@@ -11,6 +11,11 @@ export interface Question {
   difficulty: string;
   type: string;
   questionText?: string;
+  question?: string;
+  options?: any[];
+  correctAnswer?: any;
+  explanation?: string;
+  interactiveData?: any;
   createdAt?: string;
   createdByName?: string;
   createdBy?: string;
@@ -27,6 +32,7 @@ interface QuestionBankProps {
   apiEndpoint: string; // e.g., "/api/oup-creator/questions" or "/api/teacher/questions"
   userRole: "content_creator" | "teacher";
   userId?: string;
+  userEmail?: string;
   schoolId?: string;
   schoolName?: string;
   onEdit?: (question: Question) => void;
@@ -59,10 +65,79 @@ const typeLabels: { [key: string]: string } = {
   categorization: "Categorization",
 };
 
+const normalizeText = (value?: string) => (value || "").toString().trim().toLowerCase();
+
+const normalizeQuestionType = (value?: string) => {
+  const v = normalizeText(value).replace(/[\s_-]+/g, "");
+  if (v === "mcq" || v === "multiple" || v === "multiplechoice") return "multiple";
+  if (v === "truefalse" || v === "trueorfalse") return "truefalse";
+  if (v === "short" || v === "shortanswer") return "short";
+  if (v === "long" || v === "longanswer") return "long";
+  if (v === "fillblanks" || v === "fillintheblank" || v === "fillintheblanks") return "fillblanks";
+  return v;
+};
+
+function parseInteractiveData(raw: any): any {
+  if (!raw) return null;
+  if (typeof raw === "string") {
+    try {
+      return JSON.parse(raw);
+    } catch {
+      return null;
+    }
+  }
+  return raw;
+}
+
+function extractOptions(question: Question): string[] {
+  const fromQuestion = Array.isArray(question.options) ? question.options : [];
+  if (fromQuestion.length) {
+    return fromQuestion.map((o: any) =>
+      typeof o === "string" ? o : (o?.text ?? String(o ?? ""))
+    );
+  }
+
+  const parsed = parseInteractiveData((question as any).interactiveData);
+  const fromInteractive = Array.isArray(parsed?.options) ? parsed.options : [];
+  if (!fromInteractive.length) return ["", "", "", ""];
+
+  return fromInteractive
+    .map((o: any) => (typeof o === "string" ? o : (o?.text ?? String(o ?? ""))))
+    .slice(0, 4)
+    .concat(Array(Math.max(0, 4 - fromInteractive.length)).fill(""));
+}
+
+function normalizeTrueFalseValue(raw: any): string {
+  if (raw === true) return "true";
+  if (raw === false) return "false";
+  const v = normalizeText(String(raw ?? ""));
+  if (["true", "t", "1", "yes"].includes(v)) return "true";
+  if (["false", "f", "0", "no"].includes(v)) return "false";
+  return "";
+}
+
+function toMcqLetter(answerRaw: any, options: string[]): string {
+  const answer = String(answerRaw ?? "").trim();
+  if (!answer) return "";
+
+  const upper = answer.toUpperCase();
+  if (["A", "B", "C", "D"].includes(upper)) return upper;
+
+  if (/^\d+$/.test(answer)) {
+    const n = Number(answer);
+    if (n >= 0 && n <= 3) return ["A", "B", "C", "D"][n];
+    if (n >= 1 && n <= 4) return ["A", "B", "C", "D"][n - 1];
+  }
+
+  const idx = options.findIndex((o) => normalizeText(o) === normalizeText(answer));
+  return idx >= 0 && idx < 4 ? ["A", "B", "C", "D"][idx] : "";
+}
+
 export default function QuestionBank({
   apiEndpoint,
   userRole,
   userId,
+  userEmail,
   schoolId,
   schoolName,
   onEdit,
@@ -72,7 +147,7 @@ export default function QuestionBank({
 }: QuestionBankProps) {
   const [questions, setQuestions] = useState<Question[]>([]);
   const [loading, setLoading] = useState(true);
-  const [filters, setFilters] = useState({ subject: "", grade: "", book: "", type: "" });
+  const [filters, setFilters] = useState({ subject: "", grade: "", book: "", chapter: "", type: "" });
   const [searchText, setSearchText] = useState("");
   const [editingQuestion, setEditingQuestion] = useState<Question | null>(null);
   const [editFormData, setEditFormData] = useState<Partial<Question>>({});
@@ -116,6 +191,7 @@ export default function QuestionBank({
       setLoading(true);
       const headers: Record<string, string> = {
         "x-user-id": userId || "",
+        "x-user-email": userEmail || "",
         "x-user-role": userRole,
       };
       if (schoolId) {
@@ -132,15 +208,12 @@ export default function QuestionBank({
       });
 
       const data = await response.json();
-      let allUserQuestions: any[] = [];
-      
       if (data.success || Array.isArray(data)) {
-        const questions = Array.isArray(data) ? data : data.questions || [];
-        const userQuestions = questions.filter((q: any) => q.createdBy === userId || q.createdById === userId);
-        allUserQuestions = userQuestions;
+        const fetchedQuestions = Array.isArray(data) ? data : data.questions || [];
+        setQuestions(fetchedQuestions);
+      } else {
+        setQuestions([]);
       }
-
-      setQuestions(allUserQuestions);
       
     } catch (error) {
     } finally {
@@ -149,14 +222,23 @@ export default function QuestionBank({
   };
 
   const handleEdit = (question: Question) => {
+    const options = extractOptions(question);
+    const qType = normalizeQuestionType(question.type);
+    const normalizedCorrectAnswer =
+      qType === "multiple"
+        ? toMcqLetter(question.correctAnswer, options)
+        : qType === "truefalse"
+          ? normalizeTrueFalseValue(question.correctAnswer)
+          : (question.correctAnswer || "");
+
     setEditingQuestion(question);
     setEditFormData({
       questionText: question.question || question.questionText,
       difficulty: question.difficulty,
       chapter: question.chapter,
       explanation: question.explanation || "",
-      correctAnswer: question.correctAnswer || "",
-      options: question.options || [],
+      correctAnswer: normalizedCorrectAnswer,
+      options,
     });
     onEdit?.(question);
   };
@@ -169,6 +251,7 @@ export default function QuestionBank({
       const headers: Record<string, string> = {
         "Content-Type": "application/json",
         "x-user-id": userId || "",
+        "x-user-email": userEmail || "",
         "x-user-role": userRole,
       };
       if (schoolId) {
@@ -182,10 +265,28 @@ export default function QuestionBank({
         {
           method: "PUT",
           headers,
-          body: JSON.stringify({
-            ...editFormData,
-            question: editFormData.questionText, // Map questionText to question field
-          }),
+          body: JSON.stringify((() => {
+            const qType = normalizeQuestionType(editingQuestion.type);
+            const payload: any = {
+              ...editFormData,
+              question: editFormData.questionText, // Map questionText to question field
+            };
+
+            if (qType === "multiple") {
+              const opts = Array.isArray(editFormData.options) ? editFormData.options : [];
+              const letter = String(editFormData.correctAnswer || "").toUpperCase();
+              const idx = ["A", "B", "C", "D"].indexOf(letter);
+              if (idx >= 0 && opts[idx]) {
+                payload.correctAnswer = opts[idx];
+              }
+            }
+
+            if (qType === "truefalse") {
+              payload.correctAnswer = normalizeTrueFalseValue(editFormData.correctAnswer);
+            }
+
+            return payload;
+          })()),
         }
       );
 
@@ -218,6 +319,7 @@ export default function QuestionBank({
     try {
       const headers: Record<string, string> = {
         "x-user-id": userId || "",
+        "x-user-email": userEmail || "",
         "x-user-role": userRole,
       };
       if (schoolId) {
@@ -257,6 +359,7 @@ export default function QuestionBank({
       try {
         const headers: Record<string, string> = {
           "x-user-id": userId || "",
+          "x-user-email": userEmail || "",
           "x-user-role": userRole,
         };
         if (schoolId) {
@@ -326,6 +429,7 @@ export default function QuestionBank({
       try {
         const headers: Record<string, string> = {
           "x-user-id": userId || "",
+          "x-user-email": userEmail || "",
           "x-user-role": userRole,
         };
         if (schoolId) {
@@ -367,10 +471,11 @@ export default function QuestionBank({
 
   const filteredQuestions = useMemo(() => {
     return questions.filter((q) => {
-      if (filters.subject && q.subject !== filters.subject) return false;
-      if (filters.grade && q.grade !== filters.grade) return false;
-      if (filters.book && q.book !== filters.book) return false;
-      if (filters.type && q.type !== filters.type) return false;
+      if (filters.subject && normalizeText(q.subject) !== normalizeText(filters.subject)) return false;
+      if (filters.grade && normalizeText(q.grade) !== normalizeText(filters.grade)) return false;
+      if (filters.book && normalizeText(q.book) !== normalizeText(filters.book)) return false;
+      if (filters.chapter && normalizeText(q.chapter) !== normalizeText(filters.chapter)) return false;
+      if (filters.type && normalizeQuestionType(q.type) !== normalizeQuestionType(filters.type)) return false;
       if (searchText && !q.questionText?.toLowerCase().includes(searchText.toLowerCase())) return false;
       
       return true;
@@ -389,6 +494,31 @@ export default function QuestionBank({
     () => [...new Set(questions.map((q) => q.book))].sort(),
     [questions]
   );
+  const chapterOptionsSource = useMemo(() => {
+    return questions.filter((q) => {
+      if (filters.subject && q.subject !== filters.subject) return false;
+      if (filters.book && q.book !== filters.book) return false;
+      if (filters.grade && q.grade !== filters.grade) return false;
+      return true;
+    });
+  }, [questions, filters.subject, filters.book, filters.grade]);
+
+  const uniqueChapters = useMemo(() => {
+    const chapterMap = new Map<string, string>();
+    for (const q of chapterOptionsSource) {
+      const raw = (q.chapter || "").toString().trim();
+      if (!raw) continue;
+      const key = normalizeText(raw);
+      if (!chapterMap.has(key)) chapterMap.set(key, raw);
+    }
+    return Array.from(chapterMap.values()).sort((a, b) => a.localeCompare(b));
+  }, [chapterOptionsSource]);
+
+  useEffect(() => {
+    if (filters.chapter && !uniqueChapters.includes(filters.chapter)) {
+      setFilters((prev) => ({ ...prev, chapter: "" }));
+    }
+  }, [filters.chapter, uniqueChapters]);
   
   // Always show all available question types in filter, not just existing ones
   const uniqueTypes = useMemo(
@@ -456,7 +586,7 @@ export default function QuestionBank({
             </button>
           )}
         </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2 sm:gap-3">
           <div>
             <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1.5">
               Subject
@@ -510,6 +640,24 @@ export default function QuestionBank({
               {uniqueBooks.map((book) => (
                 <option key={book} value={book}>
                   {book}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1.5">
+              Chapter
+            </label>
+            <select
+              value={filters.chapter}
+              onChange={(e) => setFilters({ ...filters, chapter: e.target.value })}
+              className="w-full px-2.5 sm:px-3 py-1.5 sm:py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-xs sm:text-sm bg-white hover:border-gray-400 transition-colors"
+            >
+              <option value="">All Chapters</option>
+              {uniqueChapters.map((chapter) => (
+                <option key={chapter} value={chapter}>
+                  {chapter}
                 </option>
               ))}
             </select>

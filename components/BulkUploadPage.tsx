@@ -8,7 +8,10 @@ import * as XLSX from "xlsx";
 
 interface CSVQuestion {
   row: {
+    chapterno?: string;
     chapter: string;
+    topic?: string;
+    slo?: string;
     difficulty: string;
     questionType: string;
     question: string;
@@ -18,7 +21,9 @@ interface CSVQuestion {
     optionD?: string;
     correctAnswer?: string;
     explanation?: string;
-    slo?: string;
+    knowledge?: string;
+    understanding?: string;
+    application?: string;
   };
   errors: string[];
   index: number;
@@ -42,12 +47,59 @@ export default function BulkUploadPage({
     book: "",
   });
   const [csvData, setCsvData] = useState<CSVQuestion[]>([]);
+  const [systemBooks, setSystemBooks] = useState<any[]>([]); // for content creators
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [toast, setToast] = useState<{ type: "error" | "success" | "info"; message: string } | null>(null);
   const [successMessage, setSuccessMessage] = useState("");
+  const [systemChapters, setSystemChapters] = useState<string[]>([]);
+  const hasInvalidRows = csvData.some((d) => d.errors.length > 0);
+
+  // Auto-dismiss non-error toasts after 4 seconds
+  useEffect(() => {
+    if (!toast || toast.type === "error") return;
+    const timer = setTimeout(() => setToast(null), 4000);
+    return () => clearTimeout(timer);
+  }, [toast]);
   const { user } = useUserProfile();
   const searchParams = useSearchParams();
+
+  // fetch system books for content creators similar to QuestionCreationModePage
+  // extracted so it can be reused by ensureChaptersLoaded when called early
+  const fetchSystemBooks = async () => {
+    if (!user) return;
+    try {
+      const uniqueSubjects = new Set<string>();
+      if (user.assignedBooks && Array.isArray(user.assignedBooks)) {
+        user.assignedBooks.forEach((b: any) => {
+          if (b.subject) uniqueSubjects.add(b.subject);
+        });
+      }
+      if (user.subjectGradePairs && Array.isArray(user.subjectGradePairs)) {
+        user.subjectGradePairs.forEach((p: any) => {
+          if (p.subject) uniqueSubjects.add(p.subject);
+        });
+      }
+      const subjects = Array.from(uniqueSubjects);
+      const all: any[] = [];
+      for (const subj of subjects) {
+        try {
+          const res = await fetch(`/api/admin/books-by-subject?subject=${encodeURIComponent(subj)}`);
+          if (res.ok) {
+            const data = await res.json();
+            const books = data.books || [];
+            const withSubject = books.map((b: any) => ({ ...b, subject: b.subject || subj }));
+            all.push(...withSubject);
+          }
+        } catch {}
+      }
+      setSystemBooks(all);
+    } catch {}
+  };
+
+  useEffect(() => {
+    if (user?.role === 'content_creator') fetchSystemBooks();
+  }, [user]);
 
   // Initialize form data from query params
   useEffect(() => {
@@ -57,27 +109,81 @@ export default function BulkUploadPage({
     setFormData({ grade, subject, book });
   }, [searchParams]);
 
-  // Get all unique grades from user's assigned books
-  const getAvailableGrades = () => {
-    if (!user?.assignedBooks || user.assignedBooks.length === 0) {
-      return [];
+  // Fetch system chapters when book is selected
+  // helper to make sure chapters list is available
+  const ensureChaptersLoaded = async () => {
+    // always refresh chapters for current selection; clear stale data
+    setSystemChapters([]);
+    // make sure system books are available for content creators
+    if (user?.role === 'content_creator' && systemBooks.length === 0) {
+      await fetchSystemBooks();
     }
-    const grades = user.assignedBooks
-      .map((book: any) => book.grade)
-      .filter((value: any, index: any, self: any) => self.indexOf(value) === index);
+    // reuse fetching logic; choose correct book list per role
+    if (!formData.book || !formData.subject) {
+      setSystemChapters([]);
+      return;
+    }
+    const booksSource =
+      user?.role === 'content_creator' && systemBooks.length > 0
+        ? systemBooks
+        : (user?.assignedBooks || []);
+    if (booksSource.length === 0) {
+      setSystemChapters([]);
+      return;
+    }
+    const normalizedFormGrade = formData.grade.replace(/^(Grade|Class)\s*/i, "").trim();
+    const selectedBook = booksSource.find((b: any) => {
+      const normalizedBookGrade = (b.grade || "").toString().replace(/^(Grade|Class)\s*/i, "").trim();
+      return (
+        b.title === formData.book &&
+        (!b.subject || b.subject === formData.subject) &&
+        (!normalizedBookGrade || normalizedBookGrade === normalizedFormGrade)
+      );
+    });
+    if (!selectedBook?.id) {
+      setSystemChapters([]);
+      return;
+    }
+    try {
+      const url = `/api/admin/chapters?subject=${encodeURIComponent(formData.subject)}&book=${encodeURIComponent(formData.book)}&bookId=${encodeURIComponent(selectedBook.id)}`;
+      const res = await fetch(url);
+      if (res.ok) {
+        const data = await res.json();
+        const chapters: string[] = (data.chapters || data || []).map((c: any) =>
+          typeof c === "string" ? c : (c.name || c.chapterName || c.title || "")
+        ).filter(Boolean);
+        setSystemChapters(chapters);
+      } else {
+        setSystemChapters([]);
+      }
+    } catch {
+      setSystemChapters([]);
+    }
+  };
+
+  useEffect(() => {
+    // whenever grade/book/subject change fetch chapters proactively
+    ensureChaptersLoaded();
+  }, [formData.grade, formData.book, formData.subject, user?.assignedBooks, systemBooks]);
+  const getAvailableGrades = () => {
+    const source = user?.role === 'content_creator' && systemBooks.length > 0
+      ? systemBooks
+      : (user?.assignedBooks || []);
+    if (!source || source.length === 0) return [];
+    const grades = source.map((book: any) => book.grade)
+      .filter((v: any, i: any, self: any) => self.indexOf(v) === i);
     return grades.sort();
   };
 
   // Get subjects from user's assigned books
   const getAvailableSubjects = () => {
-    if (!user?.assignedBooks || user.assignedBooks.length === 0) {
-      return [];
-    }
+    const source = user?.role === 'content_creator' && systemBooks.length > 0
+      ? systemBooks
+      : (user?.assignedBooks || []);
+    if (!source || source.length === 0) return [];
     const uniqueSubjects = new Set<string>();
-    user.assignedBooks.forEach((book: any) => {
-      if (book.subject) {
-        uniqueSubjects.add(book.subject);
-      }
+    source.forEach((book: any) => {
+      if (book.subject) uniqueSubjects.add(book.subject);
     });
     return Array.from(uniqueSubjects);
   };
@@ -85,12 +191,13 @@ export default function BulkUploadPage({
 
   // Get available books for selected grade and subject
   const getAvailableBooks = () => {
-    if (!user?.assignedBooks || user.assignedBooks.length === 0) {
-      return [];
-    }
-    return user.assignedBooks.filter(
-      (book: any) => (!formData.grade || book.grade === formData.grade) && 
-                 (!formData.subject || book.subject === formData.subject)
+    const source = user?.role === 'content_creator' && systemBooks.length > 0
+      ? systemBooks
+      : (user?.assignedBooks || []);
+    if (!source || source.length === 0) return [];
+    return source.filter(
+      (book: any) => (!formData.grade || book.grade === formData.grade) &&
+                    (!formData.subject || book.subject === formData.subject)
     );
   };
 
@@ -101,8 +208,16 @@ export default function BulkUploadPage({
     setToast({ type: "info", message: "Processing uploaded file..." });
 
     const reader = new FileReader();
-    reader.onload = (e) => {
+    reader.onload = async (e) => {
       try {
+        await ensureChaptersLoaded();
+        if (formData.book && systemChapters.length === 0) {
+          setToast({
+            type: "error",
+            message: "Unable to load chapters for selected book. Please check your Grade/Subject/Book selection."
+          });
+          return;
+        }
         const data = new Uint8Array(e.target?.result as ArrayBuffer);
         const workbook = XLSX.read(data, { type: "array" });
         const sheetName = workbook.SheetNames[0];
@@ -114,29 +229,41 @@ export default function BulkUploadPage({
           return;
         }
 
+        let fileGrade = "";
+        let fileSubject = "";
+        let fileBook = "";
+
         const metadataRow = rawData[0]?.[0] as string;
-        if (!metadataRow || !metadataRow.toString().startsWith("#")) {
-          setToast({
-            type: "error",
-            message: 'Invalid template format. Row 1 must contain metadata starting with "#"',
+        if (
+          metadataRow &&
+          metadataRow.toLowerCase().includes("grade") &&
+          metadataRow.toLowerCase().includes("subject")
+        ) {
+          // old single-row metadata format (hash optional)
+          const metadataStr = metadataRow.toString().replace("#", "").trim();
+          const metadataParts = metadataStr.split(",").map((part: string) => part.trim());
+
+          const metadata: { [key: string]: string } = {};
+          metadataParts.forEach((part: string) => {
+            const [key, value] = part.split(":").map((s: string) => s.trim());
+            if (key && value) {
+              metadata[key] = value;
+            }
           });
-          return;
+
+          fileGrade = metadata["Grade"];
+          fileSubject = metadata["Subject"];
+          fileBook = metadata["Book"];
+        } else if (
+          rawData[0]?.[0]?.toString().toLowerCase().includes("grade") &&
+          rawData[1]?.[0]?.toString().toLowerCase().includes("subject") &&
+          rawData[2]?.[0]?.toString().toLowerCase().includes("book")
+        ) {
+          // new multi-row metadata layout: value is in second column
+          fileGrade = rawData[0][1]?.toString() || "";
+          fileSubject = rawData[1][1]?.toString() || "";
+          fileBook = rawData[2][1]?.toString() || "";
         }
-
-        const metadataStr = metadataRow.toString().replace("#", "").trim();
-        const metadataParts = metadataStr.split(",").map((part: string) => part.trim());
-
-        const metadata: { [key: string]: string } = {};
-        metadataParts.forEach((part: string) => {
-          const [key, value] = part.split(":").map((s: string) => s.trim());
-          if (key && value) {
-            metadata[key] = value;
-          }
-        });
-
-        const fileGrade = metadata["Grade"];
-        const fileSubject = metadata["Subject"];
-        const fileBook = metadata["Book"];
 
         if (!fileGrade || !fileSubject || !fileBook) {
           setToast({
@@ -146,21 +273,43 @@ export default function BulkUploadPage({
           return;
         }
 
+        if (!fileGrade || !fileSubject || !fileBook) {
+          setToast({
+            type: "error",
+            message: "Invalid template format. Metadata must contain Grade, Subject, and Book",
+          });
+          return;
+        }
+
+        // normalize grade strings for comparison
+        const normalizedFormGrade = formData.grade.replace(/^Grade\s*/i, "");
         if (
-          fileGrade !== formData.grade ||
+          fileGrade !== normalizedFormGrade ||
           fileSubject !== formData.subject ||
           fileBook !== formData.book
         ) {
           setToast({
             type: "error",
-            message: `Template mismatch! Expected: ${formData.grade}, ${formData.subject}, ${formData.book}. Found: ${fileGrade}, ${fileSubject}, ${fileBook}`,
+            message: `Template mismatch! Expected: Class ${formData.grade}, ${formData.subject}, ${formData.book}. Found: Class ${fileGrade}, ${fileSubject}, ${fileBook}`,
           });
           return;
         }
 
-        const headers = rawData[2] as any[];
+        // determine where header row and data start depending on metadata format
+        let headerRowIndex = 2;
+        let firstDataRowIndex = 3;
+        if (
+          rawData[0]?.[0]?.toString().toLowerCase().includes("grade") &&
+          rawData[1]?.[0]?.toString().toLowerCase().includes("subject") &&
+          rawData[2]?.[0]?.toString().toLowerCase().includes("book")
+        ) {
+          // new multi-row layout: metadata occupies rows 0-2, blank row at 3
+          headerRowIndex = 4;
+          firstDataRowIndex = 5;
+        }
+        const headers = rawData[headerRowIndex] as any[];
         const dataRows = rawData
-          .slice(3)
+          .slice(firstDataRowIndex)
           .filter(
             (row: any) =>
               row &&
@@ -181,14 +330,47 @@ export default function BulkUploadPage({
           return obj;
         });
 
+        const normalizeChapterName = (value: string) => {
+          if (!value) return "";
+          const punctuationRegex = /[!"#$%&'()*+,\-./:;<=>?@[\\\]^_`{|}~،؛؟]/g;
+          const zeroWidthRegex = /[\u200B-\u200D\uFEFF]/g;
+          return value
+            .toString()
+            .normalize("NFC")
+            .replace(zeroWidthRegex, "")
+            .trim()
+            .replace(/^["']|["']$/g, "")
+            .replace(punctuationRegex, " ")
+            .replace(/\s+/g, " ")
+            .toLowerCase();
+        };
+
+        const normalizedSystemChapters = systemChapters.map((chapter) => normalizeChapterName(chapter));
+
         const validatedData: CSVQuestion[] = jsonData.map((row: any, index: number) => {
           const errors: string[] = [];
 
-          if (!row.chapter) errors.push("Chapter required");
+          // additional required fields matching teacher template
+          // topic/chapterno/SLO are all optional now
+
+          if (!row.chapter) {
+            errors.push("Chapter required");
+          } else if (systemChapters.length > 0) {
+            // Validate chapter against system chapters
+            const chapterName = (row.chapter || "").toString().trim().replace(/^["']|["']$/g, "");
+            const normalizedRowChapter = normalizeChapterName(chapterName);
+            const match = normalizedSystemChapters.some((sc) => sc === normalizedRowChapter);
+            if (!match) {
+              errors.push(
+                `Chapter "${chapterName}" not found in system. Available chapters: ${systemChapters.join(", ")}`
+              );
+            }
+          }
           if (!row.question) errors.push("Question text required");
 
           const normalizedDifficulty = row.difficulty
             ?.toString()
+            .trim()
             .toUpperCase();
           if (!["EASY", "MEDIUM", "HARD"].includes(normalizedDifficulty)) {
             errors.push("Invalid difficulty (must be: EASY, MEDIUM, HARD)");
@@ -196,14 +378,15 @@ export default function BulkUploadPage({
 
           // Support both 'type' and 'questiontype' column names (case-insensitive)
           const questionTypeValue = row.type || row.questiontype || "";
-          const validTypes = ["MCQ", "mcq", "TRUE_FALSE", "FILL_IN_THE_BLANK", "SHORT_ANSWER", "LONG_ANSWER"];
-          if (!validTypes.includes(questionTypeValue)) {
+          const normalizedQuestionType = questionTypeValue?.toString().trim().toUpperCase();
+          const validTypes = ["MCQ", "TRUE_FALSE", "FILL_IN_THE_BLANK", "SHORT_ANSWER", "LONG_ANSWER"];
+          if (!validTypes.includes(normalizedQuestionType)) {
             errors.push(
               "Invalid question type (must be: MCQ, TRUE_FALSE, FILL_IN_THE_BLANK, SHORT_ANSWER, LONG_ANSWER)"
             );
           }
 
-          if (["MCQ", "mcq"].includes(questionTypeValue)) {
+          if (normalizedQuestionType === "MCQ") {
             const options = [row.optiona, row.optionb, row.optionc, row.optiond].filter(
               (val) => val !== "" && val !== null && val !== undefined
             );
@@ -214,7 +397,7 @@ export default function BulkUploadPage({
             }
           }
 
-          if (["TRUE_FALSE"].includes(questionTypeValue)) {
+          if (normalizedQuestionType === "TRUE_FALSE") {
             const normalizedAnswer = row.correctanswer?.toString().toUpperCase();
             if (!["TRUE", "FALSE"].includes(normalizedAnswer)) {
               errors.push("Correct answer must be TRUE or FALSE");
@@ -222,17 +405,29 @@ export default function BulkUploadPage({
           }
 
           if (
-            ["SHORT_ANSWER", "LONG_ANSWER"].includes(questionTypeValue) &&
+            normalizedQuestionType === "FILL_IN_THE_BLANK" &&
             !row.correctanswer
           ) {
             errors.push("Correct answer required");
           }
 
+          if (
+            ["SHORT_ANSWER", "LONG_ANSWER"].includes(normalizedQuestionType) &&
+            row.correctanswer &&
+            typeof row.correctanswer === "string" &&
+            row.correctanswer.trim() === ""
+          ) {
+            row.correctanswer = "";
+          }
+
           return { 
             row: {
-              chapter: (row.chapter || "").trim().replace(/^["']|["']$/g, ""),
+              chapterNo: row.chapterno,
+              chapter: (row.chapter || "").trim().replace(/^['"]|['"]$/g, ""),
+              topic: row.topic,
+              slo: row.slo || "",
               difficulty: row.difficulty || "",
-              questionType: questionTypeValue,
+              questionType: normalizedQuestionType,
               question: row.question || "",
               optionA: row.optiona,
               optionB: row.optionb,
@@ -240,7 +435,9 @@ export default function BulkUploadPage({
               optionD: row.optiond,
               correctAnswer: row.correctanswer,
               explanation: row.explanation,
-              slo: row.slo || "",
+              knowledge: row.knowledge,
+              understanding: row.understanding,
+              application: row.application,
             },
             errors, 
             index: index + 1 
@@ -254,8 +451,12 @@ export default function BulkUploadPage({
             validatedData.filter((d) => d.errors.length === 0).length
           } valid`,
         });
-      } catch (error) {
-        setToast({ type: "error", message: "Error reading file" });
+      } catch (error: any) {
+        console.error("BulkUploadPage file read error", error);
+        const msg =
+          error?.message ||
+          (typeof error === "string" ? error : "Error reading file");
+        setToast({ type: "error", message: msg });
       }
     };
 
@@ -268,12 +469,48 @@ export default function BulkUploadPage({
       return;
     }
 
+    const gradeVal = formData.grade.replace(/^Grade\s*/i, "");
     const data = [
-      [`# Grade: ${formData.grade}, Subject: ${formData.subject}, Book: ${formData.book}`, "", "", "", "", "", "", ""],
-      ["", "", "", "", "", "", "", ""],
-      ["chapter", "difficulty", "questionType", "question", "optionA", "optionB", "correctAnswer", "slo"],
-      ["Chapter 1", "MEDIUM", "MCQ", "What is 5 + 3?", "7", "8", "B", "SLO 1.1"],
-      ["Chapter 1", "EASY", "TRUE_FALSE", "10 - 4 = 6", "", "", "TRUE", "SLO 1.2"],
+      ["Grade", gradeVal],
+      ["Subject", formData.subject],
+      ["Book", formData.book],
+      ["", "", "", "", "", "", "", "", "", "", "", "", "", "", "", ""],
+      [
+        "ChapterNo",
+        "Chapter",
+        "Topic",
+        "SLO",
+        "QuestionType",
+        "Difficulty",
+        "Question",
+        "OptionA",
+        "OptionB",
+        "OptionC",
+        "OptionD",
+        "CorrectAnswer",
+        "Explanation",
+        "Knowledge",
+        "Understanding",
+        "Application",
+      ],
+      [
+        "1",
+        "Introduction",
+        "Basics",
+        "SLO 1",
+        "MCQ",
+        "Medium",
+        "What is 1+1?",
+        "1",
+        "2",
+        "",
+        "",
+        "B",
+        "",
+        "Y",
+        "N",
+        "N",
+      ],
     ];
 
     const worksheet = XLSX.utils.aoa_to_sheet(data);
@@ -281,12 +518,75 @@ export default function BulkUploadPage({
     XLSX.utils.book_append_sheet(workbook, worksheet, "Questions");
     XLSX.writeFile(
       workbook,
-      `OUP_Questions_Template_${formData.subject}_${formData.grade}.xlsx`
+      `OUP_Questions_Template_${formData.subject}_${gradeVal}.xlsx`
+    );
+  };
+
+  const downloadInvalidRows = () => {
+    const invalidRows = csvData.filter((d) => d.errors.length > 0);
+
+    if (invalidRows.length === 0) {
+      setToast({ type: "info", message: "No invalid rows to download" });
+      return;
+    }
+
+    const headers = [
+      "Row",
+      "ChapterNo",
+      "Chapter",
+      "Topic",
+      "SLO",
+      "QuestionType",
+      "Difficulty",
+      "Question",
+      "OptionA",
+      "OptionB",
+      "OptionC",
+      "OptionD",
+      "CorrectAnswer",
+      "Explanation",
+      "Knowledge",
+      "Understanding",
+      "Application",
+      "Errors",
+    ];
+
+    const rows = invalidRows.map(({ row, errors, index }) => [
+      index,
+      (row as any).chapterNo || (row as any).chapterno || "",
+      row.chapter,
+      row.topic || "",
+      row.slo || "",
+      row.questionType,
+      row.difficulty,
+      row.question,
+      row.optionA || "",
+      row.optionB || "",
+      row.optionC || "",
+      row.optionD || "",
+      row.correctAnswer || "",
+      row.explanation || "",
+      row.knowledge || "",
+      row.understanding || "",
+      row.application || "",
+      errors.join("; "),
+    ]);
+
+    const worksheet = XLSX.utils.aoa_to_sheet([headers, ...rows]);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Invalid Rows");
+
+    const safeSubject = (formData.subject || "Subject").replace(/[^a-z0-9]+/gi, "_");
+    const safeGrade = (formData.grade || "Grade").replace(/[^a-z0-9]+/gi, "_");
+    XLSX.writeFile(
+      workbook,
+      `Invalid_Rows_${safeSubject}_${safeGrade}_${invalidRows.length}.xlsx`
     );
   };
 
   const uploadBulk = async () => {
     const validQuestions = csvData.filter((d) => d.errors.length === 0);
+    const invalidQuestions = csvData.filter((d) => d.errors.length > 0);
 
     if (validQuestions.length === 0) {
       setToast({ type: "error", message: "No valid questions to upload" });
@@ -345,7 +645,8 @@ export default function BulkUploadPage({
           MEDIUM: "Medium",
           HARD: "Hard",
         };
-        const normalizedDifficulty = difficultyMap[row.difficulty?.toString().toUpperCase() || ""] || "Medium";
+        const normalizedDifficultyKey = row.difficulty?.toString().trim().toUpperCase() || "";
+        const normalizedDifficulty = difficultyMap[normalizedDifficultyKey] || "Medium";
 
         const requestBody = {
           type: questionType,
@@ -359,6 +660,11 @@ export default function BulkUploadPage({
           correctAnswer,
           explanation: row.explanation || "",
           slo: row.slo || "",
+          cognitiveLevel: {
+            knowledge: (row.knowledge || "").toString().toUpperCase() === "Y",
+            understanding: (row.understanding || "").toString().toUpperCase() === "Y",
+            application: (row.application || "").toString().toUpperCase() === "Y",
+          },
         };
 
         const response = await fetch(apiEndpoint, {
@@ -389,16 +695,22 @@ export default function BulkUploadPage({
     }
 
     setIsUploading(false);
+    const invalidCount = invalidQuestions.length;
     setSuccessMessage(
-      `Successfully uploaded ${inserted} question${inserted > 1 ? "s" : ""}!`
+      invalidCount > 0
+        ? `Uploaded ${inserted} question${inserted === 1 ? "" : "s"}. ${invalidCount} invalid row${invalidCount === 1 ? "" : "s"} still need attention.`
+        : `Successfully uploaded ${inserted} question${inserted > 1 ? "s" : ""}!`
     );
     setToast({
       type: "success",
-      message: `Upload complete: ${inserted} questions uploaded successfully! View them in your Question Bank.`,
+      message:
+        invalidCount > 0
+          ? `Upload complete: ${inserted} question${inserted === 1 ? "" : "s"} uploaded. ${invalidCount} invalid row${invalidCount === 1 ? " remains" : "s remain"} highlighted in the preview.`
+          : `Upload complete: ${inserted} questions uploaded successfully! View them in your Question Bank.`,
     });
 
-    // Clear form after success
-    setCsvData([]);
+    // Keep invalid rows in preview so users can fix them; clear everything if all rows were valid
+    setCsvData(invalidCount > 0 ? invalidQuestions : []);
     // Clear the file input
     const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
     if (fileInput) {
@@ -419,6 +731,32 @@ export default function BulkUploadPage({
         open={sidebarOpen}
         onClose={() => setSidebarOpen(false)}
       />
+
+      {/* Fixed floating toast popup */}
+      {toast && (
+        <div className="fixed top-5 left-1/2 -translate-x-1/2 z-[9999] w-full max-w-md px-4">
+          <div
+            className={`flex items-start gap-3 p-4 rounded-xl shadow-lg border ${
+              toast.type === "error"
+                ? "bg-red-50 border-red-200 text-red-800"
+                : toast.type === "success"
+                ? "bg-green-50 border-green-200 text-green-800"
+                : "bg-blue-50 border-blue-200 text-blue-800"
+            }`}
+          >
+            <span className="flex-shrink-0 mt-0.5 text-lg">
+              {toast.type === "error" ? "❌" : toast.type === "success" ? "✅" : "ℹ️"}
+            </span>
+            <p className="flex-1 text-sm font-medium">{toast.message}</p>
+            <button
+              onClick={() => setToast(null)}
+              className="flex-shrink-0 text-current opacity-50 hover:opacity-100 transition-opacity text-lg leading-none"
+            >
+              &times;
+            </button>
+          </div>
+        </div>
+      )}
 
       <div className="fixed top-0 right-0 bottom-0 left-0 lg:left-64 flex flex-col overflow-hidden">
         {/* Header */}
@@ -449,26 +787,12 @@ export default function BulkUploadPage({
 
         {/* Main Content */}
         <div className="flex-1 overflow-auto w-full">
-          <div className="w-full max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
+          <div className="w-full px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
             <div className="lg:col-span-2 space-y-4 sm:space-y-6">
               <div className="bg-white rounded-xl shadow-sm border p-4 sm:p-6">
                 <h3 className="text-base sm:text-lg font-semibold text-gray-900 mb-4">
                   Upload File
                 </h3>
-
-                {toast && (
-                  <div
-                    className={`p-4 mb-4 rounded-lg ${
-                      toast.type === "error"
-                        ? "bg-red-100 text-red-700"
-                        : toast.type === "success"
-                        ? "bg-green-100 text-green-700"
-                        : "bg-blue-100 text-blue-700"
-                    }`}
-                  >
-                    {toast.message}
-                  </div>
-                )}
 
                 <div className="border-t pt-4">
                   <h4 className="text-base font-semibold text-gray-900 mb-2">
@@ -521,25 +845,34 @@ export default function BulkUploadPage({
                       </div>
                     )}
 
-                    {formData.subject && (
+                    {formData.grade && formData.subject && (
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-2">
                           Book *
                         </label>
-                        <select
-                          value={formData.book}
-                          onChange={(e) =>
-                            setFormData({ ...formData, book: e.target.value })
-                          }
-                          className="w-full px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 min-h-[44px]"
-                        >
-                          <option value="">Select Book</option>
-                          {getAvailableBooks().map((book: any) => (
-                            <option key={book.id} value={book.title}>
-                              {book.title}
-                            </option>
-                          ))}
-                        </select>
+                        {getAvailableBooks().length === 0 ? (
+                          <div className="flex items-center gap-2 px-3 py-2 bg-amber-50 border border-amber-300 rounded-lg text-sm text-amber-800">
+                            <svg className="w-4 h-4 flex-shrink-0 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+                            </svg>
+                            No book assigned for this grade and subject.
+                          </div>
+                        ) : (
+                          <select
+                            value={formData.book}
+                            onChange={(e) =>
+                              setFormData({ ...formData, book: e.target.value })
+                            }
+                            className="w-full px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 min-h-[44px]"
+                          >
+                            <option value="">Select Book</option>
+                            {getAvailableBooks().map((book: any) => (
+                              <option key={book.id} value={book.title}>
+                                {book.title}
+                              </option>
+                            ))}
+                          </select>
+                        )}
                       </div>
                     )}
 
@@ -636,9 +969,10 @@ export default function BulkUploadPage({
                           <button
                             onClick={uploadBulk}
                             className={`min-h-[44px] px-4 py-2 rounded-lg text-sm font-medium ${
-                              isUploading ||
-                              csvData.length === 0 ||
-                              csvData.every((d) => d.errors.length > 0)
+                              isUploading
+                                ? "bg-indigo-500 text-white cursor-wait"
+                                : csvData.length === 0 ||
+                                  csvData.every((d) => d.errors.length > 0)
                                 ? "bg-gray-300 text-gray-500 cursor-not-allowed"
                                 : "bg-blue-600 text-white hover:bg-blue-700"
                             }`}
@@ -649,6 +983,17 @@ export default function BulkUploadPage({
                             }
                           >
                             {isUploading ? `Uploading... ${Math.round(uploadProgress)}%` : "Upload & Validate"}
+                          </button>
+                          <button
+                            onClick={downloadInvalidRows}
+                            className={`min-h-[44px] px-4 py-2 rounded-lg text-sm font-medium ${
+                              hasInvalidRows
+                                ? "bg-amber-500 text-white hover:bg-amber-600"
+                                : "bg-gray-300 text-gray-500 cursor-not-allowed"
+                            }`}
+                            disabled={!hasInvalidRows}
+                          >
+                            Download Invalid Rows
                           </button>
                           <button
                             onClick={() => {

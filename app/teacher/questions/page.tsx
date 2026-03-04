@@ -456,34 +456,47 @@ const QuestionCreator = () => {
         return;
       }
 
-      const metadataRow = rawData[0][0];
-      
-      if (!metadataRow || !metadataRow.toString().startsWith('#')) {
-        setToast({ type: 'error', message: 'Invalid template format. Row 1 must contain metadata starting with "#"' });
-        return;
-      }
+      let fileGrade = '';
+      let fileSubject = '';
+      let fileBook = '';
 
-      const metadataStr = metadataRow.toString().replace('#', '').trim();
-      const metadataParts = metadataStr.split(',').map(part => part.trim());
-      
-      const metadata = {};
-      metadataParts.forEach(part => {
-        const [key, value] = part.split(':').map(s => s.trim());
-        if (key && value) {
-          metadata[key] = value;
+      // new metadata layout: three separate rows with Grade/Subject/Book
+      if (
+        rawData[0]?.[0]?.toString().toLowerCase().includes('grade') &&
+        rawData[1]?.[0]?.toString().toLowerCase().includes('subject') &&
+        rawData[2]?.[0]?.toString().toLowerCase().includes('book')
+      ) {
+        fileGrade = rawData[0][1]?.toString() || '';
+        fileSubject = rawData[1][1]?.toString() || '';
+        fileBook = rawData[2][1]?.toString() || '';
+      } else {
+        // fallback to old single-row metadata (hash optional)
+        const metadataRow = rawData[0][0];
+        if (!metadataRow) {
+          setToast({ type: 'error', message: 'Invalid template format. Missing metadata row' });
+          return;
         }
-      });
-
-      const fileGrade = metadata['Grade'];
-      const fileSubject = metadata['Subject'];
-      const fileBook = metadata['Book'];
+        const metadataStr = metadataRow.toString().replace('#', '').trim();
+        const metadataParts = metadataStr.split(',').map(part => part.trim());
+        const metadata: any = {};
+        metadataParts.forEach(part => {
+          const [key, value] = part.split(':').map(s => s.trim());
+          if (key && value) {
+            metadata[key] = value;
+          }
+        });
+        fileGrade = metadata['Grade'];
+        fileSubject = metadata['Subject'];
+        fileBook = metadata['Book'];
+      }
 
       if (!fileGrade || !fileSubject || !fileBook) {
         setToast({ type: 'error', message: 'Invalid template format. Metadata must contain Grade, Subject, and Book' });
         return;
       }
 
-      if (fileGrade !== formData.grade || fileSubject !== formData.subject || fileBook !== formData.book) {
+      const normalizedFormGrade = formData.grade.replace(/^Grade\s*/i, "");
+      if (fileGrade !== normalizedFormGrade || fileSubject !== formData.subject || fileBook !== formData.book) {
         setToast({ 
           type: 'error', 
           message: `Template mismatch! Expected: Class ${formData.grade}, ${formData.subject}, ${formData.book}. Found: Class ${fileGrade}, ${fileSubject}, ${fileBook}` 
@@ -491,8 +504,22 @@ const QuestionCreator = () => {
         return;
       }
 
-      const headers = rawData[2];
-      const dataRows = rawData.slice(3).filter(row => row && row.some(cell => cell !== '' && cell !== null && cell !== undefined));
+      // determine where headers start depending on metadata format
+      let headers: any[] = [];
+      let dataRows: any[] = [];
+      if (
+        rawData[0]?.[0]?.toString().toLowerCase().includes('grade') &&
+        rawData[1]?.[0]?.toString().toLowerCase().includes('subject') &&
+        rawData[2]?.[0]?.toString().toLowerCase().includes('book')
+      ) {
+        // new layout: header at row index 4 (0-based), data starts at 5
+        headers = rawData[4] || [];
+        dataRows = rawData.slice(5).filter(row => row && row.some(cell => cell !== '' && cell !== null && cell !== undefined));
+      } else {
+        // old layout: header at row index 2
+        headers = rawData[2] || [];
+        dataRows = rawData.slice(3).filter(row => row && row.some(cell => cell !== '' && cell !== null && cell !== undefined));
+      }
       
       const jsonData = dataRows.map(row => {
         const obj = {};
