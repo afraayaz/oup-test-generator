@@ -454,26 +454,27 @@ async function upsertUserToPostgres(input: {
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   try {
-    let query: any = db.collection("users");
-    const schoolId = searchParams.get("schoolId");
-    const campusId = searchParams.get("campusId");
-    const role = searchParams.get("role");
-
-    if (schoolId) query = query.where("schoolId", "==", schoolId);
-    if (campusId) query = query.where("campusId", "==", campusId);
-    if (role) query = query.where("role", "==", role);
-    query = query.limit(500);
-
-    const snapshot = await query.get();
-    const users = snapshot.docs.map((doc: any) => ({ id: doc.id, ...doc.data() }));
-    return NextResponse.json({ users, source: "firebase" });
-  } catch (error: any) {
+    const users = await fetchUsersFromPostgres(searchParams);
+    return NextResponse.json({ users, source: "postgres" });
+  } catch (pgError: any) {
+    console.error("[admin/users][GET] PostgreSQL primary failed, falling back to Firebase:", pgError?.message || pgError);
     try {
-      const users = await fetchUsersFromPostgres(searchParams);
-      return NextResponse.json({ users, source: "postgres_fallback" });
-    } catch (pgError: any) {
+      let query: any = db.collection("users");
+      const schoolId = searchParams.get("schoolId");
+      const campusId = searchParams.get("campusId");
+      const role = searchParams.get("role");
+
+      if (schoolId) query = query.where("schoolId", "==", schoolId);
+      if (campusId) query = query.where("campusId", "==", campusId);
+      if (role) query = query.where("role", "==", role);
+      query = query.limit(500);
+
+      const snapshot = await query.get();
+      const users = snapshot.docs.map((doc: any) => ({ id: doc.id, ...doc.data() }));
+      return NextResponse.json({ users, source: "firebase_fallback" });
+    } catch (firebaseError: any) {
       return NextResponse.json(
-        { error: "Failed to fetch users", details: error?.message || pgError?.message },
+        { error: "Failed to fetch users", details: pgError?.message || firebaseError?.message },
         { status: 500 }
       );
     }
