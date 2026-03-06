@@ -9,7 +9,7 @@ declare global {
 
 // Load Supabase CA certificate
 const ca = readFileSync(
-  path.join(process.cwd(), "supabase-ca.crt") // or "certs/supabase-ca.crt" depending on your structure
+  path.join(process.cwd(), "prod-ca-2021") // or "certs/supabase-ca.crt" depending on your structure
 ).toString();
 
 function createPool(): Pool {
