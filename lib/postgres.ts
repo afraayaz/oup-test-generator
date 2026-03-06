@@ -1,3 +1,4 @@
+// lib/db.ts (or .js)
 import { Pool } from "pg";
 
 declare global {
@@ -7,7 +8,10 @@ declare global {
 
 function createPool(): Pool {
   if (process.env.DATABASE_URL) {
-    return new Pool({ connectionString: process.env.DATABASE_URL });
+    return new Pool({
+      connectionString: process.env.DATABASE_URL,
+      ssl: { rejectUnauthorized: false }, // Supabase requires SSL
+    });
   }
 
   return new Pool({
@@ -16,6 +20,7 @@ function createPool(): Pool {
     database: process.env.PGDATABASE,
     user: process.env.PGUSER,
     password: process.env.PGPASSWORD,
+    ssl: { rejectUnauthorized: false }, // ensure SSL even with discrete vars
   });
 }
 
