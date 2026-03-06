@@ -1,24 +1,21 @@
 import { Pool } from "pg";
-import { readFileSync } from "fs";
-import path from "path";
 
 declare global {
   // eslint-disable-next-line no-var
   var __pgPool: Pool | undefined;
 }
 
-// Load Supabase CA certificate
-const ca = readFileSync(
-  path.join(process.cwd(), "prod-ca-2021") // or "certs/supabase-ca.crt" depending on your structure
-).toString();
-
 function createPool(): Pool {
+  if (process.env.DATABASE_URL) {
+    return new Pool({ connectionString: process.env.DATABASE_URL });
+  }
+
   return new Pool({
-    connectionString: process.env.DATABASE_URL,
-    ssl: {
-      ca,                       // 🔐 trust the Supabase CA
-      rejectUnauthorized: true, // 🔐 verify-full behavior
-    },
+    host: process.env.PGHOST,
+    port: process.env.PGPORT ? Number(process.env.PGPORT) : 5432,
+    database: process.env.PGDATABASE,
+    user: process.env.PGUSER,
+    password: process.env.PGPASSWORD,
   });
 }
 
