@@ -46,32 +46,31 @@ async function fetchFromPostgres() {
     }
   };
 
-  const [usersRows, schoolsRows, quizzesRows] = await Promise.all([
-    safeRows("users", `
-      SELECT
-        id::text AS id,
-        email,
-        role,
-        school_id::text AS "schoolId",
-        created_at AS "createdAt",
-        TRIM(CONCAT(COALESCE(first_name,''), ' ', COALESCE(last_name,''))) AS name
-      FROM users
-      ORDER BY created_at DESC NULLS LAST
-      LIMIT 500
-    `),
-    safeRows("schools", `
-      SELECT id::text AS id, name, status, created_at AS "createdAt"
-      FROM schools
-      ORDER BY created_at DESC NULLS LAST
-      LIMIT 200
-    `),
-    safeRows("quizzes", `
-      SELECT id::text AS id, title, NULL::text AS grade, created_at AS "createdAt"
-      FROM quizzes
-      ORDER BY created_at DESC NULLS LAST
-      LIMIT 500
-    `),
-  ]);
+  // Run sequentially in serverless to avoid exhausting small session-mode pools.
+  const usersRows = await safeRows("users", `
+    SELECT
+      id::text AS id,
+      email,
+      role,
+      school_id::text AS "schoolId",
+      created_at AS "createdAt",
+      TRIM(CONCAT(COALESCE(first_name,''), ' ', COALESCE(last_name,''))) AS name
+    FROM users
+    ORDER BY created_at DESC NULLS LAST
+    LIMIT 500
+  `);
+  const schoolsRows = await safeRows("schools", `
+    SELECT id::text AS id, name, status, created_at AS "createdAt"
+    FROM schools
+    ORDER BY created_at DESC NULLS LAST
+    LIMIT 200
+  `);
+  const quizzesRows = await safeRows("quizzes", `
+    SELECT id::text AS id, title, NULL::text AS grade, created_at AS "createdAt"
+    FROM quizzes
+    ORDER BY created_at DESC NULLS LAST
+    LIMIT 500
+  `);
 
   const users = usersRows.map((u: any) => ({
     ...u,

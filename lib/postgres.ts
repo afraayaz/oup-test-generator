@@ -10,6 +10,12 @@ function createPool(): Pool {
     (process.env.PGHOST || "").toLowerCase() === "localhost" ||
     (process.env.PGHOST || "").toLowerCase() === "127.0.0.1";
 
+  const maxConnections = process.env.PGPOOL_MAX
+    ? Number(process.env.PGPOOL_MAX)
+    : process.env.NODE_ENV === "production"
+      ? 2
+      : 10;
+
   const ssl =
     process.env.NODE_ENV === "production" && !isLocalHost
       ? { rejectUnauthorized: false }
@@ -19,6 +25,10 @@ function createPool(): Pool {
     return new Pool({
       connectionString: process.env.DATABASE_URL,
       ssl,
+      max: maxConnections,
+      idleTimeoutMillis: 30_000,
+      connectionTimeoutMillis: 10_000,
+      allowExitOnIdle: true,
     });
   }
 
@@ -29,6 +39,10 @@ function createPool(): Pool {
     user: process.env.PGUSER,
     password: process.env.PGPASSWORD,
     ssl,
+    max: maxConnections,
+    idleTimeoutMillis: 30_000,
+    connectionTimeoutMillis: 10_000,
+    allowExitOnIdle: true,
   });
 }
 
