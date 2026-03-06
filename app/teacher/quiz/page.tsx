@@ -3,6 +3,8 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { db } from '@/firebase/firebase';
 import { collection, getDocs, query, where } from 'firebase/firestore';
 import Sidebar from '@/components/Sidebar';
+import OnboardingTour from '@/components/OnboardingTour';
+import { teacherQuizGenerationTourSteps } from '@/components/tours/teacherQuizGenerationTourSteps';
 import { useUserProfile } from '@/hooks/useUserProfile';
 import { v4 as uuidv4 } from 'uuid';
 import { MathJax, MathJaxContext } from 'better-react-mathjax';
@@ -3827,6 +3829,7 @@ const QuizGeneration = () => {
           {/* Replace Question Modal - REMOVED */}
         </div>
       </div>
+      <OnboardingTour steps={teacherQuizGenerationTourSteps} storageKey="teacher-quiz-generation-tour-completed" />
     </div>
     </MathJaxContext>
   );

@@ -8,6 +8,8 @@ import { useSearchParams } from "next/navigation";
 import QuestionCreationModePage from "@/components/QuestionCreationModePage";
 import QuestionBank from "@/components/QuestionBank";
 import BulkUploadPage from "@/components/BulkUploadPage";
+import OnboardingTour from "@/components/OnboardingTour";
+import { teacherCreateQuestionsTabTourSteps } from "@/components/tours/teacherCreateQuestionsTabTourSteps";
 import { FiMenu } from "react-icons/fi";
 
 type Mode = "create" | "bulk" | "bank";
@@ -15,8 +17,13 @@ type Mode = "create" | "bulk" | "bank";
 function TeacherCreateQuestionPageContent() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [mode, setMode] = useState<Mode>("create");
+  const [mounted, setMounted] = useState(false);
   const { user } = useUserProfile();
   const searchParams = useSearchParams();
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   useEffect(() => {
     const modeParam = searchParams.get("mode");
@@ -24,7 +31,8 @@ function TeacherCreateQuestionPageContent() {
     else if (modeParam === "bulk") setMode("bulk");
   }, [searchParams]);
 
-  if (!user) {
+  // Prevent hydration mismatch by only showing content after mount
+  if (!mounted || !user) {
     return <div className="flex items-center justify-center h-screen">Loading...</div>;
   }
 
@@ -53,7 +61,7 @@ function TeacherCreateQuestionPageContent() {
               </button>
 
               {/* Pill-tab group */}
-              <nav className="flex flex-wrap items-center rounded-lg border border-gray-200 overflow-hidden">
+              <nav className="flex flex-wrap items-center rounded-lg border border-gray-200 overflow-hidden tab-navigation">
                 {tabs.map((tab) => (
                   <button
                     key={tab.key}
@@ -108,6 +116,7 @@ function TeacherCreateQuestionPageContent() {
           </div>
         </div>
       </div>
+      <OnboardingTour steps={teacherCreateQuestionsTabTourSteps} storageKey="teacher-create-questions-tab-tour-completed" />
     </div>
   );
 }

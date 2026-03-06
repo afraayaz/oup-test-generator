@@ -3,6 +3,8 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Sidebar from '@/components/Sidebar';
+import OnboardingTour from '@/components/OnboardingTour';
+import { studentTourSteps } from '@/components/tours/studentTourSteps';
 
 interface QuizAttempt {
   id: string;
@@ -254,28 +256,32 @@ export default function DashboardClient({ initialQuizHistory, initialUpcomingQui
       value: stats.quizzesAttempted ?? 0,
       subtext: 'All-time practice sessions',
       icon: 'ri-file-list-3-line',
-      color: '#1f6fb2'
+      color: '#1f6fb2',
+      className: 'stat-card-attempted'
     },
     {
       label: 'Pending Quizzes',
       value: pendingCount,
       subtext: '',
       icon: 'ri-timer-line',
-      color: '#14b8a6'
+      color: '#14b8a6',
+      className: 'stat-card-pending'
     },
     {
       label: 'Latest Score',
       value: `${Math.round(stats.lastQuizScore || 0)}%`,
       subtext: 'Most recent attempt',
       icon: 'ri-line-chart-line',
-      color: '#f59e0b'
+      color: '#f59e0b',
+      className: 'stat-card-latest'
     },
     {
       label: 'Average Score',
       value: `${avgScore}%`,
       subtext: 'Overall performance',
       icon: 'ri-trophy-line',
-      color: '#8b5cf6'
+      color: '#8b5cf6',
+      className: 'stat-card-average'
     }
   ];
   const openHistoryModal = () => setShowHistoryModal(true);
@@ -366,7 +372,7 @@ export default function DashboardClient({ initialQuizHistory, initialUpcomingQui
             {statCards.map((item, index) => (
               <div
                 key={item.label}
-                className="rounded-2xl px-5 py-4 shadow-lg text-white relative overflow-hidden border border-white/25 min-h-[150px] transition-all duration-300 hover:shadow-xl hover:-translate-y-1 hover:scale-[1.02] cursor-pointer"
+                className={`rounded-2xl px-5 py-4 shadow-lg text-white relative overflow-hidden border border-white/25 min-h-[150px] transition-all duration-300 hover:shadow-xl hover:-translate-y-1 hover:scale-[1.02] cursor-pointer ${item.className || ''}`}
                 style={{ backgroundColor: item.color }}
               >
                 <div className="absolute inset-0 bg-gradient-to-br from-white/10 via-transparent to-black/10 pointer-events-none transition-opacity duration-300 hover:opacity-80" />
@@ -623,6 +629,7 @@ export default function DashboardClient({ initialQuizHistory, initialUpcomingQui
           </div>
         </div>
       )}
+      <OnboardingTour steps={studentTourSteps} storageKey="student-tour-completed" />
     </div>
   );
 }

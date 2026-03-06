@@ -3,6 +3,8 @@
 import { useState, useEffect } from 'react';
 import { useUserProfile } from '@/hooks/useUserProfile';
 import Sidebar from '@/components/Sidebar';
+import OnboardingTour from '@/components/OnboardingTour';
+import { teacherQuizzesLibraryTourSteps } from '@/components/tours/teacherQuizzesLibraryTourSteps';
 import Link from 'next/link';
 
 interface Quiz {
@@ -398,6 +400,7 @@ export default function TeacherQuizzesPage() {
           )}
         </div>
       </div>
+      <OnboardingTour steps={teacherQuizzesLibraryTourSteps} storageKey="teacher-quizzes-library-tour-completed" />
     </div>
   );
 }

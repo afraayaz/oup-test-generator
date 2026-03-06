@@ -22,20 +22,35 @@ export default function Home() {
   });
 
   useEffect(() => {
-    gsap.from(leftRef.current, {
-      x: -50,
-      opacity: 0,
-      duration: 1,
-      ease: 'power3.out',
-    });
+    // Ensure refs exist before animating
+    if (leftRef.current && rightRef.current) {
+      gsap.fromTo(leftRef.current, 
+        {
+          x: -50,
+          opacity: 0,
+        },
+        {
+          x: 0,
+          opacity: 1,
+          duration: 1,
+          ease: 'power3.out',
+        }
+      );
 
-    gsap.from(rightRef.current, {
-      x: 50,
-      opacity: 0,
-      duration: 1,
-      delay: 0.2,
-      ease: 'power3.out',
-    });
+      gsap.fromTo(rightRef.current,
+        {
+          x: 50,
+          opacity: 0,
+        },
+        {
+          x: 0,
+          opacity: 1,
+          duration: 1,
+          delay: 0.2,
+          ease: 'power3.out',
+        }
+      );
+    }
   }, []);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
@@ -100,7 +115,7 @@ export default function Home() {
           </div>
 
           {/* Navigation Links */}
-          <div className="space-x-6 text-sm font-medium hidden md:flex">
+          <div className="space-x-6 text-sm font-medium hidden md:flex font-open-sans">
             <Link href="/" className="hover:text-gray-300 transition">Home</Link>
             <Link href="#features" className="hover:text-gray-300 transition">Features</Link>
             <Link href="/login" className="hover:text-gray-300 transition">Login</Link>
@@ -112,6 +127,24 @@ export default function Home() {
       <div className="relative min-h-screen bg-white flex flex-col md:flex-row items-center justify-center p-6 pt-24 overflow-hidden">
         {/* Background Illustration */}
         <div className="absolute inset-0 -z-10 bg-gradient-to-br from-blue-50 to-slate-100 opacity-50 animate-fadeIn"></div>
+        
+        {/* Decorative Dots Pattern */}
+        <div className="absolute top-32 right-1/4 opacity-10">
+          <svg width="100" height="100" viewBox="0 0 100 100">
+            <circle cx="10" cy="10" r="2" fill="#002147" />
+            <circle cx="30" cy="10" r="2" fill="#002147" />
+            <circle cx="50" cy="10" r="2" fill="#002147" />
+            <circle cx="70" cy="10" r="2" fill="#002147" />
+            <circle cx="10" cy="30" r="2" fill="#002147" />
+            <circle cx="30" cy="30" r="2" fill="#002147" />
+            <circle cx="50" cy="30" r="2" fill="#002147" />
+            <circle cx="70" cy="30" r="2" fill="#002147" />
+            <circle cx="10" cy="50" r="2" fill="#002147" />
+            <circle cx="30" cy="50" r="2" fill="#002147" />
+            <circle cx="50" cy="50" r="2" fill="#002147" />
+            <circle cx="70" cy="50" r="2" fill="#002147" />
+          </svg>
+        </div>
 
         {/* Decorative Wave */}
         <div className="absolute bottom-0 left-0 w-full overflow-hidden -z-10">
@@ -127,27 +160,23 @@ export default function Home() {
         {/* Left Panel */}
         <div
           ref={leftRef}
-          className="md:w-1/2 w-full text-center md:text-left px-4 md:px-8 mb-10 md:mb-0"
+          className="md:w-1/2 w-full text-center md:text-left px-4 md:px-8 mb-10 md:mb-0 opacity-100"
         >
-          <div className="mb-6">
-  <img src="/icon.png" alt="Logo" className="w-10 h-15 object-contain" />
-</div>
-
-          <h1 className="text-4xl font-bold text-[#002147] mb-4">Welcome to Test Generator</h1>
-          <p className="text-lg text-[#4b5563] mb-6">
+          <h1 className="text-5xl font-extrabold text-[#002147] mb-4 font-gibson">Welcome to Test Generator</h1>
+          <p className="text-lg text-[#4b5563] mb-6 font-open-sans">
             A modern educational platform for creating, managing, and analyzing quizzes with role-based access for administrators, teachers, and students.
           </p>
           <div className="flex flex-col sm:flex-row gap-4">
             <Link
               href="/login"
-              className="inline-flex items-center justify-center bg-[#002147] hover:bg-[#1e3a8a] text-white font-medium py-3 px-6 rounded-lg transition-colors shadow-md"
+              className="inline-flex items-center justify-center bg-[#002147] hover:bg-[#1e3a8a] text-white font-medium py-3 px-6 rounded-lg transition-colors shadow-md font-open-sans"
             >
               <i className="ri-login-circle-line mr-2"></i>
               Sign In to Continue
             </Link>
             <button
               onClick={() => setShowRegisterModal(true)}
-              className="inline-flex items-center justify-center bg-white hover:bg-[#002147] text-[#002147] hover:text-white font-medium py-3 px-6 rounded-lg transition-all shadow-md border-2 border-[#002147]"
+              className="inline-flex items-center justify-center bg-white hover:bg-[#002147] text-[#002147] hover:text-white font-medium py-3 px-6 rounded-lg transition-all shadow-md border-2 border-[#002147] font-open-sans"
             >
               <i className="ri-user-add-line mr-2"></i>
               Register Interest
@@ -158,25 +187,35 @@ export default function Home() {
         {/* Right Panel */}
         <div
           ref={rightRef}
-          className="md:w-1/2 w-full grid grid-cols-1 sm:grid-cols-2 gap-6 px-4 md:px-8"
+          className="md:w-1/2 w-full px-4 md:px-8 opacity-100"
         >
+          {/* Cards Grid */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
           {[
             { icon: 'ri-admin-line', title: 'Admin Panel', desc: 'Manage users, organizations, content monitoring, and system oversight.' },
             { icon: 'ri-user-line', title: 'Teacher Panel', desc: 'Create questions, manage books, and generate customized quizzes.' },
             { icon: 'ri-user-voice-line', title: 'Student Portal', desc: 'Take quizzes, track performance, and review feedback from teachers.' },
-            { icon: 'ri-bar-chart-line', title: 'Analytics', desc: 'Visualize quiz performance, identify trends, and improve learning outcomes.' },
           ].map((item, idx) => (
             <div
               key={idx}
-              className="bg-white/90 backdrop-blur-md rounded-xl p-6 shadow-md border border-slate-200 hover:shadow-lg transition"
+              className={`relative bg-white/90 backdrop-blur-md rounded-xl p-4 shadow-md border border-slate-200 hover:border-2 hover:border-[#002147] hover:shadow-lg transition ${
+                idx === 2 ? 'sm:col-start-1 sm:col-end-2 sm:mx-auto sm:w-full' : ''
+              }`}
+              style={idx === 2 ? { gridColumn: '1 / 3', maxWidth: 'calc(50% - 0.75rem)', margin: '0 auto' } : {}}
             >
+              {/* Decorative Corner Accent */}
+              <div className="absolute top-0 right-0 w-16 h-16 overflow-hidden rounded-tr-xl">
+                <div className="absolute top-0 right-0 w-8 h-8 bg-gradient-to-br from-blue-100 to-transparent opacity-50"></div>
+              </div>
+              
               <div className="w-12 h-12 bg-[#e6ecf2] rounded-lg flex items-center justify-center mb-4 shadow-sm">
                 <i className={`${item.icon} text-xl text-[#002147]`}></i>
               </div>
-              <h3 className="font-semibold text-[#002147] mb-2">{item.title}</h3>
-              <p className="text-sm text-[#4b5563]">{item.desc}</p>
+              <h3 className="text-lg font-bold text-[#002147] mb-2 font-gibson">{item.title}</h3>
+              <p className="text-sm text-[#4b5563] font-open-sans">{item.desc}</p>
             </div>
           ))}
+          </div>
         </div>
       </div>
 
@@ -185,7 +224,7 @@ export default function Home() {
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl shadow-2xl max-w-md w-full max-h-[90vh] overflow-y-auto border border-gray-200">
             <div className="sticky top-0 bg-[#002147] text-white p-3 rounded-t-xl flex justify-between items-center">
-              <h2 className="text-lg font-bold flex items-center gap-2">
+              <h2 className="text-lg font-bold flex items-center gap-2 font-open-sans">
                 <i className="ri-user-add-line text-lg"></i>
                 Register Your Interest
               </h2>
@@ -197,7 +236,7 @@ export default function Home() {
               </button>
             </div>
 
-            <form onSubmit={handleSubmit} className="p-5 space-y-2">
+            <form onSubmit={handleSubmit} className="p-5 space-y-2 font-open-sans">
               {/* User Type Selection */}
               <div>
                 <label className="block text-xs font-semibold text-[#002147] mb-1">I am:</label>
@@ -342,13 +381,13 @@ export default function Home() {
 
               {/* Submit Status */}
               {submitStatus === 'success' && (
-                <div className="bg-green-50 border-2 border-green-500 text-green-700 px-3 py-2 rounded-lg flex items-center gap-2">
+                <div className="bg-green-50 border-2 border-green-500 text-green-700 px-3 py-2 rounded-lg flex items-center gap-2 font-open-sans">
                   <i className="ri-check-line text-lg"></i>
                   <span className="font-semibold text-xs">Submitted successfully! We'll contact you soon.</span>
                 </div>
               )}
               {submitStatus === 'error' && (
-                <div className="bg-red-50 border-2 border-red-500 text-red-700 px-3 py-2 rounded-lg flex items-center gap-2">
+                <div className="bg-red-50 border-2 border-red-500 text-red-700 px-3 py-2 rounded-lg flex items-center gap-2 font-open-sans">
                   <i className="ri-error-warning-line text-lg"></i>
                   <span className="font-semibold text-xs">Failed to submit. Please try again later.</span>
                 </div>

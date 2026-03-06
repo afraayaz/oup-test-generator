@@ -6,6 +6,8 @@ import { db } from '@/firebase/firebase';
 import { useUserProfile } from '@/hooks/useUserProfile';
 import * as XLSX from 'xlsx';
 import Sidebar from '@/components/Sidebar';
+import OnboardingTour from '@/components/OnboardingTour';
+import { teacherCreateQuestionTourSteps } from '@/components/tours/teacherCreateQuestionTourSteps';
 import 'katex/dist/katex.min.css';
 import katex from 'katex';
 import { MathJaxContext, MathJax } from 'better-react-mathjax';
@@ -900,7 +902,7 @@ const QuestionCreator = () => {
           <div className="lg:col-span-2 space-y-4 sm:space-y-6">
             <div className="bg-white rounded-xl shadow-sm border p-4 sm:p-6">
               <h3 className="text-base sm:text-lg font-semibold text-gray-900 mb-4">Question Creation</h3>
-              <div className="flex flex-wrap gap-2 sm:gap-4 mb-4 sm:mb-6">
+              <div className="flex flex-wrap gap-2 sm:gap-4 mb-4 sm:mb-6 mode-selector">
                 <button
                   className={`flex-1 sm:flex-none min-h-[44px] px-4 py-2 rounded-lg font-medium text-sm ${mode === 'individual' ? 'bg-blue-600 text-white hover:bg-blue-700' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}`}
                   onClick={() => setMode('individual')}
@@ -915,7 +917,7 @@ const QuestionCreator = () => {
                 </button>
                 <button
                   onClick={generateExcelTemplate}
-                  className={`w-full sm:w-auto min-h-[44px] px-4 py-2 rounded-lg font-medium text-sm ${formData.grade && formData.subject && formData.book ? 'bg-green-600 text-white hover:bg-green-700' : 'bg-gray-300 text-gray-500 cursor-not-allowed'}`}
+                  className={`w-full sm:w-auto min-h-[44px] px-4 py-2 rounded-lg font-medium text-sm template-download-btn ${formData.grade && formData.subject && formData.book ? 'bg-green-600 text-white hover:bg-green-700' : 'bg-gray-300 text-gray-500 cursor-not-allowed'}`}
                   disabled={!formData.grade || !formData.subject || !formData.book}
                 >
                   Download Template
@@ -930,7 +932,7 @@ const QuestionCreator = () => {
 
               {mode === 'individual' ? (
                 <div className="space-y-4">
-                  <div>
+                  <div className="grade-select">
                     <label className="block text-sm font-medium text-gray-700 mb-2">Class</label>
                     <select
                       name="grade"
@@ -947,7 +949,7 @@ const QuestionCreator = () => {
                   </div>
 
                   {formData.grade && (
-                    <div>
+                    <div className="subject-select">
                       <label className="block text-sm font-medium text-gray-700 mb-2">Subject</label>
                       <select
                         name="subject"
@@ -1036,7 +1038,7 @@ const QuestionCreator = () => {
                   )}
 
                   {formData.difficulty && (
-                    <div>
+                    <div className="question-type-select">
                       <label className="block text-sm font-medium text-gray-700 mb-2">Question Type</label>
                       <select
                         name="type"
@@ -1090,7 +1092,7 @@ const QuestionCreator = () => {
                               <button
                                 type="button"
                                 onClick={openFormulaBuilder}
-                                className="px-3 py-1 text-xs bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors flex items-center gap-1"
+                                className="px-3 py-1 text-xs bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors flex items-center gap-1 math-formula-btn"
                               >
                                 <span>➕</span> Insert Formula
                               </button>
@@ -1099,7 +1101,7 @@ const QuestionCreator = () => {
                               <button
                                 type="button"
                                 onClick={() => toggleUrduKeyboard('questionText')}
-                                className={`px-3 py-1 text-xs rounded-md ${showUrduKeyboard && urduKeyboardField === 'questionText' ? 'bg-blue-600 text-white' : 'bg-blue-100 text-blue-700'} hover:bg-blue-600 hover:text-white transition-colors`}
+                                className={`px-3 py-1 text-xs rounded-md urdu-keyboard-btn ${showUrduKeyboard && urduKeyboardField === 'questionText' ? 'bg-blue-600 text-white' : 'bg-blue-100 text-blue-700'} hover:bg-blue-600 hover:text-white transition-colors`}
                               >
                                 <i className="ri-keyboard-line mr-1"></i>
                                 {showUrduKeyboard && urduKeyboardField === 'questionText' ? 'Hide Keyboard' : 'Urdu Keyboard'}
@@ -1351,7 +1353,7 @@ const QuestionCreator = () => {
                       <div className="flex gap-4">
                         <button
                           onClick={handleSubmit}
-                          className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700"
+                          className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700 submit-question-btn"
                         >
                           Submit
                         </button>
@@ -1510,7 +1512,7 @@ const QuestionCreator = () => {
               )}
             </div>
           </div>
-          <div className="space-y-6">
+          <div className="space-y-6 preview-section">
             <div className="bg-white rounded-xl shadow-sm border p-6">
               <h3 className="text-lg font-semibold text-gray-900 mb-4">Question Summary</h3>
               <div className="space-y-3 text-sm">
@@ -1652,6 +1654,7 @@ const QuestionCreator = () => {
           </div>
         </div>
       )}
+      <OnboardingTour steps={teacherCreateQuestionTourSteps} storageKey="teacher-create-question-tour-completed" />
     </div>
     </MathJaxContext>
   );

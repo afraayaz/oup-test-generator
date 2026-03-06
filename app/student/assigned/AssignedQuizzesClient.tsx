@@ -3,6 +3,8 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Sidebar from '@/components/Sidebar';
+import OnboardingTour from '@/components/OnboardingTour';
+import { studentAssignedQuizzesTourSteps } from '@/components/tours/studentAssignedQuizzesTourSteps';
 
 interface Quiz {
   id: string;
@@ -131,7 +133,7 @@ export default function AssignedQuizzesClient({ initialQuizzes }: Props) {
         </header>
 
         <main className="p-4 sm:p-6">
-          <div className="mb-6 flex flex-wrap gap-2">
+          <div className="mb-6 flex flex-wrap gap-2 filter-tabs">
             {(['all', 'upcoming', 'completed'] as const).map((f) => (
               <button
                 key={f}
@@ -170,7 +172,7 @@ export default function AssignedQuizzesClient({ initialQuizzes }: Props) {
                 return (
                   <div
                     key={quiz.id}
-                    className="bg-white rounded-xl shadow-sm border border-gray-200 p-5 hover:shadow-md transition-shadow"
+                    className="bg-white rounded-xl shadow-sm border border-gray-200 p-5 hover:shadow-md transition-shadow quiz-card-assigned"
                   >
                     <div className="flex items-start justify-between mb-3">
                       <h3 className="font-semibold text-gray-900 line-clamp-2">{quiz.title}</h3>
@@ -209,7 +211,7 @@ export default function AssignedQuizzesClient({ initialQuizzes }: Props) {
                     <button
                       onClick={() => canAttempt && handleStartQuiz(quiz.id)}
                       disabled={!canAttempt && status !== 'completed'}
-                      className={`w-full py-2.5 rounded-lg font-medium transition-colors ${
+                      className={`w-full py-2.5 rounded-lg font-medium transition-colors start-quiz-btn ${
                         canAttempt
                           ? 'bg-purple-600 text-white hover:bg-purple-700'
                           : status === 'completed'
@@ -226,6 +228,7 @@ export default function AssignedQuizzesClient({ initialQuizzes }: Props) {
           )}
         </main>
       </div>
+      <OnboardingTour steps={studentAssignedQuizzesTourSteps} storageKey="student-assigned-quizzes-tour-completed" />
     </div>
   );
 }

@@ -9,6 +9,8 @@ import { arrayMove, SortableContext, useSortable, verticalListSortingStrategy } 
 import { CSS } from '@dnd-kit/utilities';
 import { useUserProfile } from '@/hooks/useUserProfile';
 import UrduKeyboard from '@/components/UrduKeyboard';
+import OnboardingTour from '@/components/OnboardingTour';
+import { studentQuizAttemptTourSteps } from '@/components/tours/studentQuizAttemptTourSteps';
 
 interface QuizItem {
   questionId: string;
@@ -1439,6 +1441,11 @@ function QuizAttemptPageContent() {
           )}
         </div>
       </main>
+      
+      <OnboardingTour 
+        steps={studentQuizAttemptTourSteps} 
+        storageKey="student-quiz-attempt-tour-completed" 
+      />
     </div>
   );
 }

@@ -15,6 +15,7 @@ const auth = getAuth(app);
 export default function LoginPage() {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
+    const [showPassword, setShowPassword] = useState(false);
     const [error, setError] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -171,7 +172,7 @@ export default function LoginPage() {
             {/* Navbar */}
             <nav className="w-full bg-[#002147] text-white shadow-md fixed top-0 left-0 z-50">
                 <div className="w-full px-4 sm:px-6 lg:px-8">
-                    <div className="flex items-center justify-between h-16">
+                    <div className="flex items-center justify-between h-12 sm:h-14">
                         {/* Logo only */}
                         <div className="flex items-center">
                             <Link href="/" className="flex-shrink-0">
@@ -181,7 +182,7 @@ export default function LoginPage() {
                                     width={200}
                                     height={48}
                                     priority={true}
-                                    className="h-12 object-contain cursor-pointer hover:opacity-80 transition"
+                                    className="h-8 sm:h-10 w-auto object-contain cursor-pointer hover:opacity-80 transition"
                                 />
                             </Link>
                         </div>
@@ -189,9 +190,9 @@ export default function LoginPage() {
                         {/* Desktop Navigation Links */}
                         <div className="hidden md:block">
                             <div className="ml-10 flex items-baseline space-x-4">
-                                <Link href="/" className="hover:text-gray-300 transition px-3 py-2 rounded-md text-sm font-medium">Home</Link>
-                                <Link href="#features" className="hover:text-gray-300 transition px-3 py-2 rounded-md text-sm font-medium">Features</Link>
-                                <Link href="/login" className="hover:text-gray-300 transition px-3 py-2 rounded-md text-sm font-medium">Login</Link>
+                                <Link href="/" className="hover:text-gray-300 transition px-3 py-2 rounded-md text-sm font-medium font-open-sans">Home</Link>
+                                <Link href="#features" className="hover:text-gray-300 transition px-3 py-2 rounded-md text-sm font-medium font-open-sans">Features</Link>
+                                <Link href="/login" className="hover:text-gray-300 transition px-3 py-2 rounded-md text-sm font-medium font-open-sans">Login</Link>
                             </div>
                         </div>
 
@@ -199,7 +200,7 @@ export default function LoginPage() {
                         <div className="-mr-2 flex md:hidden">
                             <button onClick={() => setIsMenuOpen(!isMenuOpen)} className="bg-[#002147] inline-flex items-center justify-center p-2 rounded-md text-white hover:bg-[#1e3a8a] focus:outline-none">
                                 <span className="sr-only">Open main menu</span>
-                                <i className={isMenuOpen ? "ri-close-line text-2xl" : "ri-menu-line text-2xl"}></i>
+                                <i className={isMenuOpen ? "ri-close-line text-lg sm:text-xl" : "ri-menu-line text-lg sm:text-xl"}></i>
                             </button>
                         </div>
                     </div>
@@ -208,43 +209,36 @@ export default function LoginPage() {
                 {/* Mobile Menu */}
                 <div className={`${isMenuOpen ? 'block' : 'hidden'} md:hidden`}>
                     <div className="px-2 pt-2 pb-3 space-y-1 sm:px-3">
-                        <Link href="/" className="block px-3 py-2 rounded-md text-base font-medium hover:bg-[#1e3a8a] transition">Home</Link>
-                        <Link href="#features" className="block px-3 py-2 rounded-md text-base font-medium hover:bg-[#1e3a8a] transition">Features</Link>
-                        <Link href="/login" className="block px-3 py-2 rounded-md text-base font-medium hover:bg-[#1e3a8a] transition">Login</Link>
+                        <Link href="/" className="block px-3 py-2 rounded-md text-sm sm:text-base font-medium hover:bg-[#1e3a8a] transition font-open-sans">Home</Link>
+                        <Link href="#features" className="block px-3 py-2 rounded-md text-sm sm:text-base font-medium hover:bg-[#1e3a8a] transition font-open-sans">Features</Link>
+                        <Link href="/login" className="block px-3 py-2 rounded-md text-sm sm:text-base font-medium hover:bg-[#1e3a8a] transition font-open-sans">Login</Link>
                     </div>
                 </div>
             </nav>
 
             {/* Main Content */}
-            <div className="relative min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50 flex items-center justify-center p-4 pt-24 overflow-x-hidden">
+            <div className="relative h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50 flex items-center justify-center px-4 pt-14 pb-4 overflow-hidden">
 
                 {/* Login Card */}
                 <div className="w-full max-w-sm" ref={cardRef}>
                     <div
-                        className="bg-white rounded-xl shadow-xl p-8 border border-slate-200"
+                        className="bg-white rounded-2xl shadow-2xl p-6 sm:p-8 border border-slate-100"
                         style={{ willChange: 'opacity, transform', transform: 'translateZ(0)' }}
                     >
-                        <div className="text-center mb-6">
-                            <div ref={iconRef} className="flex justify-center mb-4">
-                                <Image 
-                                    src="/icon.png" 
-                                    alt="Logo" 
-                                    width={40}
-                                    height={40}
-                                    priority={true}
-                                    className="w-10 h-10 object-contain"
-                                />
-                            </div>
-                            <h1 className="text-2xl font-semibold text-[#002147]">Welcome Back</h1>
-                            <p className="text-sm text-[#4b5563]">Log in to access your dashboard</p>
+                        {/* Top Accent Bar */}
+                        <div className="w-20 h-1 bg-gradient-to-r from-[#002147] to-[#1e3a8a] rounded-full mx-auto mb-6"></div>
+                        
+                        <div className="text-center mb-6 sm:mb-7">
+                            <h1 className="text-2xl sm:text-3xl font-bold text-[#002147] font-gibson mb-2">Welcome Back</h1>
+                            <p className="text-sm text-[#6b7280] font-open-sans">Log in to access your dashboard</p>
                         </div>
 
                         {error && (
-                            <div className="bg-red-50 border border-red-300 rounded-lg p-4 mb-4">
+                            <div className="bg-gradient-to-r from-red-50 to-red-100 border-l-4 border-red-500 rounded-r-lg p-3 mb-4 shadow-sm">
                                 <div className="flex items-start">
-                                    <i className="ri-error-warning-line text-red-600 mr-3 mt-0.5"></i>
+                                    <i className="ri-error-warning-fill text-red-600 mr-2 mt-0.5 text-base"></i>
                                     <div>
-                                        <p className="text-red-700 text-sm font-medium">{error}</p>
+                                        <p className="text-red-800 text-xs font-medium">{error}</p>
                                         {error.includes('too many requests') && (
                                             <p className="text-red-600 text-xs mt-1">Please wait a few minutes before trying again.</p>
                                         )}
@@ -256,37 +250,52 @@ export default function LoginPage() {
                             </div>
                         )}
 
-                        <form onSubmit={handleLogin} className="space-y-6">
+                        <form onSubmit={handleLogin} className="space-y-5 sm:space-y-6 pb-6">
                             <div>
-                                <label htmlFor="email" className="block text-sm text-[#002147] mb-2 font-medium">Email</label>
+                                <label htmlFor="email" className="flex items-center text-sm text-[#002147] mb-2 font-semibold font-open-sans">
+                                    <i className="ri-mail-line mr-2 text-[#002147]"></i>
+                                    Email Address
+                                </label>
                                 <input
                                     type="email"
                                     id="email"
                                     value={email}
                                     onChange={(e) => setEmail(e.target.value)}
-                                    className="w-full px-4 py-2 border border-slate-300 rounded-md focus:ring-2 focus:ring-[#002147] focus:outline-none transition text-sm"
+                                    className="w-full px-4 py-3 border-2 border-slate-200 rounded-lg focus:ring-2 focus:ring-[#002147] focus:border-[#002147] focus:outline-none transition-all text-sm bg-slate-50 hover:bg-white"
                                     placeholder="you@example.com"
                                     required
                                 />
                             </div>
 
                             <div>
-                                <label htmlFor="password" className="block text-sm text-[#002147] mb-2 font-medium">Password</label>
-                                <input
-                                    type="password"
-                                    id="password"
-                                    value={password}
-                                    onChange={(e) => setPassword(e.target.value)}
-                                    className="w-full px-4 py-2 border border-slate-300 rounded-md focus:ring-2 focus:ring-[#002147] focus:outline-none transition text-sm"
-                                    placeholder="••••••••"
-                                    required
-                                />
+                                <label htmlFor="password" className="flex items-center text-sm text-[#002147] mb-2 font-semibold font-open-sans">
+                                    <i className="ri-lock-line mr-2 text-[#002147]"></i>
+                                    Password
+                                </label>
+                                <div className="relative">
+                                    <input
+                                        type={showPassword ? "text" : "password"}
+                                        id="password"
+                                        value={password}
+                                        onChange={(e) => setPassword(e.target.value)}
+                                        className="w-full px-4 py-3 pr-12 border-2 border-slate-200 rounded-lg focus:ring-2 focus:ring-[#002147] focus:border-[#002147] focus:outline-none transition-all text-sm bg-slate-50 hover:bg-white"
+                                        placeholder="••••••••"
+                                        required
+                                    />
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowPassword(!showPassword)}
+                                        className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-[#002147] transition-colors focus:outline-none"
+                                    >
+                                        <i className={`${showPassword ? 'ri-eye-off-line' : 'ri-eye-line'} text-xl`}></i>
+                                    </button>
+                                </div>
                             </div>
 
                             <button
                                 type="submit"
                                 disabled={isLoading}
-                                className="w-full bg-[#002147] hover:bg-[#1e3a8a] text-white py-2.5 rounded-md transition flex items-center justify-center shadow-md font-semibold text-sm"
+                                className="w-full bg-[#002147] hover:bg-[#1e3a8a] text-white py-3 rounded-lg transition-colors flex items-center justify-center shadow-md font-medium font-open-sans"
                             >
                                 {isLoading ? (
                                     <>

@@ -4,6 +4,8 @@ import { useState, useEffect } from "react";
 import Sidebar from "@/components/Sidebar";
 import { useUserProfile } from "@/hooks/useUserProfile";
 import { useAuthGuard } from "@/hooks/useAuthGuard";
+import OnboardingTour from "@/components/OnboardingTour";
+import { teacherTourSteps } from "@/components/tours/teacherTourSteps";
 import {
   FiPlus,
   FiEdit,
@@ -652,28 +654,34 @@ export default function TeacherDashboard() {
         </section>
 
         <section className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3 sm:gap-4 lg:gap-6 mb-6 sm:mb-8">
-          <StatCard
-            title="Assigned Books"
-            value={user?.assignedBooks ? user.assignedBooks.length.toString() : "0"}
-            icon={<FiBookOpen />}
-            color="bg-[#9b1827]"
-          />
-          <StatCard
-            title="Total Questions"
-            value={loadingTeacherCreatedQuestions ? "..." : teacherCreatedQuestions.toString()}
-            icon={<FaPencilAlt />}
-            color="bg-[#9b1827]"
-          />
-          <StatCard
-            title="Quizzes Created"
-            value={loadingQuizzes ? "..." : quizzesCreated.toString()}
-            icon={<FiFileText />}
-            color="bg-[#9b1827]"
-          />
+          <div className="stat-card-books">
+            <StatCard
+              title="Assigned Books"
+              value={user?.assignedBooks ? user.assignedBooks.length.toString() : "0"}
+              icon={<FiBookOpen />}
+              color="bg-[#9b1827]"
+            />
+          </div>
+          <div className="stat-card-questions">
+            <StatCard
+              title="Total Questions"
+              value={loadingTeacherCreatedQuestions ? "..." : teacherCreatedQuestions.toString()}
+              icon={<FaPencilAlt />}
+              color="bg-[#9b1827]"
+            />
+          </div>
+          <div className="stat-card-quizzes">
+            <StatCard
+              title="Quizzes Created"
+              value={loadingQuizzes ? "..." : quizzesCreated.toString()}
+              icon={<FiFileText />}
+              color="bg-[#9b1827]"
+            />
+          </div>
         </section>
 
         <section className="grid grid-cols-1 xl:grid-cols-3 gap-6 lg:gap-8">
-          <div className="xl:col-span-2">
+          <div className="xl:col-span-2 assigned-books-section">
             <div className="space-y-3">
               {user?.assignedBooks && user.assignedBooks.length > 0 ? (
                 <BookGroupSection
@@ -767,6 +775,7 @@ export default function TeacherDashboard() {
           </div>
         </section>
       </main>
+      <OnboardingTour steps={teacherTourSteps} storageKey="teacher-tour-completed" />
     </div>
   );
 }
