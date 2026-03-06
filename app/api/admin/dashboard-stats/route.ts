@@ -117,9 +117,19 @@ async function fetchFromFirebase(currentDb: any) {
 export async function GET() {
   console.log("DB_URL set?:", !!process.env.DATABASE_URL);
   console.log("PGHOST:", process.env.PGHOST, "PGDATABASE:", process.env.PGDATABASE);
+  console.log("VERCEL_ENV:", process.env.VERCEL_ENV, "BRANCH:", process.env.VERCEL_GIT_COMMIT_REF);
 
   // 1) Primary: PostgreSQL
   try {
+    const probe = await pgPool.query(`
+      select
+        (select count(*) from subjects) as subjects,
+        (select count(*) from books) as books,
+        (select count(*) from questions) as questions,
+        (select count(*) from users) as users
+    `);
+    console.log("[PG PROBE]", probe.rows[0]);
+
     const pgPayload = await fetchFromPostgres();
 
     // Migration-phase behavior:
