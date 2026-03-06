@@ -6,8 +6,20 @@ declare global {
 }
 
 function createPool(): Pool {
+  const isLocalHost =
+    (process.env.PGHOST || "").toLowerCase() === "localhost" ||
+    (process.env.PGHOST || "").toLowerCase() === "127.0.0.1";
+
+  const ssl =
+    process.env.NODE_ENV === "production" && !isLocalHost
+      ? { rejectUnauthorized: false }
+      : undefined;
+
   if (process.env.DATABASE_URL) {
-    return new Pool({ connectionString: process.env.DATABASE_URL });
+    return new Pool({
+      connectionString: process.env.DATABASE_URL,
+      ssl,
+    });
   }
 
   return new Pool({
@@ -16,6 +28,7 @@ function createPool(): Pool {
     database: process.env.PGDATABASE,
     user: process.env.PGUSER,
     password: process.env.PGPASSWORD,
+    ssl,
   });
 }
 
