@@ -485,10 +485,17 @@ async function createTeacherQuizInPostgres(request: NextRequest, payload: any) {
     { column: 'updated_at', value: now },
   ];
 
+  // Debug: Log items being saved
+  console.log('[Quiz POST] Items count:', payload?.items?.length || 0);
+  console.log('[Quiz POST] Items sample:', JSON.stringify(payload?.items).substring(0, 500));
+
   const present = mapping.filter((item) => columns.has(item.column));
   if (!present.length) {
     throw new Error('No matching columns for quiz insert');
   }
+
+  console.log('[Quiz POST] Columns being inserted:', present.map(p => p.column).join(', '));
+  console.log('[Quiz POST] Items column present:', present.some(p => p.column === 'items'));
 
   const insertColumns = present.map((item) => item.column === 'class' ? '"class"' : item.column);
   const values = present.map((item) => item.json ? JSON.stringify(item.value) : item.value);
@@ -502,6 +509,11 @@ async function createTeacherQuizInPostgres(request: NextRequest, payload: any) {
 
   const result = await pgPool.query(sql, values);
   const quizId = result.rows[0]?.id;
+
+  console.log('\n[Quiz POST] ========== Quiz Created ==========');
+  console.log('[Quiz POST] Quiz ID:', quizId);
+  console.log('[Quiz POST] Quiz ID type:', typeof quizId);
+  console.log('[Quiz POST] Items in payload:', payload?.items?.length || 0);
 
   if (!quizId) {
     throw new Error('Quiz insert failed');
@@ -547,6 +559,9 @@ async function createTeacherQuizInPostgres(request: NextRequest, payload: any) {
   } catch (quizItemsError) {
     console.error('[teacher/quizzes][POST] quiz_items insert fallback failed:', quizItemsError);
   }
+
+  console.log('[Quiz POST] Returning success response with quiz ID:', quizId);
+  console.log('[Quiz POST] ==========================================\n');
 
   return NextResponse.json(
     {
@@ -615,6 +630,10 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const payload = await request.json();
+    console.log('\n[Quiz POST] ========== Creating Quiz ==========');
+    console.log('[Quiz POST] Title:', payload?.title);
+    console.log('[Quiz POST] Format:', payload?.quizFormat);
+    console.log('[Quiz POST] Items count:', payload?.items?.length || 0);
 
     try {
       return await createTeacherQuizInPostgres(request, payload);
@@ -623,6 +642,7 @@ export async function POST(request: NextRequest) {
       return await createTeacherQuizInFirebase(payload);
     }
   } catch (error) {
+    console.error('[Quiz POST] Fatal error creating quiz:', error);
     return NextResponse.json(
       { error: 'Failed to create quiz' },
       { status: 500 }

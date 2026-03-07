@@ -181,52 +181,130 @@ export async function GET(
 ) {
   try {
     const { quizId } = await params;
+    console.log('\n[Quiz GET] ========== Fetching Quiz ==========');
+    console.log('[Quiz GET] Quiz ID:', quizId);
+    console.log('[Quiz GET] Quiz ID type:', typeof quizId);
 
     try {
       const quizRes = await pgPool.query(
         `
           SELECT
             q.id::text AS id,
-            COALESCE(NULLIF(to_jsonb(q)->>'title', ''), 'Untitled') AS title,
-            COALESCE(NULLIF(to_jsonb(q)->>'quiz_format', ''), NULLIF(to_jsonb(q)->>'quizFormat', ''), 'Online') AS "quizFormat",
-            COALESCE(NULLIF(to_jsonb(q)->>'subject', ''), '') AS subject,
-            COALESCE(NULLIF(to_jsonb(q)->>'class', ''), NULLIF(to_jsonb(q)->>'grade', ''), '') AS class,
-            COALESCE(NULLIF(to_jsonb(q)->>'time_limit_minutes', ''), NULLIF(to_jsonb(q)->>'timeLimitMinutes', ''), '') AS "timeLimitMinutes",
-            COALESCE(
-              CASE WHEN COALESCE(to_jsonb(q)->>'total_questions', '') ~ '^\\d+$' THEN (to_jsonb(q)->>'total_questions')::int END,
-              CASE WHEN COALESCE(to_jsonb(q)->>'totalQuestions', '') ~ '^\\d+$' THEN (to_jsonb(q)->>'totalQuestions')::int END,
-              jsonb_array_length(COALESCE(q.items, '[]'::jsonb)),
-              qi_counts.question_count,
-              0
-            ) AS "totalQuestions",
-            COALESCE(
-              CASE WHEN COALESCE(to_jsonb(q)->>'total_marks', '') ~ '^\\d+$' THEN (to_jsonb(q)->>'total_marks')::int END,
-              CASE WHEN COALESCE(to_jsonb(q)->>'totalMarks', '') ~ '^\\d+$' THEN (to_jsonb(q)->>'totalMarks')::int END,
-              0
-            ) AS "totalMarks",
-            q.created_at AS "createdAt",
-            COALESCE(q.items, '[]'::jsonb) AS items
+            q.title AS title,
+            q.quiz_format AS "quizFormat",
+            q.subject AS subject,
+            COALESCE(q.grade, '') AS class,
+            q.time_limit_minutes AS "timeLimitMinutes",
+            (SELECT COUNT(*)::int FROM quiz_items qi WHERE qi.quiz_id = q.id) AS "totalQuestions",
+            COALESCE(q.total_marks, 0) AS "totalMarks",
+            q.created_at AS "createdAt"
           FROM quizzes q
-          LEFT JOIN LATERAL (
-            SELECT COUNT(*)::int AS question_count
-            FROM quiz_items qi
-            WHERE qi.quiz_id::text = q.id::text
-          ) qi_counts ON true
           WHERE q.id::text = $1
           LIMIT 1
         `,
         [quizId]
       );
 
+      console.log('[Quiz GET] PostgreSQL query executed');
+      console.log('[Quiz GET] Row count:', quizRes.rowCount);
+
       if (!quizRes.rowCount) {
+        console.log('[Quiz GET] Quiz not found in PostgreSQL, trying Firebase...');
         const fallbackPayload = await fetchQuizFromFirebase(quizId);
         if (!fallbackPayload) {
+          console.log('[Quiz GET] Quiz not found in Firebase either');
           return NextResponse.json({ error: 'Quiz not found' }, { status: 404 });
         }
+        console.log('[Quiz GET] Quiz found in Firebase');
         return NextResponse.json({ ...fallbackPayload, source: 'firebase_fallback' }, { status: 200 });
       }
 
       const quizRow = quizRes.rows[0];
+      console.log('[Quiz GET] Quiz found:', quizRow.id);
+      
+      // Fetch items from quiz_items table with question details
+      const itemsRes = await pgPool.query(
+        `
+          SELECT
+            qi.id::text AS id,
+            qi.question_id::text AS "questionId",
+            qi.position AS position,
+            qi.marks AS marks,
+            q.question_text AS question,
+            q.type AS "questionType",
+            q.interactive_data AS "interactiveData",
+            q.answer AS answer,
+            q.explanation AS explanation,
+            q.subject AS subject,
+            q.grade AS grade,
+            q.difficulty AS difficulty,
+            q.slo AS slo
+          FROM quiz_items qi
+          LEFT JOIN questions q ON q.id = qi.question_id
+          WHERE qi.quiz_id::text = $1
+          ORDER BY qi.position ASC
+        `,
+        [quizId]
+      );
+
+      console.log('[Quiz GET] Items found:', itemsRes.rowCount);
+      
+      let items: any[] = [];
+      if (itemsRes.rows.length > 0) {
+        items = itemsRes.rows.map((row: any) => {
+          // Parse interactive data for MCQ options
+          let options: any[] = [];
+          let parsedAnswer: any = { value: 0 };
+          
+          if (row.interactiveData) {
+            try {
+              const interactiveData = typeof row.interactiveData === 'string' 
+                ? JSON.parse(row.interactiveData) 
+                : row.interactiveData;
+              
+              if (interactiveData.options && Array.isArray(interactiveData.options)) {
+                options = interactiveData.options;
+              }
+              if (interactiveData.correctAnswer !== undefined) {
+                parsedAnswer = { value: interactiveData.correctAnswer };
+              }
+            } catch (e) {
+              console.error('[Quiz GET] Error parsing interactive data:', e);
+            }
+          }
+          
+          // If no options in interactive_data, try to parse from answer field
+          if (options.length === 0 && row.answer) {
+            try {
+              const answerData = typeof row.answer === 'string' ? JSON.parse(row.answer) : row.answer;
+              if (typeof answerData === 'object' && answerData.value !== undefined) {
+                parsedAnswer = answerData;
+              } else if (typeof answerData === 'number') {
+                parsedAnswer = { value: answerData };
+              }
+            } catch (e) {
+              // answer is plain text, keep as is
+              parsedAnswer = { value: row.answer };
+            }
+          }
+
+          return {
+            questionId: row.questionId,
+            questionType: row.questionType || 'multiple',
+            subject: row.subject || quizRow.subject,
+            difficulty: row.difficulty || 'Medium',
+            slo: row.slo || '',
+            question: row.question ? (typeof row.question === 'string' ? { text: row.question, format: 'text' } : row.question) : { text: '', format: 'text' },
+            options: options,
+            answer: parsedAnswer,
+            explanation: row.explanation || '',
+            marks: row.marks || 1,
+          };
+        });
+      }
+
+      console.log('[Quiz GET] Formatted items count:', items.length);
+      
       let attempts: any[] = [];
 
       if (await hasQuizAttemptsTable()) {
@@ -312,16 +390,16 @@ export async function GET(
         {
           quiz: {
             id: quizRow.id,
-            title: quizRow.title,
-            quizFormat: quizRow.quizFormat,
-            subject: quizRow.subject,
-            class: quizRow.class,
-            grade: quizRow.class,
+            title: quizRow.title || 'Untitled',
+            quizFormat: quizRow.quizFormat || 'Online',
+            subject: quizRow.subject || '',
+            class: quizRow.class || '',
+            grade: quizRow.class || '',
             totalQuestions: Number(quizRow.totalQuestions) || 0,
             totalMarks: Number(quizRow.totalMarks) || 0,
             timeLimitMinutes: quizRow.timeLimitMinutes || null,
             createdAt: quizRow.createdAt ? new Date(quizRow.createdAt).toISOString() : null,
-            items: Array.isArray(quizRow.items) ? quizRow.items : [],
+            items: items,
           },
           attempts,
           source: 'postgres',

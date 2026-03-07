@@ -78,8 +78,13 @@ export default function QuizDetailsPage() {
         const response = await fetch(`/api/teacher/quizzes/${quizId}`);
         if (response.ok) {
           const data = await response.json();
+          console.log('Quiz data received:', data);
+          console.log('Quiz items:', data.quiz?.items);
+          console.log('Items count:', data.quiz?.items?.length);
           setQuiz(data.quiz);
           setAttempts(data.attempts || []);
+        } else {
+          console.error('Failed to fetch quiz, status:', response.status);
         }
       } catch (error) {
         console.error('Error fetching quiz details:', error);
@@ -780,7 +785,16 @@ export default function QuizDetailsPage() {
                   </div>
                 </div>
                 <div className="space-y-6">
-                  {quiz.items?.map((item: any, index: number) => (
+                  {!quiz.items || quiz.items.length === 0 ? (
+                    <div className="text-center py-12">
+                      <svg className="w-16 h-16 text-gray-300 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                      </svg>
+                      <p className="text-gray-500 text-lg font-medium">No questions found in this quiz</p>
+                      <p className="text-gray-400 text-sm mt-2">The quiz was created but questions were not saved properly.</p>
+                    </div>
+                  ) : (
+                    quiz.items.map((item: any, index: number) => (
                     <div key={index} className="border border-gray-200 rounded-lg p-4 sm:p-6">
                       <div className="flex items-start justify-between mb-4">
                         <h3 className="font-semibold text-gray-900 flex-1">
@@ -844,7 +858,8 @@ export default function QuizDetailsPage() {
                         </div>
                       )}
                     </div>
-                  ))}
+                  ))
+                  )}
                 </div>
               </div>
             </div>
