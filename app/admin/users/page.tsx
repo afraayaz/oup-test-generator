@@ -1,4 +1,5 @@
 import UsersClient from './UsersClient';
+import { headers } from 'next/headers';
 
 const PROJECT_ID = 'quiz-app-ff0ab';
 const FIRESTORE_URL = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/(default)/documents`;
@@ -54,7 +55,10 @@ function parseDocument(doc: FirestoreDocument): { id: string; data: Record<strin
 
 async function fetchUsers() {
   try {
-    const response = await fetch('/api/admin/users', { cache: 'no-store' });
+    const h = await headers();
+    const host = h.get('x-forwarded-host') || h.get('host') || process.env.VERCEL_URL || 'localhost:5000';
+    const proto = h.get('x-forwarded-proto') || (host.includes('localhost') ? 'http' : 'https');
+    const response = await fetch(`${proto}://${host}/api/admin/users`, { cache: 'no-store' });
     if (!response.ok) {
       return [];
     }
@@ -69,7 +73,10 @@ async function fetchUsers() {
 
 async function fetchSchools() {
   try {
-    const response = await fetch('/api/admin/schools', { cache: 'no-store' });
+    const h = await headers();
+    const host = h.get('x-forwarded-host') || h.get('host') || process.env.VERCEL_URL || 'localhost:5000';
+    const proto = h.get('x-forwarded-proto') || (host.includes('localhost') ? 'http' : 'https');
+    const response = await fetch(`${proto}://${host}/api/admin/schools`, { cache: 'no-store' });
     if (!response.ok) {
       return [];
     }
@@ -84,7 +91,10 @@ async function fetchSchools() {
 
 async function fetchCampuses() {
   try {
-    const response = await fetch('/api/admin/campuses', { cache: 'no-store' });
+    const h = await headers();
+    const host = h.get('x-forwarded-host') || h.get('host') || process.env.VERCEL_URL || 'localhost:5000';
+    const proto = h.get('x-forwarded-proto') || (host.includes('localhost') ? 'http' : 'https');
+    const response = await fetch(`${proto}://${host}/api/admin/campuses`, { cache: 'no-store' });
     if (!response.ok) {
       return [];
     }
