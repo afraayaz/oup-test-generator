@@ -2,6 +2,9 @@ import OrganizationClient from "./OrganizationClient";
 import { pgPool } from "@/lib/postgres";
 import { getDb, switchToSecondaryFirebase, resetToPrimaryFirebase } from "@/lib/firebaseAdmin";
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 type School = {
   id: string;
   name: string;
