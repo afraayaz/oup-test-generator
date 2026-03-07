@@ -72,9 +72,6 @@ export const teacherTourSteps: Step[] = [
         <p className="text-gray-700 text-sm mb-2">
           You now know the basics! Use the sidebar to create questions and generate quizzes.
         </p>
-        <p className="text-xs text-gray-500">
-          Tip: Access this tour again from profile settings.
-        </p>
       </div>
     ),
   },
