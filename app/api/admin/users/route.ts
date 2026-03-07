@@ -105,21 +105,23 @@ async function resolvePgUserId(input: { id?: string; email?: string; uid?: strin
   return res.rowCount ? Number(res.rows[0].id) : null;
 }
 
-async function resolveSubjectIdByName(name: string): Promise<number | null> {
+async function resolveSubjectIdByName(name: string, client?: any): Promise<number | null> {
   const subject = String(name || "").trim();
   if (!subject) return null;
-  const res = await pgPool.query(
+  const dbClient = client || pgPool;
+  const res = await dbClient.query(
     `SELECT id::bigint AS id FROM subjects WHERE LOWER(name) = LOWER($1) LIMIT 1`,
     [subject]
   );
   return res.rowCount ? Number(res.rows[0].id) : null;
 }
 
-async function resolveGradeId(rawGrade: string): Promise<number | null> {
+async function resolveGradeId(rawGrade: string, client?: any): Promise<number | null> {
   const grade = normalizeGradeLabel(rawGrade);
   if (!grade) return null;
   const gradeDigits = grade.replace(/[^\d]/g, "");
-  const res = await pgPool.query(
+  const dbClient = client || pgPool;
+  const res = await dbClient.query(
     `
       SELECT id::bigint AS id
       FROM grades
@@ -135,11 +137,12 @@ async function resolveGradeId(rawGrade: string): Promise<number | null> {
   return res.rowCount ? Number(res.rows[0].id) : null;
 }
 
-async function resolveBookId(book: any): Promise<number | null> {
+async function resolveBookId(book: any, client?: any): Promise<number | null> {
   if (book?.id && /^\d+$/.test(String(book.id))) return Number(book.id);
   const title = String(book?.title || "").trim();
   if (!title) return null;
-  const subjectId = await resolveSubjectIdByName(String(book?.subject || ""));
+  const dbClient = client || pgPool;
+  const subjectId = await resolveSubjectIdByName(String(book?.subject || ""), dbClient);
   const gradeLabel = normalizeGradeLabel(String(book?.grade || ""));
   const gradeDigits = gradeLabel.replace(/[^\d]/g, "");
 
@@ -157,7 +160,7 @@ async function resolveBookId(book: any): Promise<number | null> {
     values.push(gradeDigits);
   }
 
-  const res = await pgPool.query(
+  const res = await dbClient.query(
     `SELECT id::bigint AS id FROM books WHERE ${where.join(" AND ")} ORDER BY id DESC LIMIT 1`,
     values
   );
@@ -229,7 +232,7 @@ async function syncUserAssignmentsToPostgres(input: {
 
     if (hasSubjectAssignments) {
       for (const subjectName of subjects) {
-        const subjectId = await resolveSubjectIdByName(subjectName);
+        const subjectId = await resolveSubjectIdByName(subjectName, client);
         if (!subjectId) continue;
         await insertRow(
           client,
@@ -259,8 +262,8 @@ async function syncUserAssignmentsToPostgres(input: {
         const subjectName = String(pair?.subject || "").trim();
         const gradeRaw = String(pair?.grade || "").trim();
         if (!subjectName || !gradeRaw) continue;
-        const subjectId = await resolveSubjectIdByName(subjectName);
-        const gradeId = await resolveGradeId(gradeRaw);
+        const subjectId = await resolveSubjectIdByName(subjectName, client);
+        const gradeId = await resolveGradeId(gradeRaw, client);
         if (!subjectId || !gradeId) continue;
         const key = `${subjectId}:${gradeId}`;
         if (seen.has(key)) continue;
@@ -285,7 +288,7 @@ async function syncUserAssignmentsToPostgres(input: {
     if (hasBookAssignments) {
       const inserted = new Set<number>();
       for (const book of allBooks) {
-        const bookId = await resolveBookId(book);
+        const bookId = await resolveBookId(book, client);
         if (!bookId || inserted.has(bookId)) continue;
         inserted.add(bookId);
         await insertRow(
