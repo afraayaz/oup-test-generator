@@ -77,6 +77,10 @@ export default function UsersClient({ initialUsers, schools, campuses }: Props) 
   const [showEditUser, setShowEditUser] = useState(false);
   const [editingUserId, setEditingUserId] = useState<string | null>(null);
   const [users, setUsers] = useState<User[]>(initialUsers);
+  const [schoolsFromApi, setSchoolsFromApi] = useState<School[]>([]);
+  const [campusesFromApi, setCampusesFromApi] = useState<Campus[]>([]);
+  const [schoolsLoaded, setSchoolsLoaded] = useState(false);
+  const [campusesLoaded, setCampusesLoaded] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [formStep, setFormStep] = useState(1);
   const [userType, setUserType] = useState<'school' | 'oup' | null>(null);
@@ -109,18 +113,21 @@ export default function UsersClient({ initialUsers, schools, campuses }: Props) 
   const availableGrades = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10'];
   const availableSections = ['A', 'B', 'C', 'D'];
 
+  const effectiveSchools = schoolsLoaded ? schoolsFromApi : schools;
+  const effectiveCampuses = campusesLoaded ? campusesFromApi : campuses;
+
   const getCampusesForSchool = (schoolId: string) => {
-    return campuses.filter(c => c.schoolId === schoolId);
+    return effectiveCampuses.filter(c => c.schoolId === schoolId);
   };
   
-  const activeSchools = schools;
+  const activeSchools = effectiveSchools;
 
   const getSchoolName = (schoolId: string) => {
-    return schools.find(s => s.id === schoolId)?.name || '';
+    return effectiveSchools.find(s => s.id === schoolId)?.name || '';
   };
 
   const getCampusName = (campusId: string) => {
-    return campuses.find(c => c.id === campusId)?.name || '';
+    return effectiveCampuses.find(c => c.id === campusId)?.name || '';
   };
 
   // Fetch subjects from database on component mount
@@ -141,6 +148,33 @@ export default function UsersClient({ initialUsers, schools, campuses }: Props) 
     };
     
     fetchSubjectsFromAPI();
+  }, []);
+
+  useEffect(() => {
+    const refreshSchoolCampusData = async () => {
+      try {
+        const [schoolsRes, campusesRes] = await Promise.all([
+          fetch('/api/admin/schools', { cache: 'no-store' }),
+          fetch('/api/admin/campuses', { cache: 'no-store' }),
+        ]);
+
+        if (schoolsRes.ok) {
+          const schoolsData = await schoolsRes.json();
+          setSchoolsFromApi(Array.isArray(schoolsData?.schools) ? schoolsData.schools : []);
+        }
+        if (campusesRes.ok) {
+          const campusesData = await campusesRes.json();
+          setCampusesFromApi(Array.isArray(campusesData?.campuses) ? campusesData.campuses : []);
+        }
+      } catch {
+        // Keep SSR-provided values if client refresh fails
+      } finally {
+        setSchoolsLoaded(true);
+        setCampusesLoaded(true);
+      }
+    };
+
+    refreshSchoolCampusData();
   }, []);
 
   // SSR can occasionally hydrate with empty initial data in preview.
@@ -1738,7 +1772,7 @@ export default function UsersClient({ initialUsers, schools, campuses }: Props) 
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
                 >
                   <option value="">All Schools</option>
-                  {schools.map(school => (
+                  {effectiveSchools.map(school => (
                     <option key={school.id} value={school.id}>{school.name}</option>
                   ))}
                 </select>
