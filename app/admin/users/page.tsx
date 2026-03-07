@@ -1,5 +1,4 @@
 import UsersClient from './UsersClient';
-import { headers } from 'next/headers';
 
 const PROJECT_ID = 'quiz-app-ff0ab';
 const FIRESTORE_URL = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/(default)/documents`;
@@ -55,10 +54,7 @@ function parseDocument(doc: FirestoreDocument): { id: string; data: Record<strin
 
 async function fetchUsers() {
   try {
-    const h = await headers();
-    const host = h.get('host') || 'localhost:5000';
-    const proto = h.get('x-forwarded-proto') || 'http';
-    const response = await fetch(`${proto}://${host}/api/admin/users`, { cache: 'no-store' });
+    const response = await fetch('/api/admin/users', { cache: 'no-store' });
     if (!response.ok) {
       return [];
     }
@@ -73,10 +69,7 @@ async function fetchUsers() {
 
 async function fetchSchools() {
   try {
-    const h = await headers();
-    const host = h.get('host') || 'localhost:5000';
-    const proto = h.get('x-forwarded-proto') || 'http';
-    const response = await fetch(`${proto}://${host}/api/admin/schools`, { cache: 'no-store' });
+    const response = await fetch('/api/admin/schools', { cache: 'no-store' });
     if (!response.ok) {
       return [];
     }
@@ -91,10 +84,7 @@ async function fetchSchools() {
 
 async function fetchCampuses() {
   try {
-    const h = await headers();
-    const host = h.get('host') || 'localhost:5000';
-    const proto = h.get('x-forwarded-proto') || 'http';
-    const response = await fetch(`${proto}://${host}/api/admin/campuses`, { cache: 'no-store' });
+    const response = await fetch('/api/admin/campuses', { cache: 'no-store' });
     if (!response.ok) {
       return [];
     }
