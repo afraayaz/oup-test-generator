@@ -191,10 +191,11 @@ export async function GET(
             COALESCE(NULLIF(to_jsonb(q)->>'quiz_format', ''), NULLIF(to_jsonb(q)->>'quizFormat', ''), 'Online') AS "quizFormat",
             COALESCE(NULLIF(to_jsonb(q)->>'subject', ''), '') AS subject,
             COALESCE(NULLIF(to_jsonb(q)->>'class', ''), NULLIF(to_jsonb(q)->>'grade', ''), '') AS class,
+            COALESCE(NULLIF(to_jsonb(q)->>'time_limit_minutes', ''), NULLIF(to_jsonb(q)->>'timeLimitMinutes', ''), '') AS "timeLimitMinutes",
             COALESCE(
               CASE WHEN COALESCE(to_jsonb(q)->>'total_questions', '') ~ '^\\d+$' THEN (to_jsonb(q)->>'total_questions')::int END,
               CASE WHEN COALESCE(to_jsonb(q)->>'totalQuestions', '') ~ '^\\d+$' THEN (to_jsonb(q)->>'totalQuestions')::int END,
-              jsonb_array_length(COALESCE(to_jsonb(q)->'items', to_jsonb(q)->'quizItems', to_jsonb(q)->'questions', '[]'::jsonb)),
+              jsonb_array_length(COALESCE(q.items, '[]'::jsonb)),
               qi_counts.question_count,
               0
             ) AS "totalQuestions",
@@ -204,7 +205,7 @@ export async function GET(
               0
             ) AS "totalMarks",
             q.created_at AS "createdAt",
-            COALESCE(to_jsonb(q)->'items', to_jsonb(q)->'quizItems', to_jsonb(q)->'questions', '[]'::jsonb) AS items
+            COALESCE(q.items, '[]'::jsonb) AS items
           FROM quizzes q
           LEFT JOIN LATERAL (
             SELECT COUNT(*)::int AS question_count
@@ -315,8 +316,10 @@ export async function GET(
             quizFormat: quizRow.quizFormat,
             subject: quizRow.subject,
             class: quizRow.class,
+            grade: quizRow.class,
             totalQuestions: Number(quizRow.totalQuestions) || 0,
             totalMarks: Number(quizRow.totalMarks) || 0,
+            timeLimitMinutes: quizRow.timeLimitMinutes || null,
             createdAt: quizRow.createdAt ? new Date(quizRow.createdAt).toISOString() : null,
             items: Array.isArray(quizRow.items) ? quizRow.items : [],
           },
