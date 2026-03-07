@@ -344,11 +344,8 @@ async function fetchUsersFromPostgres(params: URLSearchParams) {
       'Active'::text AS status,
       u.created_at AS "createdAt",
       ''::text AS "lastActive",
-      COALESCE(u.assigned_grade, '') AS grade,
-      CASE
-        WHEN COALESCE(u.assigned_subjects, '') = '' THEN ARRAY[]::text[]
-        ELSE string_to_array(u.assigned_subjects, ',')
-      END AS subjects
+      COALESCE(to_jsonb(u)->>'assigned_grade', '') AS grade,
+      COALESCE(to_jsonb(u)->>'assigned_subjects', '') AS subjects_raw
     FROM users u
     LEFT JOIN schools s ON s.id = u.school_id
     LEFT JOIN campuses c ON c.id = u.campus_id
@@ -366,7 +363,28 @@ async function fetchUsersFromPostgres(params: URLSearchParams) {
     schoolName: r.schoolName || "",
     campusId: r.campusId || "",
     campusName: r.campusName || "",
-    subjects: Array.isArray(r.subjects) ? r.subjects : [],
+    subjects: (() => {
+      if (Array.isArray(r.subjects_raw)) return r.subjects_raw;
+      const raw = String(r.subjects_raw || "").trim();
+      if (!raw) return [];
+      // Handles both comma-separated text and JSON array-ish strings.
+      if (raw.startsWith("{") && raw.endsWith("}")) {
+        return raw
+          .slice(1, -1)
+          .split(",")
+          .map((s: string) => s.replace(/^"+|"+$/g, "").trim())
+          .filter(Boolean);
+      }
+      if (raw.startsWith("[") && raw.endsWith("]")) {
+        try {
+          const arr = JSON.parse(raw);
+          return Array.isArray(arr) ? arr.map((x) => String(x).trim()).filter(Boolean) : [];
+        } catch {
+          return [];
+        }
+      }
+      return raw.split(",").map((s: string) => s.trim()).filter(Boolean);
+    })(),
   }));
   return users;
 }
