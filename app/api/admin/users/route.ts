@@ -348,7 +348,56 @@ async function fetchUsersFromPostgres(params: URLSearchParams) {
       u.created_at AS "createdAt",
       ''::text AS "lastActive",
       COALESCE(to_jsonb(u)->>'assigned_grade', '') AS grade,
-      COALESCE(to_jsonb(u)->>'assigned_subjects', '') AS subjects_raw
+      COALESCE(to_jsonb(u)->>'assigned_subjects', '') AS subjects_raw,
+      COALESCE((
+        SELECT json_agg(
+          json_build_object(
+            'subject', COALESCE(sg.name, ''),
+            'grade', COALESCE(g.label, g.code, ''),
+            'assignedBooks', (
+              SELECT COALESCE(json_agg(
+                json_build_object(
+                  'id', b2.id::text,
+                  'title', COALESCE(b2.title, ''),
+                  'subject', COALESCE(s2.name, ''),
+                  'grade', COALESCE(g2.label, g2.code, to_jsonb(b2)->>'grade', ''),
+                  'chapters', COALESCE(NULLIF(to_jsonb(b2)->>'chapters', '')::int, 0)
+                )
+              ), '[]'::json)
+              FROM user_book_assignments uba2
+              JOIN books b2 ON b2.id = uba2.book_id
+              LEFT JOIN subjects s2 ON s2.id = b2.subject_id
+              LEFT JOIN grades g2 ON g2.id::text = COALESCE(to_jsonb(b2)->>'grade_id', '')
+              WHERE uba2.user_id = u.id
+                AND LOWER(COALESCE(s2.name, '')) = LOWER(COALESCE(sg.name, ''))
+                AND (
+                  LOWER(COALESCE(g2.label, g2.code, b2.grade, '')) = LOWER(COALESCE(g.label, g.code, ''))
+                  OR COALESCE(g.label, g.code, '') = ''
+                )
+            )
+          )
+        )
+        FROM user_subject_grade_assignments usga
+        LEFT JOIN subjects sg ON sg.id = usga.subject_id
+        LEFT JOIN grades g ON g.id = usga.grade_id
+        WHERE usga.user_id = u.id
+      ), '[]'::json) AS "subjectGradePairs",
+      COALESCE((
+        SELECT json_agg(
+          json_build_object(
+            'id', b.id::text,
+            'title', COALESCE(b.title, ''),
+            'subject', COALESCE(s.name, ''),
+            'grade', COALESCE(g.label, g.code, to_jsonb(b)->>'grade', ''),
+            'chapters', COALESCE(NULLIF(to_jsonb(b)->>'chapters', '')::int, 0)
+          )
+        )
+        FROM user_book_assignments uba
+        JOIN books b ON b.id = uba.book_id
+        LEFT JOIN subjects s ON s.id = b.subject_id
+        LEFT JOIN grades g ON g.id::text = COALESCE(to_jsonb(b)->>'grade_id', '')
+        WHERE uba.user_id = u.id
+      ), '[]'::json) AS "assignedBooks"
     FROM users u
     LEFT JOIN schools s ON s.id = u.school_id
     LEFT JOIN campuses c ON c.id = u.campus_id
@@ -388,6 +437,31 @@ async function fetchUsersFromPostgres(params: URLSearchParams) {
       }
       return raw.split(",").map((s: string) => s.trim()).filter(Boolean);
     })(),
+    subjectGradePairs: Array.isArray(r.subjectGradePairs)
+      ? r.subjectGradePairs.map((p: any, idx: number) => ({
+          id: `${r.id}-${idx}-${String(p?.subject || "").trim()}-${String(p?.grade || "").trim()}`,
+          subject: String(p?.subject || "").trim(),
+          grade: String(p?.grade || "").trim(),
+          assignedBooks: Array.isArray(p?.assignedBooks)
+            ? p.assignedBooks.map((b: any) => ({
+                id: String(b?.id || ""),
+                title: String(b?.title || ""),
+                subject: String(b?.subject || ""),
+                grade: String(b?.grade || ""),
+                chapters: Number(b?.chapters || 0),
+              }))
+            : [],
+        }))
+      : [],
+    assignedBooks: Array.isArray(r.assignedBooks)
+      ? r.assignedBooks.map((b: any) => ({
+          id: String(b?.id || ""),
+          title: String(b?.title || ""),
+          subject: String(b?.subject || ""),
+          grade: String(b?.grade || ""),
+          chapters: Number(b?.chapters || 0),
+        }))
+      : [],
   }));
   return users;
 }
