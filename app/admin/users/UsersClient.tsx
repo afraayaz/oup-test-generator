@@ -143,6 +143,25 @@ export default function UsersClient({ initialUsers, schools, campuses }: Props) 
     fetchSubjectsFromAPI();
   }, []);
 
+  // SSR can occasionally hydrate with empty initial data in preview.
+  // Refresh users once on mount from the API as a safety net.
+  useEffect(() => {
+    const refreshUsers = async () => {
+      try {
+        const response = await fetch('/api/admin/users', { cache: 'no-store' });
+        if (!response.ok) return;
+        const data = await response.json();
+        if (Array.isArray(data?.users)) {
+          setUsers(data.users);
+        }
+      } catch {
+        // keep SSR-provided users if refresh fails
+      }
+    };
+
+    refreshUsers();
+  }, []);
+
   const filteredUsers = users.filter(user => {
     const matchesSearch = (user.name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
                          (user.email || '').toLowerCase().includes(searchTerm.toLowerCase());
