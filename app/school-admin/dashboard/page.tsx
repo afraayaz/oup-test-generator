@@ -4,8 +4,6 @@ import { useState, useEffect } from 'react';
 import Sidebar from '@/components/Sidebar';
 import { useUserProfile } from '@/hooks/useUserProfile';
 import { AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
-import { db } from '@/firebase/firebase';
-import { collection, getDocs, query, where } from 'firebase/firestore';
 
 export default function SchoolAdminDashboard() {
   const { user } = useUserProfile();
@@ -24,149 +22,44 @@ export default function SchoolAdminDashboard() {
 
   useEffect(() => {
     if (user?.schoolId) {
-      fetchSchoolStats();
-      fetchAllDashboardData();
+      fetchDashboardData();
     }
   }, [user?.schoolId]);
 
-  const fetchAllDashboardData = async () => {
-    try {
-      const schoolId = user?.schoolId;
-
-      // Fetch questions for subject distribution and performance data
-      const questionsRef = collection(db, `questions/schools/${schoolId}`);
-      const questionsSnapshot = await getDocs(questionsRef);
-      const questions = questionsSnapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      }));
-
-      // Calculate subject distribution
-      const subjectCounts: Record<string, number> = {};
-      const colors = ['#3B82F6', '#10B981', '#F59E0B', '#8B5CF6', '#EF4444'];
-      questions.forEach((q: any) => {
-        subjectCounts[q.subject] = (subjectCounts[q.subject] || 0) + 1;
-      });
-
-      const subjects = Object.entries(subjectCounts).slice(0, 5).map(([subject, count], idx) => ({
-        subject,
-        tests: count as number,
-        color: colors[idx] || colors[0]
-      }));
-      setSubjectDistribution(subjects.length > 0 ? subjects : [
-        { subject: 'No Data', tests: 0, color: '#D1D5DB' }
-      ]);
-
-      // Calculate grade-wise performance
-      const gradeCounts: Record<string, { count: number; avgScore: number }> = {};
-      questions.forEach((q: any) => {
-        const grade = q.grade || 'Grade 9';
-        if (!gradeCounts[grade]) {
-          gradeCounts[grade] = { count: 0, avgScore: 0 };
-        }
-        gradeCounts[grade].count += 1;
-        gradeCounts[grade].avgScore = Math.min(95, 65 + (gradeCounts[grade].count * 2));
-      });
-
-      const gradeData = Object.entries(gradeCounts).map(([grade, data]) => ({
-        grade,
-        avgScore: Math.round(data.avgScore),
-        students: Math.floor(Math.random() * 50 + 70)
-      }));
-      setGradePerformance(gradeData.length > 0 ? gradeData : [
-        { grade: 'Grade 9', avgScore: 75, students: 80 }
-      ]);
-
-      // Generate performance trend data (last 6 months)
-      const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'];
-      const performanceMonths = months.map((month, idx) => ({
-        month,
-        avgScore: Math.min(95, 65 + (idx * 3)),
-        tests: Math.floor(questions.length / 6 * (idx + 1))
-      }));
-      setPerformanceData(performanceMonths);
-
-      // Fetch teachers for top performers
-      const teachersRef = collection(db, 'users');
-      const teachersQuery = query(teachersRef, where('role', '==', 'teacher'), where('schoolId', '==', schoolId));
-      const teachersSnapshot = await getDocs(teachersQuery);
-      const topTeachersData = teachersSnapshot.docs
-        .map((doc, idx) => {
-          const data = doc.data();
-          return {
-            name: data.name || `Teacher ${idx + 1}`,
-            subject: data.subject || 'General',
-            quizzes: Math.floor(Math.random() * 20 + 5),
-            avgScore: Math.floor(Math.random() * 20 + 75)
-          };
-        })
-        .slice(0, 4)
-        .sort((a, b) => b.avgScore - a.avgScore);
-      setTopTeachers(topTeachersData.length > 0 ? topTeachersData : [
-        { name: 'No Teachers', subject: 'N/A', quizzes: 0, avgScore: 0 }
-      ]);
-
-      // Recent activity
-      const recentQuestions = questions.slice(-4).reverse().map((q: any, idx) => ({
-        id: idx + 1,
-        type: 'quiz',
-        title: 'Question added',
-        description: `${q?.subject || 'Subject'} - ${q?.chapter || 'Chapter'} question added`,
-        time: `${Math.floor(Math.random() * 24) + 1} hours ago`
-      }));
-      setRecentActivity(recentQuestions.length > 0 ? recentQuestions : [
-        { id: 1, type: 'quiz', title: 'No activity', description: 'Start creating questions', time: 'Just now' }
-      ]);
-    } catch (error) {
-    }
-  };
-
-  const fetchSchoolStats = async () => {
+  const fetchDashboardData = async () => {
     try {
       setLoading(true);
-      const schoolId = user?.schoolId;
-
-      // Fetch teachers
-      const teachersRef = collection(db, 'users');
-      const teachersQuery = query(teachersRef, where('role', '==', 'teacher'), where('schoolId', '==', schoolId));
-      const teachersSnapshot = await getDocs(teachersQuery);
-      const totalTeachers = teachersSnapshot.size;
-
-      // Fetch students
-      const studentsQuery = query(teachersRef, where('role', '==', 'student'), where('schoolId', '==', schoolId));
-      const studentsSnapshot = await getDocs(studentsQuery);
-      const totalStudents = studentsSnapshot.size;
-
-      // Fetch questions to get quiz/test count
-      const questionsRef = collection(db, `questions/schools/${schoolId}`);
-      const questionsSnapshot = await getDocs(questionsRef);
-      const totalQuestions = questionsSnapshot.size;
-
-      // Calculate active quizzes (questions created this month)
-      const now = new Date();
-      const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-      const activeQuizzes = questionsSnapshot.docs.filter(doc => {
-        const createdAt = doc.data().createdAt?.toDate?.();
-        return createdAt && createdAt >= startOfMonth;
-      }).length;
-
-      // Calculate average school score (mock calculation based on data)
-      const avgSchoolScore = totalQuestions > 0 ? Math.min(95, 65 + (totalQuestions * 2)) : 70;
-      const totalUsers = totalTeachers + totalStudents;
-
-      setStats({
-        totalTeachers,
-        totalStudents,
-        totalUsers,
-        activeQuizzes,
-        avgSchoolScore: Math.round(avgSchoolScore),
-        testsThisMonth: activeQuizzes,
-        teacherGrowth: totalTeachers > 0 ? Math.min(25, Math.floor((totalTeachers / 20) * 10)) : 0,
-        studentGrowth: totalStudents > 0 ? Math.min(30, Math.floor((totalStudents / 400) * 15)) : 0
+      const response = await fetch(`/api/school-admin/dashboard-stats?schoolId=${encodeURIComponent(user?.schoolId || '')}`, {
+        headers: {
+          'x-user-role': user?.role || 'school_admin',
+        },
+        cache: 'no-store',
       });
+      if (!response.ok) {
+        setLoading(false);
+        return;
+      }
+      const payload = await response.json();
+      setStats(payload?.stats || {
+        totalTeachers: 0,
+        totalStudents: 0,
+        totalUsers: 0,
+        activeQuizzes: 0,
+        avgSchoolScore: 0,
+        testsThisMonth: 0,
+        teacherGrowth: 0,
+        studentGrowth: 0,
+      });
+      setSubjectDistribution(Array.isArray(payload?.subjectDistribution) ? payload.subjectDistribution : []);
+      setGradePerformance(Array.isArray(payload?.gradePerformance) ? payload.gradePerformance : []);
+      setPerformanceData(Array.isArray(payload?.performanceData) ? payload.performanceData : []);
+      setTopTeachers(Array.isArray(payload?.topTeachers) ? payload.topTeachers : []);
+      setRecentActivity(Array.isArray(payload?.recentActivity) ? payload.recentActivity : []);
     } catch (error) {
+      // no-op
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   const [performanceData, setPerformanceData] = useState<any[]>([]);
@@ -274,7 +167,7 @@ export default function SchoolAdminDashboard() {
 
             {/* Subject Distribution */}
             <div className="bg-white rounded-xl p-4 sm:p-6 shadow-sm border border-gray-100">
-              <h3 className="text-base sm:text-lg font-bold text-gray-900 mb-4 sm:mb-6">Active Tests by Subject</h3>
+              <h3 className="text-base sm:text-lg font-bold text-gray-900 mb-4 sm:mb-6">Question Distribution by Subject</h3>
               <div className="w-full overflow-hidden min-h-[250px] flex items-center justify-center">
                 {loading || subjectDistribution.length === 0 ? (
                   <i className="ri-loader-4-line text-3xl text-gray-300 animate-spin"></i>
@@ -368,7 +261,18 @@ export default function SchoolAdminDashboard() {
                         </div>
                         <div className="text-right">
                           <p className="text-lg font-bold text-indigo-600">{teacher.avgScore}%</p>
-                          <p className="text-xs text-gray-500">{teacher.quizzes} quizzes</p>
+                          <p
+                            className="text-xs text-gray-500"
+                            title={
+                              Array.isArray(teacher.breakdown) && teacher.breakdown.length > 0
+                                ? teacher.breakdown
+                                    .map((b: any) => `${b.subject} • ${b.grade}: ${b.quizzes}`)
+                                    .join('\n')
+                                : 'No subject/grade breakdown available'
+                            }
+                          >
+                            {teacher.quizzes} quizzes
+                          </p>
                         </div>
                       </div>
                     </div>

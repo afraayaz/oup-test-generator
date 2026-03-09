@@ -139,6 +139,26 @@ async function getCreatorKeys(userId: string, userEmail?: string | null): Promis
   return Array.from(keys);
 }
 
+type PgErrorLike = {
+  code?: string;
+  constraint?: string;
+};
+
+function isQuestionsPrimaryKeyConflict(error: unknown): boolean {
+  const pgError = error as PgErrorLike | undefined;
+  return pgError?.code === "23505" && pgError?.constraint === "questions_pkey";
+}
+
+async function realignQuestionsIdSequence(): Promise<void> {
+  await pgPool.query(`
+    SELECT setval(
+      pg_get_serial_sequence('public.questions', 'id'),
+      COALESCE((SELECT MAX(id) FROM public.questions), 0) + 1,
+      false
+    )
+  `);
+}
+
 export async function GET(request: NextRequest) {
   try {
     const userId = request.headers.get("x-user-id");
@@ -363,27 +383,40 @@ export async function POST(request: NextRequest) {
       JSON.stringify(cognitiveLevel),
     ] as const;
 
-    const result = hasBookId
-      ? await pgPool.query(sqlWithBookId, [
-          baseValues[0],
-          baseValues[1],
-          baseValues[2],
-          baseValues[3],
-          baseValues[4],
-          resolvedBookId,
-          baseValues[5],
-          baseValues[6],
-          baseValues[7],
-          baseValues[8],
-          baseValues[9],
-          baseValues[10],
-          baseValues[11],
-          baseValues[12],
-          baseValues[13],
-          baseValues[14],
-          baseValues[15],
-        ])
-      : await pgPool.query(sqlWithoutBookId, baseValues);
+    const runInsert = () =>
+      hasBookId
+        ? pgPool.query(sqlWithBookId, [
+            baseValues[0],
+            baseValues[1],
+            baseValues[2],
+            baseValues[3],
+            baseValues[4],
+            resolvedBookId,
+            baseValues[5],
+            baseValues[6],
+            baseValues[7],
+            baseValues[8],
+            baseValues[9],
+            baseValues[10],
+            baseValues[11],
+            baseValues[12],
+            baseValues[13],
+            baseValues[14],
+            baseValues[15],
+          ])
+        : pgPool.query(sqlWithoutBookId, baseValues);
+
+    let result;
+    try {
+      result = await runInsert();
+    } catch (error) {
+      if (!isQuestionsPrimaryKeyConflict(error)) throw error;
+      console.warn(
+        "[POST /api/oup-creator/questions] questions_id_seq is out of sync. Realigning sequence and retrying once."
+      );
+      await realignQuestionsIdSequence();
+      result = await runInsert();
+    }
     await refreshContentCreatorStats(userId, userEmail);
 
     return NextResponse.json({

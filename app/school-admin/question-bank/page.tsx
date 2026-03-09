@@ -2,8 +2,6 @@
 import { useState, useEffect } from 'react';
 import Sidebar from '@/components/Sidebar';
 import { useUserProfile } from '@/hooks/useUserProfile';
-import { db } from '@/firebase/firebase';
-import { collection, getDocs, deleteDoc, doc } from 'firebase/firestore';
 
 export default function SchoolAdminQBPage() {
   const { user } = useUserProfile();
@@ -25,6 +23,20 @@ export default function SchoolAdminQBPage() {
     contributor: 'all'
   });
 
+  const normalizeGradeToken = (value: any): string => {
+    const raw = String(value || '').trim();
+    if (!raw) return '';
+    const match = raw.match(/(\d+)/);
+    if (match) return match[1];
+    return raw.toLowerCase();
+  };
+
+  const formatGradeLabel = (value: any): string => {
+    const token = normalizeGradeToken(value);
+    if (!token) return 'Unknown';
+    return /^\d+$/.test(token) ? `Grade ${token}` : token;
+  };
+
   useEffect(() => {
     if (user?.schoolId) {
       fetchSchoolQuestions();
@@ -34,15 +46,24 @@ export default function SchoolAdminQBPage() {
   const fetchSchoolQuestions = async () => {
     try {
       setLoading(true);
-      const schoolId = user?.schoolId;
-      const questionsRef = collection(db, `questions/schools/${schoolId}`);
-      const snapshot = await getDocs(questionsRef);
-      const allQuestions = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      }));
-      setQuestions(allQuestions);
+      const schoolId = user?.schoolId || '';
+      const response = await fetch('/api/teacher/questions?qb=school', {
+        headers: {
+          'x-user-id': user?.uid || '',
+          'x-user-email': user?.email || '',
+          'x-user-role': (user?.role || 'school_admin').toLowerCase().replace(/\s+/g, '_'),
+          'x-school-id': schoolId,
+        },
+        cache: 'no-store',
+      });
+      if (!response.ok) {
+        setQuestions([]);
+        return;
+      }
+      const data = await response.json();
+      setQuestions(Array.isArray(data?.questions) ? data.questions : []);
     } catch (error) {
+      setQuestions([]);
     }
     setLoading(false);
   };
@@ -50,9 +71,18 @@ export default function SchoolAdminQBPage() {
   const handleDeleteQuestion = async () => {
     if (!questionToDelete) return;
     try {
-      const schoolId = user?.schoolId;
-      const questionRef = doc(db, `questions/schools/${schoolId}`, questionToDelete);
-      await deleteDoc(questionRef);
+      const response = await fetch(`/api/teacher/questions/${questionToDelete}`, {
+        method: 'DELETE',
+        headers: {
+          'x-user-id': user?.uid || '',
+          'x-user-role': (user?.role || 'school_admin').toLowerCase().replace(/\s+/g, '_'),
+          'x-school-id': user?.schoolId || '',
+        },
+      });
+      if (!response.ok) {
+        alert('Error deleting question');
+        return;
+      }
       alert('Question deleted successfully!');
       setShowDeleteModal(false);
       setQuestionToDelete(null);
@@ -69,14 +99,24 @@ export default function SchoolAdminQBPage() {
       totalBooks: Array.from(new Set(questions.map((q: any) => q.book))).length,
       totalSubjects: Array.from(new Set(questions.map((q: any) => q.subject))).length,
       totalContributors: Array.from(new Set(questions.map((q: any) => q.createdByName))).length,
-      byDifficulty: { easy: 0, medium: 0, hard: 0 }
+      byDifficulty: { easy: 0, medium: 0, hard: 0 },
+      byDifficultyPercent: { easy: 0, medium: 0, hard: 0 }
     };
 
     questions.forEach((q: any) => {
-      if (q.difficulty && (q.difficulty === 'easy' || q.difficulty === 'medium' || q.difficulty === 'hard')) {
-        stats.byDifficulty[q.difficulty as keyof typeof stats.byDifficulty]++;
-      }
+      const d = String(q?.difficulty || '').trim().toLowerCase();
+      if (d === 'easy') stats.byDifficulty.easy++;
+      else if (d === 'medium' || d === 'moderate') stats.byDifficulty.medium++;
+      else if (d === 'hard') stats.byDifficulty.hard++;
     });
+
+    if (stats.totalQuestions > 0) {
+      stats.byDifficultyPercent.easy = Math.round((stats.byDifficulty.easy / stats.totalQuestions) * 100);
+      stats.byDifficultyPercent.medium = Math.round((stats.byDifficulty.medium / stats.totalQuestions) * 100);
+      stats.byDifficultyPercent.hard = Math.round((stats.byDifficulty.hard / stats.totalQuestions) * 100);
+    } else {
+      stats.byDifficultyPercent = { easy: 0, medium: 0, hard: 0 };
+    }
 
     return stats;
   };
@@ -84,9 +124,18 @@ export default function SchoolAdminQBPage() {
   const getFilteredQuestions = () => {
     return questions.filter((q: any) => {
       if (filters.subject !== 'all' && q.subject !== filters.subject) return false;
-      if (filters.grade !== 'all' && q.grade !== filters.grade) return false;
+      if (filters.grade !== 'all' && normalizeGradeToken(q.grade) !== filters.grade) return false;
       if (filters.book !== 'all' && q.book !== filters.book) return false;
-      if (filters.difficulty !== 'all' && q.difficulty.toLowerCase() !== filters.difficulty) return false;
+      const diff = String(q?.difficulty || '').trim().toLowerCase();
+      if (
+        filters.difficulty !== 'all' &&
+        !(
+          diff === filters.difficulty ||
+          (filters.difficulty === 'medium' && diff === 'moderate')
+        )
+      ) {
+        return false;
+      }
       if (filters.contributor !== 'all' && q.createdByName !== filters.contributor) return false;
       return true;
     });
@@ -105,7 +154,20 @@ export default function SchoolAdminQBPage() {
 
   const stats = getStatistics();
   const getAllBooks = () => Array.from(new Set(questions.map((q: any) => q.book)));
-  const getAllGrades = () => Array.from(new Set(questions.map((q: any) => q.grade)));
+  const getAllGrades = () => {
+    const map = new Map<string, string>();
+    questions.forEach((q: any) => {
+      const token = normalizeGradeToken(q.grade);
+      if (!token) return;
+      if (!map.has(token)) map.set(token, formatGradeLabel(q.grade));
+    });
+    return Array.from(map.entries()).sort((a, b) => {
+      const aNum = Number(a[0]);
+      const bNum = Number(b[0]);
+      if (Number.isFinite(aNum) && Number.isFinite(bNum)) return aNum - bNum;
+      return a[1].localeCompare(b[1]);
+    });
+  };
   const getAllSubjects = () => Array.from(new Set(questions.map((q: any) => q.subject)));
   const getAllContributors = () => Array.from(new Set(questions.map((q: any) => q.createdByName)));
 
@@ -170,15 +232,15 @@ export default function SchoolAdminQBPage() {
               <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide mb-2">By Difficulty</p>
               <div className="flex justify-around gap-2">
                 <div className="text-center">
-                  <div className="text-lg font-bold text-green-600">{stats.byDifficulty.easy}</div>
+                  <div className="text-lg font-bold text-green-600">{stats.byDifficultyPercent.easy}%</div>
                   <p className="text-xs text-gray-500">Easy</p>
                 </div>
                 <div className="text-center">
-                  <div className="text-lg font-bold text-yellow-600">{stats.byDifficulty.medium}</div>
+                  <div className="text-lg font-bold text-yellow-600">{stats.byDifficultyPercent.medium}%</div>
                   <p className="text-xs text-gray-500">Med</p>
                 </div>
                 <div className="text-center">
-                  <div className="text-lg font-bold text-red-600">{stats.byDifficulty.hard}</div>
+                  <div className="text-lg font-bold text-red-600">{stats.byDifficultyPercent.hard}%</div>
                   <p className="text-xs text-gray-500">Hard</p>
                 </div>
               </div>
@@ -202,7 +264,9 @@ export default function SchoolAdminQBPage() {
                 <label className="block text-sm font-semibold text-gray-700 mb-2">Grade</label>
                 <select value={filters.grade} onChange={(e) => setFilters({ ...filters, grade: e.target.value })} className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent transition">
                   <option value="all">All Grades</option>
-                  {getAllGrades().map(g => <option key={g} value={g}>{g}</option>)}
+                  {getAllGrades().map(([token, label]) => (
+                    <option key={token} value={token}>{label}</option>
+                  ))}
                 </select>
               </div>
               <div>

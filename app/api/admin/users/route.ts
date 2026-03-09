@@ -548,14 +548,23 @@ async function upsertUserToPostgres(input: {
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
+  const headerRole = String((request as any).headers?.get?.("x-user-role") || "").trim().toLowerCase().replace(/-/g, "_");
+  const headerSchoolId = String((request as any).headers?.get?.("x-school-id") || "").trim();
   try {
-    const users = await fetchUsersFromPostgres(searchParams);
+    const effectiveParams = new URLSearchParams(searchParams.toString());
+    if (headerRole === "school_admin") {
+      if (!headerSchoolId) {
+        return NextResponse.json({ error: "School admin requires school scope" }, { status: 400 });
+      }
+      effectiveParams.set("schoolId", headerSchoolId);
+    }
+    const users = await fetchUsersFromPostgres(effectiveParams);
     return NextResponse.json({ users, source: "postgres" });
   } catch (pgError: any) {
     console.error("[admin/users][GET] PostgreSQL primary failed, falling back to Firebase:", pgError?.message || pgError);
     try {
       let query: any = db.collection("users");
-      const schoolId = searchParams.get("schoolId");
+      const schoolId = headerRole === "school_admin" ? headerSchoolId : searchParams.get("schoolId");
       const campusId = searchParams.get("campusId");
       const role = searchParams.get("role");
 

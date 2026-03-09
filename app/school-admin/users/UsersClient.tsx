@@ -2,7 +2,28 @@
 
 import { useState } from 'react';
 import Sidebar from '@/components/Sidebar';
-import type { UserData } from './page';
+
+export interface UserData {
+  id: string;
+  name: string;
+  email: string;
+  role: 'student' | 'teacher' | 'content_manager';
+  schoolId?: string;
+  schoolName?: string;
+  campusId?: string;
+  campusName?: string;
+  grade?: string;
+  class?: string;
+  section?: string;
+  rollNumber?: string;
+  subjects?: string[];
+  assignedClasses?: string[];
+  assignedGrades?: string[];
+  phone?: string;
+  status?: string;
+  createdAt?: string;
+  createdBy?: string;
+}
 
 interface UsersClientProps {
   students: UserData[];

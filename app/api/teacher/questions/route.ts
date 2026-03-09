@@ -64,6 +64,26 @@ function safeJson(value: any): any {
   return value;
 }
 
+type PgErrorLike = {
+  code?: string;
+  constraint?: string;
+};
+
+function isQuestionsPrimaryKeyConflict(error: unknown): boolean {
+  const pgError = error as PgErrorLike | undefined;
+  return pgError?.code === "23505" && pgError?.constraint === "questions_pkey";
+}
+
+async function realignQuestionsIdSequence(): Promise<void> {
+  await pgPool.query(`
+    SELECT setval(
+      pg_get_serial_sequence('public.questions', 'id'),
+      COALESCE((SELECT MAX(id) FROM public.questions), 0) + 1,
+      false
+    )
+  `);
+}
+
 let hasQuestionsBookIdColumnCache: boolean | null = null;
 async function hasQuestionsBookIdColumn(): Promise<boolean> {
   if (hasQuestionsBookIdColumnCache !== null) return hasQuestionsBookIdColumnCache;
@@ -326,30 +346,40 @@ export async function GET(request: NextRequest) {
 
     const sql = `
       SELECT
-        id::text AS id,
-        question_text AS "questionText",
-        type,
-        subject,
-        grade,
-        book,
-        chapter,
-        slo,
-        difficulty,
-        answer AS "correctAnswer",
-        explanation,
-        marks,
-        qb_source AS source,
-        source_school_id AS "schoolId",
-        is_interactive AS "isInteractive",
-        interactive_data AS "interactiveData",
-        image_url AS "imageUrl",
-        created_by AS "createdBy",
-        created_at AS "createdAt",
-        updated_at AS "updatedAt",
-        cognitive_level AS "cognitiveLevel"
-      FROM questions
+        q.id::text AS id,
+        q.question_text AS "questionText",
+        q.type,
+        q.subject,
+        q.grade,
+        q.book,
+        q.chapter,
+        q.slo,
+        q.difficulty,
+        q.answer AS "correctAnswer",
+        q.explanation,
+        q.marks,
+        q.qb_source AS source,
+        q.source_school_id AS "schoolId",
+        q.is_interactive AS "isInteractive",
+        q.interactive_data AS "interactiveData",
+        q.image_url AS "imageUrl",
+        q.created_by AS "createdBy",
+        COALESCE(
+          NULLIF(TRIM(CONCAT(COALESCE(creator.first_name, ''), ' ', COALESCE(creator.last_name, ''))), ''),
+          creator.email,
+          q.created_by::text
+        ) AS "createdByName",
+        q.created_at AS "createdAt",
+        q.updated_at AS "updatedAt",
+        q.cognitive_level AS "cognitiveLevel"
+      FROM questions q
+      LEFT JOIN users creator
+        ON creator.id::text = q.created_by::text
+        OR COALESCE(to_jsonb(creator)->>'uid', '') = q.created_by::text
+        OR COALESCE(to_jsonb(creator)->>'firebase_uid', '') = q.created_by::text
+        OR LOWER(COALESCE(creator.email, '')) = LOWER(q.created_by::text)
       WHERE ${where.join(" AND ")}
-      ORDER BY created_at DESC
+      ORDER BY q.created_at DESC
       LIMIT 5000
     `;
 
@@ -510,7 +540,19 @@ export async function POST(request: NextRequest) {
       RETURNING id
     `;
 
-    const result = await pgPool.query(sql, insertValues);
+    const runInsert = () => pgPool.query(sql, insertValues);
+
+    let result;
+    try {
+      result = await runInsert();
+    } catch (error) {
+      if (!isQuestionsPrimaryKeyConflict(error)) throw error;
+      console.warn(
+        "[teacher/questions][POST] questions_id_seq is out of sync. Realigning sequence and retrying once."
+      );
+      await realignQuestionsIdSequence();
+      result = await runInsert();
+    }
 
     return NextResponse.json({
       success: true,
